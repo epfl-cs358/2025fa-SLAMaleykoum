@@ -1,7 +1,6 @@
 // Filename: esp1/mapping/occupancy/bayesian_grid.h
 // Description: Contract for the coarse Bayesian Occupancy Grid map.
 
-
 #pragma once
 
 #include "common/data_types.h"
@@ -13,7 +12,8 @@
 //      as we would only pay for the explored space.
 // However, for now, keep it as a fixed-size map.
 
-// TODO: For now we will use a 4bit value per cell, might change later ?
+// TODO: For now we could use a 4bit value per cell to keep it lightweitgt ?
+//      Could always change later ?
 
 /**
  * @brief Manages the coarse occupancy map using Bayesian filtering.
