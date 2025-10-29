@@ -41,8 +41,7 @@ struct Waypoint {
  * @brief Raw data from wheel encoders.
  */
 struct OdometryData {
-    float delta_distance_left;  // Change in distance for left wheel (m)
-    float delta_distance_right; // Change in distance for right wheel (m)
+    float delta_distance;  // Change in distance for rear wheels (m)
     uint32_t timestamp_ms;      // Timestamp of the measurement
 };
 
