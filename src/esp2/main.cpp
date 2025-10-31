@@ -14,8 +14,7 @@
 #include "ImuSensor.h"
 #include "I2C_mutex.h"
 #include "AS5600Encoder.h"
-#include "WiFi.h"
-#include <PubSubClient.h>
+#include "wifi_connection.h"
 
 // Pins used by the hardware components on the esp 2
 #define ESC_PIN 15          // pin used for the motor
@@ -25,19 +24,10 @@
 #define SDA_PIN 8           // pin used for SDA of IMU
 #define SCL_PIN 9           // pin used for SCL of IMU
 
-const char* ssid = "PCSlam"; // change it
-const char* pass = "SlamAleykoum"; // change it
-
-// HiveMQ public broker
-const char* mqtt_server = "broker.hivemq.com";
-const int mqtt_port = 1883;
-const char* mqtt_topic_data = "slamaleykoum77/TheSLAM";
-const char* mqtt_topic_commands = "slamaleykoum77/commands";
-
 WiFiClient espClient;
-PubSubClient client(espClient);
+Connection connection(espClient);
 
-// Harwdare objects
+// Harwdare objects 
 MotorManager motor(ESC_PIN); // motor
 DMS15 servo_dir(SERVO_DIR_PIN); // servo
 UltraSonicSensor ultrasonic(US_TRIG_PIN, US_ECHO_PIN); // ultra sonic sensor
@@ -51,68 +41,11 @@ const int stepDeg = 5;
 const int minAngle = 60;
 const int maxAngle = 120;
 
-// setup wifi function
-void setupWifi(){
-    delay(100);
-    Serial.print("\nConnecting to ");
-    Serial.println(ssid);
-
-    WiFi.begin(ssid, pass);
-
-    while(WiFi.status() != WL_CONNECTED) {
-        delay(100);
-        Serial.print("-");
-    }
-
-    Serial.print("\nConnected to ");
-    Serial.println(ssid);
-}
-
-// reconnect mqtt function
-void reconnect() {
-  while (!client.connected()) {
-    Serial.print("Attempting MQTT connection...");
-
-    if (client.connect("ESP32_Client")) {
-        Serial.println("connected!");
-        client.subscribe(mqtt_topic_commands);
-    } else {
-        Serial.print("failed, rc=");
-        Serial.print(client.state());
-        Serial.println(" - retrying in 2 seconds");
-        delay(2000);
-    }
-  }
-}
-
-// callback to receive messages from mqtt explorer
-void callback(char* topic, byte* payload, unsigned int length) {
-    Serial.print("Message arrived on topic: ");
-    Serial.println(topic);
-
-    String message;
-    for (unsigned int i = 0; i < length; i++) {
-        message += (char)payload[i];
-    }
-    Serial.print("Message: ");
-    Serial.println(message);
-
-    if (String(topic) == mqtt_topic_commands) {
-        if (message == "forward") {
-            motor.forward(drivePower / 100.0f);
-        } else if (message == "stop") {
-            motor.stop();
-        }
-    }
-}
-
 void setup() {
     
     Serial.begin(115200);
 
-    setupWifi();
-    client.setServer(mqtt_server, mqtt_port);
-    client.setCallback(callback);
+    connection.setupWifi();
 
     delay(2000);
 
@@ -153,8 +86,7 @@ void setup() {
 }
 
 void loop() {
-    if (!client.connected()) reconnect();
-    client.loop();
+    connection.check_connection();
 
     // Print the current state at the beginning of the loop
     Serial.println(imu.data());
@@ -168,14 +100,9 @@ void loop() {
     // ***** TEST FOR MQTT (SEND SENSOR DISTANCE)
     char msg[50];
     snprintf(msg, sizeof(msg), "Distance: %.2f cm", dist);
-
     // Publish data to MQTT
-    if (client.publish(mqtt_topic_data, msg)) {
-        Serial.print("Published: ");
-        Serial.println(msg);
-    } else {
-        Serial.println("Failed to publish message!");
-    }
+    connection.publish(msg);
+
     // ****** END TEST
 
     //read keyboard serial input

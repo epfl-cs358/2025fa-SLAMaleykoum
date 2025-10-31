@@ -9,7 +9,7 @@
 
 // Change the id depending on the test we want to run
 #ifndef TEST_ID
-#define TEST_ID 6
+#define TEST_ID 4
 #endif
 
 void setup() {
@@ -24,7 +24,9 @@ void setup() {
     #elif TEST_ID == 5
         setup_motor_runs();
     #elif TEST_ID == 6
-        setup_encoder();
+        setup_test_connection();
+    #elif TEST_ID == 7
+        setup_encoder();    
     #endif
 }
 
@@ -40,7 +42,9 @@ void loop() {
     #elif TEST_ID == 5
         loop_motor_runs();
     #elif TEST_ID == 6
+        loop_test_connection();
+    #elif TEST_ID == 7
         loop_encoder();
-            
+
     #endif
 }
