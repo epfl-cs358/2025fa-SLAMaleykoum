@@ -1,6 +1,21 @@
 /**
- * @file test_common.h 
- * @brief Regroups the common variables and the setup and loop functions
+ * @file test_common.h
+ * @brief Declares global hardware objects, pin mappings, and shared test function prototypes.
+ *
+ * This header centralizes all common definitions, hardware object declarations, 
+ * and test function prototypes used across the various test modules.
+ *
+ * @details
+ * - Defines all pin mappings for the ESP32-S3 board used in the project.  
+ * - Declares all global hardware interfaces (motor, servo, ultrasonic sensor, IMU, encoder).  
+ * - Declares the global `Connection` object for Wi-Fi and MQTT communication.  
+ * - Provides prototypes for each `setup_*()` and `loop_*()` function, 
+ *   allowing `test_main.cpp` to call the corresponding tests dynamically.
+ *
+ * @note
+ * The global objects are **defined** once in `test_globals.cpp`.  
+ * This file only provides `extern` declarations to make them accessible 
+ * across all test files.
  */
 #pragma once
 #include <Arduino.h>

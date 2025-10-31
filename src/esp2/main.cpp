@@ -1,12 +1,21 @@
 /**
  * @file main.cpp
- * @brief Main program, more complete test. In the end there will be the true programm
- * of the car in htis file.
- * 
+ * @brief Main control program for the SLAMaleykoum autonomous car.
+ *
+ * This file contains the primary firmware logic executed on the ESP32-S3 board.  
+ * It integrates all hardware modules — motor, servo, ultrasonic sensor, IMU, and encoder — 
+ * as well as the Wi-Fi and MQTT connection system.  
+ * The current implementation serves as a comprehensive integration test, 
+ * which will later evolve into the final autonomous driving program.
+ *
+ * @note
+ * This version is primarily designed for validation and debugging.  
+ * The final release will include autonomous navigation logic, data fusion, 
+ * and closed-loop control algorithms.
+ *
  * @author SLAMaleykoum
  * @date October 2025
  */
-
 #include <Arduino.h>
 #include "MotorManager.h"
 #include "DMS15.h"

@@ -1,6 +1,6 @@
 /**
  * @file servo_right_left.cpp
- * @brief Test to makes the servo of the wheels turns left and right
+ * @brief Test to makes the servo of the wheels turn left and right
  */
 #include "test_common.h"
 
