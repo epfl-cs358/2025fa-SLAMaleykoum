@@ -15,5 +15,5 @@ void loop_test_connection() {
     // Publish data to MQTT
     connection.publish(msg);
 
-    delay(100);
+    delay(1000);
 }
