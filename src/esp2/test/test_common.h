@@ -32,3 +32,4 @@ void setup_imu_stop_z();            void loop_imu_stop_z();
 void setup_motor_start_stop();      void loop_motor_start_stop();
 void setup_servo_right_left();      void loop_servo_right_left();
 void setup_motor_runs();            void loop_motor_runs();
+void setup_encoder();               void loop_encoder();
