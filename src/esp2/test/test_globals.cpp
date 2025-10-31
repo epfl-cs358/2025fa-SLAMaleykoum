@@ -9,3 +9,6 @@ DMS15 servo_dir(SERVO_DIR_PIN);
 UltraSonicSensor ultrasonic(US_TRIG_PIN, US_ECHO_PIN);
 ImuSensor imu(SDA_PIN, SCL_PIN);
 AS5600Encoder encoder(SDA_PIN, SCL_PIN);
+
+WiFiClient espClient;
+Connection connection(espClient);

@@ -10,6 +10,9 @@
 #include "ImuSensor.h"
 #include "I2C_mutex.h"
 #include "AS5600Encoder.h"
+#include <WiFi.h>
+#include <PubSubClient.h>
+#include "wifi_connection.h"
 
 // Pins used by the hardware components on the esp 2
 #define ESC_PIN 15          // pin used for the motor
@@ -26,9 +29,12 @@ extern UltraSonicSensor ultrasonic;
 extern ImuSensor imu; 
 extern AS5600Encoder encoder;
 
+extern Connection connection;
+
 // Prototypes of the functions
 void setup_all_together();          void loop_all_together();
 void setup_imu_stop_z();            void loop_imu_stop_z();
 void setup_motor_start_stop();      void loop_motor_start_stop();
 void setup_servo_right_left();      void loop_servo_right_left();
 void setup_motor_runs();            void loop_motor_runs();
+void setup_test_connection();       void loop_test_connection();
