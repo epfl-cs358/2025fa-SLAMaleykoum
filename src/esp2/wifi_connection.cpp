@@ -8,7 +8,7 @@ const int mqtt_port = 1883;
 const char* mqtt_topic_data = "slamaleykoum77/TheSLAM";
 const char* mqtt_topic_commands = "slamaleykoum77/commands";
 
-Connection::Connection(WiFiClient espClient) : 
+Connection::Connection(WiFiClient& espClient) : 
     client(espClient), _espClient(espClient) {}
 
 void Connection::setupWifi(){

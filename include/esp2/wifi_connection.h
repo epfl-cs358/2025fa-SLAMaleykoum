@@ -11,14 +11,14 @@ extern const char* mqtt_topic_commands;
 
 class Connection {
     private:
-    const char* ssid = "PCSlam";
-    const char* pass = "SlamAleykoum"; 
+    const char* ssid = "PC-Alex";
+    const char* pass = "rienattergrabandedehaineux"; 
 
     WiFiClient _espClient;
     PubSubClient client;
 
     public:
-    Connection(WiFiClient espClient);
+    Connection(WiFiClient& espClient);
 
     // setup wifi function
     void setupWifi();
