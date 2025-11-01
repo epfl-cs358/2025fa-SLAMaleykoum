@@ -2,7 +2,7 @@
  * @file motor_runs
  * @brief Test to make the motor run simply
  */
-#include "test_common.h"
+#include "test_common_esp2.h"
 
 static int drivePower = 20;
 

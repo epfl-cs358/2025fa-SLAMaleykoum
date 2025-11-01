@@ -21,7 +21,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <PubSubClient.h>
-#include "wifi_connection.h"
+#include "common/wifi_connection.h"
 
 // Pins used by the hardware components on the esp 2
 #define LIDAR_PIN 4 // TO CHANGE!!!

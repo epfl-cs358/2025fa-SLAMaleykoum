@@ -121,5 +121,5 @@ class Connection {
      * @note The function does not buffer messages if disconnected.  
      *       Ensure `check_connection()` is called regularly.
      */
-    void publish(const char* msg);
+    void publish(const char* mqtt_topic, const char* msg);
 };

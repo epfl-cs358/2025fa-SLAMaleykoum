@@ -5,6 +5,8 @@
  */
 #include "test_common_esp1.h"
 
+const char* mqtt_topic_lidar_basic = "slamaleykoum77/lidar";
+
 void setup_test_lidar_basic() {
     
     Serial.begin(115200);
@@ -17,17 +19,17 @@ void setup_test_lidar_basic() {
 void loop_test_lidar_basic() {
     connection.check_connection();
 
-    int num_points = 100;
+    int num_points = 10;
     float distances[5] = {2.0, 2.5, 3.0, 5.0, 4.0};
     int quality[5] = {1, 4, 6, 3, 8};
 
-    char msg[500];
-    strcpy(msg, "[");  // start JSON array
+    char msg[6000];
+    strcpy(msg, "{\"type\": \"lidar\", \"points\": [");  // start JSON array
 
     for (int i = 0; i < num_points; i++) {
         float angle_deg = i * 3.6;
         char point[50];
-        snprintf(point, sizeof(point), "{\"angle\": %d, \"distance\": %.2f, \"quality\": %u}", angle_deg, distances[i % 5], quality[i % 5]);
+        snprintf(point, sizeof(point), "{\"angle\": %.0f, \"distance\": %.2f, \"quality\": %u}", angle_deg, distances[i % 5], quality[i % 5]);
         strcat(msg, point);
 
         if (i < num_points - 1) strcat(msg, ",");  // add comma except after last element
@@ -35,7 +37,7 @@ void loop_test_lidar_basic() {
 
     strcat(msg, "]");  // close JSON array
 
-    connection.publish(msg);
+    connection.publish(mqtt_topic_lidar_basic, msg);
 
-    delay(100000);
+    delay(1000);
 }

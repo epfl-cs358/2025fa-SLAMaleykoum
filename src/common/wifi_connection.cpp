@@ -11,11 +11,10 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <PubSubClient.h>
-#include "wifi_connection.h"
+#include "common/wifi_connection.h"
 
 const char* mqtt_server = "broker.hivemq.com";
 const int mqtt_port = 1883;
-const char* mqtt_topic_data = "slamaleykoum77/TheSLAM";
 const char* mqtt_topic_commands = "slamaleykoum77/commands";
 
 Connection::Connection() : 
@@ -46,7 +45,7 @@ void Connection::reconnect() {
 
     if (client.connect("ESP32_Client")) {
         Serial.println("connected!");
-        client.subscribe(mqtt_topic_commands);
+        client.subscribe(mqtt_topic_commands); // inutile pour nous mais on garde au cas où (manque callback function)
     } else {
         Serial.print("failed, rc=");
         Serial.print(client.state());
@@ -61,8 +60,8 @@ void Connection::check_connection() {
     client.loop();
 }
 
-void Connection::publish(const char* msg) {
-    if (client.publish(mqtt_topic_data, msg)) {
+void Connection::publish(const char* mqtt_topic, const char* msg) {
+    if (client.publish(mqtt_topic, msg)) {
         Serial.print("Published: ");
         Serial.println(msg);
     } else {

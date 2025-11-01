@@ -19,7 +19,7 @@
  * @author SLAMaleykoum
  * @date October 2025
  */
-#include "test_common.h"
+#include "test_common_esp2.h"
 
 // Change the id depending on the test to run
 #ifndef TEST_ID

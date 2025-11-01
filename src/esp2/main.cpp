@@ -23,7 +23,7 @@
 #include "ImuSensor.h"
 #include "I2C_mutex.h"
 #include "AS5600Encoder.h"
-#include "wifi_connection.h"
+#include "common/wifi_connection.h"
 
 // Pins used by the hardware components on the esp 2
 #define ESC_PIN 15          // pin used for the motor
@@ -48,6 +48,8 @@ int angle = 90;
 const int stepDeg = 5;
 const int minAngle = 60;
 const int maxAngle = 120;
+
+const char* mqtt_topic = "slamaleykoum77/ultrasonic";
 
 void setup() {
     
@@ -108,7 +110,7 @@ void loop() {
     char msg[50];
     snprintf(msg, sizeof(msg), "Distance: %.2f cm", dist);
     // Publish data to MQTT
-    connection.publish(msg);
+    connection.publish(mqtt_topic, msg);
 
     motor.forward(drivePower / 100.);
     // Emergency stop if an obstacle is detected

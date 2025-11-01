@@ -27,7 +27,7 @@
 #include "AS5600Encoder.h"
 #include <WiFi.h>
 #include <PubSubClient.h>
-#include "wifi_connection.h"
+#include "common/wifi_connection.h"
 
 // Pins used by the hardware components on the esp 2
 #define ESC_PIN 15          // pin used for the motor

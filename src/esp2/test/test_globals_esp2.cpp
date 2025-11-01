@@ -12,7 +12,7 @@
  * Only one instance of each hardware component exists globally.  
  * Do **not** redefine them elsewhere to avoid multiple-definition errors.
  */
-#include "test_common.h"
+#include "test_common_esp2.h"
 
 MotorManager motor(ESC_PIN);
 DMS15 servo_dir(SERVO_DIR_PIN);

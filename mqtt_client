@@ -4,27 +4,72 @@ import paho.mqtt.client as mqtt
 import json
 import math
 import matplotlib.pyplot as plt
+import time
+
+# Minimum time (in seconds) between prints per topic
+PRINT_INTERVAL = 0.5  
+
+last_print_times = {}
 
 def on_message(client, userdata, msg):
+    topic = msg.topic
+    now = time.time()
+    last_time = last_print_times.get(topic, 0)
+    
+    # Throttle printing if messages arrive too fast
+    if now - last_time < PRINT_INTERVAL:
+        return
+    last_print_times[topic] = now
+
     try:
         data = json.loads(msg.payload.decode())
-        print("Received LIDAR data:")
-        for p in data:
-            angle = p.get("angle")
-            distance = p.get("distance")
-            quality = p.get("quality")
-            print(f"  Angle: {angle}°, Distance: {distance}, Quality: {quality}")
-        print("-" * 40)
+        print(f"\n--- Message received on topic '{topic}' ---")
+
+        sensor_type = data.get("type")
+
+        if sensor_type == "print":
+            message = data.get("message")
+            print(f"{message}")
+
+        elif sensor_type == "imu":
+            ax = data.get("ax")
+            ay = data.get("ay")
+            az = data.get("az")
+            print(f"IMU Acceleration: ax={ax}, ay={ay}, az={az}")
+
+        elif sensor_type == "ultrasonic":
+            dist = data.get("distance")
+            print(f"Ultrasonic Distance: {dist} m")
+
+        elif sensor_type == "encoder":
+            angle = data.get("angle")
+            print(f"Encoder Angle: {angle}°")
+
+        elif sensor_type == "servo":
+            angle = data.get("angle")
+            print(f"Servo Angle: {angle}°")
+
+        elif sensor_type == "lidar":
+            points = data.get("points", [])
+            print(f"LIDAR: Received {len(points)} points")
+            for p in points[:5]:  # only show first 5 points
+                print(f"  angle={p.get('angle')}°, dist={p.get('distance')}, quality={p.get('quality')}")
+            if len(points) > 5:
+                print("  ... (truncated)")
+
+        else:
+            print("Unknown sensor type or format:", data)
+
     except Exception as e:
-        print("Error parsing message:", e)
+        print("Error decoding message:", e)
 
 # MQTT setup
 client = mqtt.Client()
 client.connect("broker.hivemq.com", 1883)
-client.subscribe("slamaleykoum77/lidardata")
+client.subscribe("slamaleykoum77/#")  # subscribe to all sensors under your base topic
 client.on_message = on_message
 
-print("Listening for LIDAR data... (press Ctrl+C to stop)")
+print("Listening for sensor data... (Ctrl+C to stop)")
 try:
     client.loop_forever()
 except KeyboardInterrupt:

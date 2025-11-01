@@ -29,7 +29,9 @@
  *
  * @see wifi_connection.h
  */
-#include "test_common.h"
+#include "test_common_esp2.h"
+
+const char* mqtt_topic_connection2 = "slamaleykoum77/print";
 
 void setup_test_connection() {
     Serial.begin(115200);
@@ -44,7 +46,7 @@ void loop_test_connection() {
     char msg[50];
     snprintf(msg, sizeof(msg), "I am connected!!!!");
     // Publish data to MQTT
-    connection.publish(msg);
+    connection.publish(mqtt_topic_connection2, msg);
 
     delay(1000);
 }
