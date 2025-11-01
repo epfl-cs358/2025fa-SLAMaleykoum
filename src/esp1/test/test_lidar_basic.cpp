@@ -19,6 +19,7 @@ void loop_test_lidar_basic() {
 
     int num_points = 100;
     float distances[5] = {2.0, 2.5, 3.0, 5.0, 4.0};
+    int quality[5] = {1, 4, 6, 3, 8};
 
     char msg[500];
     strcpy(msg, "[");  // start JSON array
@@ -26,7 +27,7 @@ void loop_test_lidar_basic() {
     for (int i = 0; i < num_points; i++) {
         float angle_deg = i * 3.6;
         char point[50];
-        snprintf(point, sizeof(point), "{\"angle\": %d, \"distance\": %.2f}", angle_deg, distances[i % 5]);
+        snprintf(point, sizeof(point), "{\"angle\": %d, \"distance\": %.2f, \"quality\": %u}", angle_deg, distances[i % 5], quality[i % 5]);
         strcat(msg, point);
 
         if (i < num_points - 1) strcat(msg, ",");  // add comma except after last element

@@ -5,37 +5,28 @@ import json
 import math
 import matplotlib.pyplot as plt
 
-points = []
-
 def on_message(client, userdata, msg):
     try:
         data = json.loads(msg.payload.decode())
-        # Exemple attendu : [{"angle": 0, "distance": 100}, {"angle": 1, "distance": 98}, ...]
+        print("Received LIDAR data:")
         for p in data:
-            angle = math.radians(p["angle"])
-            dist = p["distance"] / 100.0  # en mètres
-            x = dist * math.cos(angle)
-            y = dist * math.sin(angle)
-            points.append((x, y))
+            angle = p.get("angle")
+            distance = p.get("distance")
+            quality = p.get("quality")
+            print(f"  Angle: {angle}°, Distance: {distance}, Quality: {quality}")
+        print("-" * 40)
     except Exception as e:
-        print("Erreur:", e)
+        print("Error parsing message:", e)
 
+# MQTT setup
 client = mqtt.Client()
 client.connect("broker.hivemq.com", 1883)
 client.subscribe("slamaleykoum77/lidardata")
 client.on_message = on_message
-client.loop_start()
 
-plt.ion()
-fig, ax = plt.subplots()
-ax.set_xlim(-5, 5)
-ax.set_ylim(-5, 5)
-
-while True:
-    if points:
-        ax.clear()
-        ax.set_xlim(-5, 5)
-        ax.set_ylim(-5, 5)
-        xs, ys = zip(*points[-360:])  # afficher les derniers points
-        ax.scatter(xs, ys, s=5)
-        plt.pause(0.1)
+print("Listening for LIDAR data... (press Ctrl+C to stop)")
+try:
+    client.loop_forever()
+except KeyboardInterrupt:
+    print("\nStopped by user.")
+    client.disconnect()
