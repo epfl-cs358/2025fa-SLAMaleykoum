@@ -18,6 +18,7 @@ MotorManager motor(ESC_PIN);
 DMS15 servo_dir(SERVO_DIR_PIN);
 UltraSonicSensor ultrasonic(US_TRIG_PIN, US_ECHO_PIN);
 ImuSensor imu(SDA_PIN, SCL_PIN);
+IMUData imu_data;
 AS5600Encoder encoder(SDA_PIN, SCL_PIN);
 
 Connection connection;
