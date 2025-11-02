@@ -1,44 +1,57 @@
 // Filename: esp2/control/motor_pid.h
-// Description: Contract for the high-frequency PID motor control loop on ESP_2.
+// Description: Takes a target velocity and current velocity, and computes
+//      the required PWM pulse width (microseconds) for the motor controller.
 
 #pragma once
 
-#include "common/data_types.h"
-#include <stdint.h>
+#include "common/data_types.h" // For Velocity and MotorOutputs types
+#include "MotorController.h"   // For NEUTRAL_US, MAX_FORWARD_US, MAX_REVERSE_US
+#include <Arduino.h>           // For constrain()
 
-// TODO: Define `MotorOutputs` type.
+// --- Tuning Parameters ---
+// These limits prevent the integral term from
+// growing too large (integral windup).
+// You will need to tune these values.
+#define PID_INTEGRAL_MIN -5.0f
+#define PID_INTEGRAL_MAX 5.0f
 
-/**
- * @brief Manages the closed-loop PID control of the drive motors.
- * Runs in the highest priority task (100-200 Hz).
- */
+// These limits clamp the intermediate control signal
+// before it's scaled to PWM values.
+#define PID_CONTROL_MIN -1.0f
+#define PID_CONTROL_MAX 1.0f
+
 class MotorPID {
 public:
     /**
-     * @brief Initializes the Motor Controller with PID gains.
-     * @param Kp, Ki, Kd PID gains for the velocity loop.
+     * @brief Constructor to initialize PID gains.
+     * @param Kp Proportional gain
+     * @param Ki Integral gain
+     * @param Kd Derivative gain
      */
     MotorPID(float Kp, float Ki, float Kd);
 
     /**
-     * @brief Calculates motor PWM based on target and current velocities.
-     * @param target_velocity The desired velocity from Pure Pursuit.
-     * @param current_velocity The current estimated velocity (from Localization EKF).
-     * @return The final MotorOutputs (PWM values).
+     * @brief Computes the raw PWM motor command.
+     * @param target_vel The desired velocity (from Pure Pursuit).
+     * @param current_velocity The measured velocity (from EKF/Odometry).
+     * @param dt The time delta since the last compute call (in seconds).
+     * @return The raw PWM pulse width (MotorOutputs type, e.g., 1000-2000µs)
      */
-    MotorOutputs compute_motor_commands(const Velocity& target_velocity, const Velocity& current_velocity);
+    MotorOutputs compute_pwm_output(const Velocity& target_vel, const Velocity& current_velocity, float dt);
 
     /**
-     * @brief Directly applies the calculated PWM values to the motor hardware pins.
+     * @brief Resets the integral and derivative states.
+     * Call this when disabling the PID or after a long period of disuse.
      */
-    void apply_outputs(const MotorOutputs& outputs);
-
-    /**
-     * @brief Immediately stops the motors.
-     */
-    void emergency_stop();
+    void reset();
 
 private:
-    float Kp_, Ki_, Kd_;
-    // Internal state variables for PID
+    // PID Gains
+    float Kp_;
+    float Ki_;
+    float Kd_;
+
+    // PID State
+    float integral_;
+    float prev_err_;
 };
