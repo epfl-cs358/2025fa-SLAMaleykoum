@@ -47,14 +47,16 @@ static constexpr float ACC_START_TH    = 0.40f;   // m/s² threshold to detect m
 static constexpr float ACC_STOP_TH     = 0.25f;   // m/s² threshold to detect stop
 static constexpr float V_STOP_TH       = 0.08f;   // m/s velocity threshold for stop
 static constexpr uint32_t LOOP_DT_US   = 10;      // delay between 2 fetch of imu data
-static constexpr uint32_t PRINT_EVERY  = 500;     // print every 500 ms during integration
+static constexpr uint32_t PRINT_EVERY  = 1000;     // print every 500 ms during integration
 
 // --- Calibration data ---
 struct BiasStats {
   float acc_bias_x = 0, acc_bias_y = 0, acc_bias_z = 0;
   float gyro_bias_x = 0, gyro_bias_y = 0, gyro_bias_z = 0;
+  float quat_bias_x = 0, quat_bias_y = 0, quat_bias_z = 0;
   float acc_std_x = 0, acc_std_y = 0, acc_std_z = 0;
   float gyro_std_x = 0, gyro_std_y = 0, gyro_std_z = 0;
+  float quat_std_x = 0, quat_std_y = 0, quat_std_z = 0;
   uint32_t samples = 0;
 };
 
@@ -105,6 +107,10 @@ void update_global_bias_stats(BiasStats& global, const BiasStats& run, int n) {
   global.gyro_bias_y += (run.gyro_bias_y - global.gyro_bias_y) * k;
   global.gyro_bias_z += (run.gyro_bias_z - global.gyro_bias_z) * k;
 
+  global.quat_bias_x += (run.quat_bias_x - global.quat_bias_x) * k;
+  global.quat_bias_y += (run.quat_bias_y - global.quat_bias_y) * k;
+  global.quat_bias_z += (run.quat_bias_z - global.quat_bias_z) * k;
+
   // moyenne des std (même logique, approximation simple)
   global.acc_std_x += (run.acc_std_x - global.acc_std_x) * k;
   global.acc_std_y += (run.acc_std_y - global.acc_std_y) * k;
@@ -113,6 +119,10 @@ void update_global_bias_stats(BiasStats& global, const BiasStats& run, int n) {
   global.gyro_std_x += (run.gyro_std_x - global.gyro_std_x) * k;
   global.gyro_std_y += (run.gyro_std_y - global.gyro_std_y) * k;
   global.gyro_std_z += (run.gyro_std_z - global.gyro_std_z) * k;
+
+  global.quat_std_x += (run.quat_std_x - global.quat_std_x) * k;
+  global.quat_std_y += (run.quat_std_y - global.quat_std_y) * k;
+  global.quat_std_z += (run.quat_std_z - global.quat_std_z) * k;
 }
 
 // --- Minimal JSON logger over MQTT ---
@@ -135,7 +145,7 @@ static void mqtt_printf(const char* tag, const char* fmt, ...) {
 // --- (1) Bias measurement ---
 static void measure_bias(uint32_t duration_ms) {
   mqtt_printf("Bias", "Keep device still, collecting data...");
-  OnlineStats acc_st, gyr_st;
+  OnlineStats acc_st, gyr_st, quat_st;
 
   uint32_t t0 = millis();
   uint32_t last_print = t0;
@@ -150,14 +160,16 @@ static void measure_bias(uint32_t duration_ms) {
     imu.readAndUpdate();
     acc_st.add(imu.imu_data.acc_x, imu.imu_data.acc_y, imu.imu_data.acc_z);
     gyr_st.add(imu.imu_data.omega_x, imu.imu_data.omega_y, imu.imu_data.omega_z);
+    quat_st.add(imu.imu_data.qx, imu.imu_data.qy, imu.imu_data.qz);
 
     if ((uint32_t)(millis()-last_print) > PRINT_EVERY) {
       last_print = millis();
       mqtt_printf("Bias",
-        "t=%lu ms acc(%.3f %.3f %.3f) gyro(%.3f %.3f %.3f)",
+        "t=%lu ms acc(%.3f %.3f %.3f) gyro(%.3f %.3f %.3f) quat(%.3f %.3f %.3f)",
         (unsigned long)(millis()-t0),
         imu.imu_data.acc_x, imu.imu_data.acc_y, imu.imu_data.acc_z,
-        imu.imu_data.omega_x, imu.imu_data.omega_y, imu.imu_data.omega_z
+        imu.imu_data.omega_x, imu.imu_data.omega_y, imu.imu_data.omega_z,
+        imu.imu_data.qx, imu.imu_data.qy, imu.imu_data.qz
       );
     }
     delay(LOOP_DT_US);
@@ -169,6 +181,8 @@ static void measure_bias(uint32_t duration_ms) {
                   g_bias.acc_std_x,  g_bias.acc_std_y,  g_bias.acc_std_z);
   gyr_st.finalize(g_bias.gyro_bias_x, g_bias.gyro_bias_y, g_bias.gyro_bias_z,
                   g_bias.gyro_std_x,  g_bias.gyro_std_y,  g_bias.gyro_std_z);
+  quat_st.finalize(g_bias.quat_bias_x, g_bias.quat_bias_y, g_bias.quat_bias_z,
+                  g_bias.quat_std_x,  g_bias.quat_std_y,  g_bias.quat_std_z);
 
   mqtt_printf("Bias",
     "Acc bias [m/s^2]: (%.5f, %.5f, %.5f)  std:(%.5f, %.5f, %.5f)",
@@ -179,6 +193,11 @@ static void measure_bias(uint32_t duration_ms) {
     "Gyro bias [rad/s]: (%.5f, %.5f, %.5f)  std:(%.5f, %.5f, %.5f)",
     g_bias.gyro_bias_x, g_bias.gyro_bias_y, g_bias.gyro_bias_z,
     g_bias.gyro_std_x,  g_bias.gyro_std_y,  g_bias.gyro_std_z
+  );
+  mqtt_printf("Bias",
+    "Quat bias [rad/s]: (%.5f, %.5f, %.5f)  std:(%.5f, %.5f, %.5f)",
+    g_bias.quat_bias_x, g_bias.quat_bias_y, g_bias.quat_bias_z,
+    g_bias.quat_std_x,  g_bias.quat_std_y,  g_bias.quat_std_z
   );
 }
 
@@ -375,6 +394,9 @@ static void handle_command(const String& line) {
       mqtt_printf("IMU", "Gyro bias [rad/s]: (%.6f, %.6f, %.6f), std: (%.6f, %.6f, %.6f)\n",
                     global_stats.gyro_bias_x, global_stats.gyro_bias_y, global_stats.gyro_bias_z,
                     global_stats.gyro_std_x, global_stats.gyro_std_y, global_stats.gyro_std_z);
+      mqtt_printf("IMU", "Quat bias [rad/s]: (%.6f, %.6f, %.6f), std: (%.6f, %.6f, %.6f)\n",
+                    global_stats.quat_bias_x, global_stats.quat_bias_y, global_stats.quat_bias_z,
+                    global_stats.quat_std_x, global_stats.quat_std_y, global_stats.quat_std_z);
 
       break;
     }
