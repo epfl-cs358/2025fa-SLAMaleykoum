@@ -22,6 +22,7 @@
  * Later the data can be corrected this way :
  *  acc_corr = (acc_raw - acc_bias) * acc_scale;
  *  gyro_corr = (gyro_raw - gyro_bias) * gyro_scale;
+ *  quat_corr = quat_raw - quat_bias;
  * 
  * Complete the values of the following data depending on the results of the test:
  *  - acc_bias_x =
@@ -66,9 +67,25 @@ struct ScaleEst {
   float acc_scale_y  = 1.0f; // multiplier for Y-axis accel
 };
 
+struct RunningStats {
+  int n = 0;
+  double mean = 0;
+  double m2 = 0;
+
+  void update_running_stats(float x) {
+    n++;
+    double delta = x - mean;
+    mean += delta / n;
+    m2   += delta * (x - mean);
+  }
+
+  float get_std() {
+    return (n > 1) ? sqrt(m2 / (n - 1)) : 0.0f;
+  }
+};
+
 static BiasStats g_bias;
 static ScaleEst  g_scale;
-static uint16_t nbr_of_samples;
 
 static inline float dt_s(uint32_t newer_ms, uint32_t older_ms) {
   return (float)(newer_ms - older_ms) * 1e-3f;
@@ -224,6 +241,7 @@ static void test_gyro_turn(float angle_true_deg) {
     float wz = imu.imu_data.omega_z - g_bias.gyro_bias_z;
     uint32_t t_now = imu.imu_data.timestamp_ms;
     float dt = dt_s(t_now, t_prev); // dt between 2 imu data update
+    Serial.printf("dt = %0.3f", dt);
 
     // trapezoidal integration
     angle_rad += 0.5f * (wz_prev + wz) * dt;
@@ -248,12 +266,11 @@ static void test_gyro_turn(float angle_true_deg) {
   }
 
   float angle_deg_meas = angle_rad * 180.f / PI;
-  float scale = (fabsf(angle_deg_meas) > 1e-3f) ? (angle_true_deg / angle_deg_meas) : 1.0f;
-  g_scale.gyro_scale_z = scale;
+  g_scale.gyro_scale_z = (fabsf(angle_deg_meas) > 1e-3f) ? 
+                            (angle_true_deg / angle_deg_meas) : 1.0f;
 
   mqtt_printf("Gyro", "Measured=%.2f deg, True=%.2f deg, scale_z=%.6f",
               angle_deg_meas, angle_true_deg, g_scale.gyro_scale_z);
-  mqtt_printf("Gyro", "=> Apply: corrected_angle = measured_angle * scale_z");
 }
 
 // --- (3) Translation test (1D along X) ---
@@ -311,7 +328,6 @@ static void test_translation_1d_x(float dist_true_m) {
 
   mqtt_printf("Trans", "Measured=%.3f m, True=%.3f m, acc_scale_x=%.6f",
               dist_meas, dist_true_m, g_scale.acc_scale_x);
-  mqtt_printf("Trans", "=> Apply: corrected_acc = (measured_acc - bias) * acc_scale_x");
 }
 
 // --- (4) Translation test (1D along Y) ---
@@ -369,25 +385,25 @@ static void test_translation_1d_y(float dist_true_m) {
 
   mqtt_printf("Trans", "Measured=%.3f m, True=%.3f m, acc_scale_y=%.6f",
               dist_meas, dist_true_m, g_scale.acc_scale_y);
-  mqtt_printf("Trans", "=> Apply: corrected_acc = (measured_acc - bias) * acc_scale_y");
 }
 
 static void handle_command(const String& line) {
   char cmd = line.charAt(0);
   float val = line.substring(1).toFloat();
 
+  int runs = 10;
   switch (cmd) {
     case '1': {
-      BiasStats global_stats = {}; // to accumulate the final stats
+      BiasStats global_stats; // to accumulate the final stats
       
-      for (int i = 1; i <= 10; ++i) {
+      for (int i = 1; i <= runs; ++i) {
         measure_bias(val);
         update_global_bias_stats(global_stats, g_bias, i);
         imu.readAndUpdate();
         delay(1000);
       }
 
-      mqtt_printf("IMU", "\n[Final Stats after 10 runs]\n");
+      mqtt_printf("IMU", "\n[Final Stats after %d runs]\n", runs);
       mqtt_printf("IMU", "Acc bias [m/s²]: (%.6f, %.6f, %.6f), std: (%.6f, %.6f, %.6f)\n",
                     global_stats.acc_bias_x, global_stats.acc_bias_y, global_stats.acc_bias_z,
                     global_stats.acc_std_x, global_stats.acc_std_y, global_stats.acc_std_z);
@@ -397,19 +413,54 @@ static void handle_command(const String& line) {
       mqtt_printf("IMU", "Quat bias [rad/s]: (%.6f, %.6f, %.6f), std: (%.6f, %.6f, %.6f)\n",
                     global_stats.quat_bias_x, global_stats.quat_bias_y, global_stats.quat_bias_z,
                     global_stats.quat_std_x, global_stats.quat_std_y, global_stats.quat_std_z);
-
       break;
     }
     case '2': {
-      test_gyro_turn(val);
+      RunningStats gyro_scale_stats;
+
+      for (int i = 1; i <= runs; i++) {
+        test_gyro_turn(val);
+        gyro_scale_stats.update_running_stats(g_scale.gyro_scale_z);
+
+        Serial.printf("Test %d finit \n", i);
+        delay(2000);
+      }
+
+      mqtt_printf("IMU", "\n[Final Gyro calibration after %d runs]\n", gyro_scale_stats.n);
+      mqtt_printf("IMU", "Mean scale_z = %.6f  |  Std = %.6f\n", 
+                  gyro_scale_stats.mean, gyro_scale_stats.get_std());
       break;
     }
     case '3': {
-      test_translation_1d_x(val);
+      RunningStats accel_x_scale_stats;
+
+      for (int i = 1; i <= runs; i++) {
+        test_translation_1d_x(val);
+        accel_x_scale_stats.update_running_stats(g_scale.acc_scale_x);
+
+        Serial.printf("Test %d finit \n", i);
+        delay(2000);
+      }
+
+      mqtt_printf("IMU", "\n[Final Accel on X axis calibration after %d runs]\n", accel_x_scale_stats.n);
+      mqtt_printf("IMU", "Mean scale_x = %.6f  |  Std = %.6f\n", 
+                  accel_x_scale_stats.mean, accel_x_scale_stats.get_std());
       break;
     }
     case '4': {
-      test_translation_1d_y(val);
+      RunningStats accel_y_scale_stats;
+
+      for (int i = 1; i <= runs; i++) {
+        test_translation_1d_y(val);
+        accel_y_scale_stats.update_running_stats(g_scale.acc_scale_y);
+
+        Serial.printf("Test %d finit \n", i);
+        delay(2000);
+      }
+
+      mqtt_printf("IMU", "\n[Final Accel on Y axis calibration after %d runs]\n", accel_y_scale_stats.n);
+      mqtt_printf("IMU", "Mean scale_y = %.6f  |  Std = %.6f\n", 
+                  accel_y_scale_stats.mean, accel_y_scale_stats.get_std());
       break;
     }
     default:
@@ -446,7 +497,7 @@ void setup_imu_calibration() {
 void loop_imu_calibration() {
   // connection.check_connection();
 
-  handle_command("1 8000");
+  handle_command("2 90");
 
   while (true) {delay(10000);}
   
