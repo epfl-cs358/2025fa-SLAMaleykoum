@@ -14,6 +14,7 @@
 
 
 static const char* MQTT_TOPIC_LIDAR = "slamaleykoum77/lidar";
+static const char* MQTT_TOPIC_LIDAR_debug = "slamaleykoum77/print";
 
 // ---- Tunables ----
 static const uint16_t LEFT_DEG         = 0;     // inclusive
@@ -50,12 +51,18 @@ void setup_test_lidar_express() {
     // FOV restriction (smaller FOV => fewer points)
     lidar.setAngleOfInterest(LEFT_DEG, RIGHT_DEG);
 
+    connection.check_connection();
+
     // Start EXPRESS mode
     if (!lidar.start(express)) {
+        char msgstart[100];
+        snprintf(msgstart, sizeof(msgstart), "je n'arrive pas à me co");
+        // Publish data to MQTT
+        connection.publish(MQTT_TOPIC_LIDAR_debug, msgstart);
         Serial.println("[LiDAR] Failed to start EXPRESS mode. Rebooting device...");
         lidar.resetDevice();
         delay(500);
-        lidar.start(express);
+        while(true);
     }
 
     Serial.println("[LiDAR] EXPRESS mode started.");
@@ -92,6 +99,11 @@ void loop_test_lidar_express() {
         double angle = lidar.Data[i].angle;
         uint16_t dist = lidar.Data[i].distance;
 
+        char debugmsg[100];
+        snprintf(debugmsg, sizeof(debugmsg), "angle: %d ; dist: %u", angle, dist);
+        // Publish data to MQTT
+        connection.publish(MQTT_TOPIC_LIDAR_debug, debugmsg);
+
         // Skip zero/empty entries
         if (!lidar.isDataValid(dist)) continue;
         if (!lidar.isDataBetweenBorders(angle)) continue;
@@ -102,6 +114,7 @@ void loop_test_lidar_express() {
         if (kept > 0) strlcat(msg, ",", sizeof(msg));
         append_point(msg, sizeof(msg), angle, dist, /*quality*/0);
         kept++;
+        delay(100);
     }
 
     strlcat(msg, "]}", sizeof(msg));
@@ -112,4 +125,5 @@ void loop_test_lidar_express() {
     // Optional: also log a brief summary
     Serial.print("[LiDAR] published points: ");
     Serial.println(kept);
+    delay(100);
 }
