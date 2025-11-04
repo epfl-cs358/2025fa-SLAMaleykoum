@@ -12,7 +12,6 @@
  *   2 <angle_deg>    : gyro test; enter true rotation angle (e.g. "2 90")
  *   3 <distance_m>   : translation test on x; enter true distance (e.g. "3 1.20")
  *   4 <distance_m>   : translation test on y; enter true distance (e.g. "4 1.20")
- *   p                : print last IMU sample
  *
  * Notes:
  *   - For (1): keep the car perfectly still on a flat surface.
@@ -43,12 +42,12 @@ const char* mqtt_topic_calibration = "slamaleykoum77/imu";
 // --- Constants ---
 static constexpr float GYRO_START_TH   = 0.35f;   // rad/s threshold to detect rotation start
 static constexpr float GYRO_STOP_TH    = 0.15f;   // rad/s threshold to detect stop
-static constexpr uint32_t STABLE_MS    = 300;     // ms under threshold before considered stable
+static constexpr uint32_t STABLE_MS    = 500;     // ms under threshold before considered stable
 static constexpr float ACC_START_TH    = 0.40f;   // m/s² threshold to detect movement start
 static constexpr float ACC_STOP_TH     = 0.25f;   // m/s² threshold to detect stop
 static constexpr float V_STOP_TH       = 0.08f;   // m/s velocity threshold for stop
-static constexpr uint32_t LOOP_DT_US   = 20000;    // ~50 Hz, stable
-static constexpr uint32_t PRINT_EVERY  = 50;      // print every 50 ms during integration
+static constexpr uint32_t LOOP_DT_US   = 10;      // delay between 2 fetch of imu data
+static constexpr uint32_t PRINT_EVERY  = 500;     // print every 500 ms during integration
 
 // --- Calibration data ---
 struct BiasStats {
@@ -67,13 +66,10 @@ struct ScaleEst {
 
 static BiasStats g_bias;
 static ScaleEst  g_scale;
+static uint16_t nbr_of_samples;
 
-// --- Time helpers ---
-static inline float dt_ms(uint32_t newer_ms, uint32_t older_ms) {
-  return (float)((uint32_t)(newer_ms - older_ms));
-}
 static inline float dt_s(uint32_t newer_ms, uint32_t older_ms) {
-  return dt_ms(newer_ms, older_ms) * 1e-3f;
+  return (float)(newer_ms - older_ms) * 1e-3f;
 }
 
 // --- Online statistics (Welford) ---
@@ -96,6 +92,29 @@ struct OnlineStats {
   }
 };
 
+void update_global_bias_stats(BiasStats& global, const BiasStats& run, int n) {
+  // n = numéro du run courant (1-indexé)
+  float k = 1.0f / n;
+
+  // moyenne cumulative (formule en ligne)
+  global.acc_bias_x += (run.acc_bias_x - global.acc_bias_x) * k;
+  global.acc_bias_y += (run.acc_bias_y - global.acc_bias_y) * k;
+  global.acc_bias_z += (run.acc_bias_z - global.acc_bias_z) * k;
+
+  global.gyro_bias_x += (run.gyro_bias_x - global.gyro_bias_x) * k;
+  global.gyro_bias_y += (run.gyro_bias_y - global.gyro_bias_y) * k;
+  global.gyro_bias_z += (run.gyro_bias_z - global.gyro_bias_z) * k;
+
+  // moyenne des std (même logique, approximation simple)
+  global.acc_std_x += (run.acc_std_x - global.acc_std_x) * k;
+  global.acc_std_y += (run.acc_std_y - global.acc_std_y) * k;
+  global.acc_std_z += (run.acc_std_z - global.acc_std_z) * k;
+
+  global.gyro_std_x += (run.gyro_std_x - global.gyro_std_x) * k;
+  global.gyro_std_y += (run.gyro_std_y - global.gyro_std_y) * k;
+  global.gyro_std_z += (run.gyro_std_z - global.gyro_std_z) * k;
+}
+
 // --- Minimal JSON logger over MQTT ---
 static void mqtt_printf(const char* tag, const char* fmt, ...) {
   char msg[160];
@@ -109,41 +128,41 @@ static void mqtt_printf(const char* tag, const char* fmt, ...) {
   snprintf(payload, sizeof(payload),
            "{\"type\":\"imu\",\"tag\":\"%s\",\"message\":\"%s\"}",
            tag, msg);
-  connection.publish(mqtt_topic_calibration, payload);
+  Serial.printf("%s\n", msg);
+  // connection.publish(mqtt_topic_calibration, payload);
 }
 
 // --- (1) Bias measurement ---
 static void measure_bias(uint32_t duration_ms) {
   mqtt_printf("Bias", "Keep device still, collecting data...");
-  Serial.println("Keep device still, collecting data...");
   OnlineStats acc_st, gyr_st;
 
   uint32_t t0 = millis();
   uint32_t last_print = t0;
 
   // small warm-up
-  for (int i=0;i<10;i++) { imu.readAndUpdate(); delay(5); }
+  for (int i=0;i<10;i++) { 
+    imu.readAndUpdate();
+    delay(20);
+  }
 
-  Serial.println("------------------------------------------------ apres le warm up");
-  delay(1000);
   while ((uint32_t)(millis()-t0) < duration_ms) {
     imu.readAndUpdate();
-    acc_st.add(imu_data.acc_x, imu_data.acc_y, imu_data.acc_z);
-    gyr_st.add(imu_data.omega_x, imu_data.omega_y, imu_data.omega_z);
+    acc_st.add(imu.imu_data.acc_x, imu.imu_data.acc_y, imu.imu_data.acc_z);
+    gyr_st.add(imu.imu_data.omega_x, imu.imu_data.omega_y, imu.imu_data.omega_z);
 
-    if ((uint32_t)(millis()-last_print) > 500) {
+    if ((uint32_t)(millis()-last_print) > PRINT_EVERY) {
       last_print = millis();
       mqtt_printf("Bias",
         "t=%lu ms acc(%.3f %.3f %.3f) gyro(%.3f %.3f %.3f)",
         (unsigned long)(millis()-t0),
-        imu_data.acc_x, imu_data.acc_y, imu_data.acc_z,
-        imu_data.omega_x, imu_data.omega_y, imu_data.omega_z
+        imu.imu_data.acc_x, imu.imu_data.acc_y, imu.imu_data.acc_z,
+        imu.imu_data.omega_x, imu.imu_data.omega_y, imu.imu_data.omega_z
       );
     }
-    delayMicroseconds(LOOP_DT_US);
-    Serial.println("------------------------------------------------ dans la boucle");
+    delay(LOOP_DT_US);
   }
-  delay(1000);
+  delay(10);
 
   g_bias.samples = acc_st.n;
   acc_st.finalize(g_bias.acc_bias_x, g_bias.acc_bias_y, g_bias.acc_bias_z,
@@ -151,7 +170,6 @@ static void measure_bias(uint32_t duration_ms) {
   gyr_st.finalize(g_bias.gyro_bias_x, g_bias.gyro_bias_y, g_bias.gyro_bias_z,
                   g_bias.gyro_std_x,  g_bias.gyro_std_y,  g_bias.gyro_std_z);
 
-  mqtt_printf("Bias", "N=%lu", (unsigned long)g_bias.samples);
   mqtt_printf("Bias",
     "Acc bias [m/s^2]: (%.5f, %.5f, %.5f)  std:(%.5f, %.5f, %.5f)",
     g_bias.acc_bias_x, g_bias.acc_bias_y, g_bias.acc_bias_z,
@@ -162,33 +180,31 @@ static void measure_bias(uint32_t duration_ms) {
     g_bias.gyro_bias_x, g_bias.gyro_bias_y, g_bias.gyro_bias_z,
     g_bias.gyro_std_x,  g_bias.gyro_std_y,  g_bias.gyro_std_z
   );
-  mqtt_printf("Bias", "=> Use these as software offsets.");
 }
 
 // --- (2) Gyro test (yaw rotation around Z) ---
 static void test_gyro_turn(float angle_true_deg) {
+  imu.readAndUpdate();
   mqtt_printf("Gyro", "Hold the car and start rotating around Z.");
 
   // Wait for motion start
-  uint32_t stable_cnt = 0;
-  while (true) {
+  while (fabsf(imu.imu_data.omega_z - g_bias.gyro_bias_z) <= GYRO_START_TH) {
+    delay(LOOP_DT_US);
     imu.readAndUpdate();
-    float wz = imu_data.omega_z - g_bias.gyro_bias_z;
-    if (fabsf(wz) > GYRO_START_TH) break;
-    delayMicroseconds(LOOP_DT_US);
   }
   mqtt_printf("Gyro", "Detected start. Integrating...");
 
   float angle_rad = 0.f;
-  uint32_t t_prev = imu_data.timestamp_ms;
-  float wz_prev   = imu_data.omega_z - g_bias.gyro_bias_z;
+  uint32_t t_prev = imu.imu_data.timestamp_ms;
+  float wz_prev   = imu.imu_data.omega_z - g_bias.gyro_bias_z;
   uint32_t last_print = millis();
 
+  uint32_t stable_cnt = 0;
   while (true) {
     imu.readAndUpdate();
-    float wz   = imu_data.omega_z - g_bias.gyro_bias_z;
-    uint32_t t_now = imu_data.timestamp_ms;
-    float dt   = dt_s(t_now, t_prev);
+    float wz = imu.imu_data.omega_z - g_bias.gyro_bias_z;
+    uint32_t t_now = imu.imu_data.timestamp_ms;
+    float dt = dt_s(t_now, t_prev); // dt between 2 imu data update
 
     // trapezoidal integration
     angle_rad += 0.5f * (wz_prev + wz) * dt;
@@ -209,7 +225,7 @@ static void test_gyro_turn(float angle_true_deg) {
 
     t_prev = t_now;
     wz_prev = wz;
-    delayMicroseconds(LOOP_DT_US);
+    delay(LOOP_DT_US);
   }
 
   float angle_deg_meas = angle_rad * 180.f / PI;
@@ -219,16 +235,6 @@ static void test_gyro_turn(float angle_true_deg) {
   mqtt_printf("Gyro", "Measured=%.2f deg, True=%.2f deg, scale_z=%.6f",
               angle_deg_meas, angle_true_deg, g_scale.gyro_scale_z);
   mqtt_printf("Gyro", "=> Apply: corrected_angle = measured_angle * scale_z");
-
-  // Optional: publish a structured JSON "result" (handy to parse on the broker/UI)
-//   {
-//     char payload[192];
-//     snprintf(payload, sizeof(payload),
-//              "{\"type\":\"gyro_result\",\"tag\":\"Gyro\","
-//              "\"angle_deg_meas\":%.2f,\"angle_deg_true\":%.2f,\"scale_z\":%.6f}",
-//              angle_deg_meas, angle_true_deg, g_scale.gyro_scale_z);
-//     connection.publish(mqtt_topic_connection, payload);
-//   }
 }
 
 // --- (3) Translation test (1D along X) ---
@@ -236,25 +242,23 @@ static void test_translation_1d_x(float dist_true_m) {
   mqtt_printf("Trans", "Keep still, then push straight ~1–2 m and stop sharply.");
 
   // Wait for start
-  uint32_t stable_cnt = 0;
-  while (true) {
+  while (fabsf(imu.imu_data.acc_x - g_bias.acc_bias_x) <= ACC_START_TH) {
+    delay(LOOP_DT_US);
     imu.readAndUpdate();
-    float ax = imu_data.acc_x - g_bias.acc_bias_x;
-    if (fabsf(ax) > ACC_START_TH) break;
-    delayMicroseconds(LOOP_DT_US);
   }
   mqtt_printf("Trans", "Detected start. Integrating...");
 
   float v = 0.f, x = 0.f;
-  uint32_t t_prev = imu_data.timestamp_ms;
-  float ax_prev   = imu_data.acc_x - g_bias.acc_bias_x;
+  uint32_t t_prev = imu.imu_data.timestamp_ms;
+  float ax_prev   = imu.imu_data.acc_x - g_bias.acc_bias_x;
   uint32_t last_print = millis();
 
+  uint32_t stable_cnt = 0;
   while (true) {
     imu.readAndUpdate();
-    float ax   = imu_data.acc_x - g_bias.acc_bias_x;
-    uint32_t t_now = imu_data.timestamp_ms;
-    float dt   = dt_s(t_now, t_prev);
+    float ax = imu.imu_data.acc_x - g_bias.acc_bias_x;
+    uint32_t t_now = imu.imu_data.timestamp_ms;
+    float dt = dt_s(t_now, t_prev);
 
     // trapezoidal integration: accel -> vel -> pos
     float a_mid = 0.5f * (ax_prev + ax);
@@ -279,7 +283,7 @@ static void test_translation_1d_x(float dist_true_m) {
 
     t_prev = t_now;
     ax_prev = ax;
-    delayMicroseconds(LOOP_DT_US);
+    delay(LOOP_DT_US);
   }
 
   float dist_meas = x;
@@ -289,16 +293,6 @@ static void test_translation_1d_x(float dist_true_m) {
   mqtt_printf("Trans", "Measured=%.3f m, True=%.3f m, acc_scale_x=%.6f",
               dist_meas, dist_true_m, g_scale.acc_scale_x);
   mqtt_printf("Trans", "=> Apply: corrected_acc = (measured_acc - bias) * acc_scale_x");
-
-  // Structured JSON result (facilitates parsing on your UI)
-//   {
-//     char payload[224];
-//     snprintf(payload, sizeof(payload),
-//              "{\"type\":\"trans_result\",\"tag\":\"Trans\","
-//              "\"dist_meas_m\":%.3f,\"dist_true_m\":%.3f,"
-//              "\"acc_scale_x\":%.6f}", dist_meas, dist_true_m, g_scale.acc_scale_x);
-//     connection.publish(mqtt_topic_connection, payload);
-//   }
 }
 
 // --- (4) Translation test (1D along Y) ---
@@ -306,25 +300,23 @@ static void test_translation_1d_y(float dist_true_m) {
   mqtt_printf("Trans", "Keep still, then push straight ~1–2 m and stop sharply.");
 
   // Wait for start
-  uint32_t stable_cnt = 0;
-  while (true) {
+  while (fabsf(imu.imu_data.acc_y - g_bias.acc_bias_y) <= ACC_START_TH) {
+    delay(LOOP_DT_US);
     imu.readAndUpdate();
-    float ay = imu_data.acc_y - g_bias.acc_bias_y;
-    if (fabsf(ay) > ACC_START_TH) break;
-    delayMicroseconds(LOOP_DT_US);
   }
   mqtt_printf("Trans", "Detected start. Integrating...");
 
   float v = 0.f, y = 0.f;
-  uint32_t t_prev = imu_data.timestamp_ms;
-  float ay_prev   = imu_data.acc_y - g_bias.acc_bias_y;
+  uint32_t t_prev = imu.imu_data.timestamp_ms;
+  float ay_prev   = imu.imu_data.acc_y - g_bias.acc_bias_y;
   uint32_t last_print = millis();
 
+  uint32_t stable_cnt = 0;
   while (true) {
     imu.readAndUpdate();
-    float ay   = imu_data.acc_y - g_bias.acc_bias_y;
-    uint32_t t_now = imu_data.timestamp_ms;
-    float dt   = dt_s(t_now, t_prev);
+    float ay = imu.imu_data.acc_y - g_bias.acc_bias_y;
+    uint32_t t_now = imu.imu_data.timestamp_ms;
+    float dt = dt_s(t_now, t_prev);
 
     // trapezoidal integration: accel -> vel -> pos
     float a_mid = 0.5f * (ay_prev + ay);
@@ -349,7 +341,7 @@ static void test_translation_1d_y(float dist_true_m) {
 
     t_prev = t_now;
     ay_prev = ay;
-    delayMicroseconds(LOOP_DT_US);
+    delay(LOOP_DT_US);
   }
 
   float dist_meas = y;
@@ -359,70 +351,43 @@ static void test_translation_1d_y(float dist_true_m) {
   mqtt_printf("Trans", "Measured=%.3f m, True=%.3f m, acc_scale_y=%.6f",
               dist_meas, dist_true_m, g_scale.acc_scale_y);
   mqtt_printf("Trans", "=> Apply: corrected_acc = (measured_acc - bias) * acc_scale_y");
-
-  // Structured JSON result (facilitates parsing on your UI)
-//   {
-//     char payload[224];
-//     snprintf(payload, sizeof(payload),
-//              "{\"type\":\"trans_result\",\"tag\":\"Trans\","
-//              "\"dist_meas_m\":%.3f,\"dist_true_m\":%.3f,"
-//              "\"acc_scale_y\":%.6f}", dist_meas, dist_true_m, g_scale.acc_scale_y);
-//     connection.publish(mqtt_topic_connection, payload);
-//   }
-}
-
-// --- Utility ---
-static void print_sample() {
-  mqtt_printf("Sample",
-              "t=%lu ms | acc(%.3f %.3f %.3f) m/s^2 | gyro(%.3f %.3f %.3f) rad/s | q(%.4f %.4f %.4f)",
-              (unsigned long)imu_data.timestamp_ms,
-              imu_data.acc_x, imu_data.acc_y, imu_data.acc_z,
-              imu_data.omega_x, imu_data.omega_y, imu_data.omega_z,
-              imu_data.qx, imu_data.qy, imu_data.qz);
-
-  // Optional: send structured JSON for dashboards
-//   char payload[256];
-//   snprintf(payload, sizeof(payload),
-//            "{\"type\":\"sample\",\"timestamp_ms\":%lu,"
-//            "\"acc_x\":%.3f,\"acc_y\":%.3f,\"acc_z\":%.3f,"
-//            "\"gyro_x\":%.3f,\"gyro_y\":%.3f,\"gyro_z\":%.3f,"
-//            "\"qx\":%.4f,\"qy\":%.4f,\"qz\":%.4f}",
-//            (unsigned long)imu_data.timestamp_ms,
-//            imu_data.acc_x, imu_data.acc_y, imu_data.acc_z,
-//            imu_data.omega_x, imu_data.omega_y, imu_data.omega_z,
-//            imu_data.qx, imu_data.qy, imu_data.qz);
-//   connection.publish(mqtt_topic_connection, payload);
 }
 
 static void handle_command(const String& line) {
-  if (line.length() == 0) return;
-  if (line == "p") { imu.readAndUpdate(); print_sample(); return; }
-
   char cmd = line.charAt(0);
-  float val = 0.f;
-  if (line.length() > 1) val = line.substring(1).toFloat();
-  Serial.print("le numero de cirque est ");
-  Serial.println(cmd);
+  float val = line.substring(1).toFloat();
 
   switch (cmd) {
     case '1': {
-      uint32_t dur = (val > 0.f) ? (uint32_t)val : 6000u;
-      measure_bias(dur);
+      BiasStats global_stats = {}; // to accumulate the final stats
+      
+      for (int i = 1; i <= 10; ++i) {
+        measure_bias(val);
+        update_global_bias_stats(global_stats, g_bias, i);
+        imu.readAndUpdate();
+        delay(1000);
+      }
+
+      mqtt_printf("IMU", "\n[Final Stats after 10 runs]\n");
+      mqtt_printf("IMU", "Acc bias [m/s²]: (%.6f, %.6f, %.6f), std: (%.6f, %.6f, %.6f)\n",
+                    global_stats.acc_bias_x, global_stats.acc_bias_y, global_stats.acc_bias_z,
+                    global_stats.acc_std_x, global_stats.acc_std_y, global_stats.acc_std_z);
+      mqtt_printf("IMU", "Gyro bias [rad/s]: (%.6f, %.6f, %.6f), std: (%.6f, %.6f, %.6f)\n",
+                    global_stats.gyro_bias_x, global_stats.gyro_bias_y, global_stats.gyro_bias_z,
+                    global_stats.gyro_std_x, global_stats.gyro_std_y, global_stats.gyro_std_z);
+
       break;
     }
     case '2': {
-      float angle_deg = (fabsf(val) > 0.f) ? val : 90.f;
-      test_gyro_turn(angle_deg);
+      test_gyro_turn(val);
       break;
     }
     case '3': {
-      float dist_m = (fabsf(val) > 0.f) ? val : 1.0f;
-      test_translation_1d_x(dist_m);
+      test_translation_1d_x(val);
       break;
     }
     case '4': {
-      float dist_m = (fabsf(val) > 0.f) ? val : 1.0f;
-      test_translation_1d_y(dist_m);
+      test_translation_1d_y(val);
       break;
     }
     default:
@@ -435,9 +400,9 @@ void setup_imu_calibration() {
   Serial.begin(115200);
   delay(200);
 
-  connection.setupWifi();
+  // connection.setupWifi();
 
-  connection.check_connection();
+  // connection.check_connection();
   
   mqtt_printf("IMU", "Calibration and accuracy test started");  
 
@@ -447,6 +412,7 @@ void setup_imu_calibration() {
       while(true);
   }
   imu.readAndUpdate();
+  delay(150);
 }
 
 /** Complete line with serial command:
@@ -454,13 +420,12 @@ void setup_imu_calibration() {
  *   2 <angle_deg>    : gyro test; enter true rotation angle (e.g. "2 90")
  *   3 <distance_m>   : translation test for x; enter true distance (e.g. "3 1.20")
  *   4 <distance_m>   : translation test for y; enter true distance (e.g. "4 1.20")
- *   p                : print last IMU sample
  */
 void loop_imu_calibration() {
-  connection.check_connection();
+  // connection.check_connection();
 
-  String line = "1 8000";
-  if (line != "") handle_command(line);
-  imu.readAndUpdate();
-  delay(1000);
+  handle_command("1 8000");
+
+  while (true) {delay(10000);}
+  
 }

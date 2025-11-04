@@ -21,7 +21,6 @@ class ImuSensor {
 private:
     Adafruit_BNO08x bno086; // handles all the communication with the sensor (I2C addr, SH2 protocol..)
     sh2_SensorValue_t sensorValue; // temp structure to keep the current mesure
-    IMUData imu_data;
     const uint8_t IMU_ADDR = 0x4B;
     int _sdaPin;
     int _sclPin;
@@ -34,6 +33,7 @@ private:
     bool configureSensor(uint32_t period_us = 400); // 400 Hz by default
 
 public:
+    IMUData imu_data;
     /**
      * @brief Construct an ImuSensor object
      * Calls the constructor of bno086 and nitializes the sensorValue and all the data components to 0

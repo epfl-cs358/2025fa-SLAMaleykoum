@@ -41,8 +41,7 @@
 extern MotorManager motor;
 extern DMS15 servo_dir;
 extern UltraSonicSensor ultrasonic;
-extern ImuSensor imu; 
-extern IMUData imu_data;
+extern ImuSensor imu;
 extern AS5600Encoder encoder;
 
 extern Connection connection;
