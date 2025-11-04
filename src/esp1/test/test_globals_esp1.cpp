@@ -14,4 +14,6 @@
  */
 #include "test_common_esp1.h"
 
+rpLidar lidar(&Serial1);
+
 Connection connection;

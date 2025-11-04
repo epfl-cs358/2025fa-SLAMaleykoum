@@ -22,16 +22,19 @@
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include "common/wifi_connection.h"
+#include "esp1/hardware/rpLidar.h"
 
 // Pins used by the hardware components on the esp 2
-#define LIDAR_PIN 4 // TO CHANGE!!!
+#define LIDAR_UART_RX 4
+#define LIDAR_UART_TX 5
+#define LIDAR_BAUD 115200
 
 // Harwdare objects
-//extern LiDAR lidar;
-
 extern Connection connection;
+extern rpLidar lidar;
 
 // Prototypes of the functions
 //void setup_all_together();          void loop_all_together();
 void setup_test_lidar_basic();      void loop_test_lidar_basic();
 void setup_test_connection();       void loop_test_connection();
+void setup_test_lidar_express();    void loop_test_lidar_express();
