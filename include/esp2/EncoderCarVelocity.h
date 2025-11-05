@@ -13,18 +13,16 @@ public:
     float getMotorAngularVelocity() const;
     float getWheelAngularVelocity() const;
     float getWheelLinearVelocity() const;
-
-    // last raw angle (0–360°)
+ 
     float getLastAngle() const;
-
-    // continuous unwrapped angle (can exceed 360°)
+ 
     float getUnwrappedAngle() const { return unwrappedAngle; }
 
 private:
     AS5600Encoder* encoder;
 
-    float lastAngle;          // last raw angle (0–360)
-    float unwrappedAngle;     // continuous angle in degrees
+    float lastAngle;          
+    float unwrappedAngle;      
     unsigned long lastTime;
     float motorAngularVelocity;
 

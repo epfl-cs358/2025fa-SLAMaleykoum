@@ -28,6 +28,7 @@
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include "common/wifi_connection.h"
+#include "EncoderCarVelocity.h"
 
 // Pins used by the hardware components on the esp 2
 #define ESC_PIN 15          // pin used for the motor

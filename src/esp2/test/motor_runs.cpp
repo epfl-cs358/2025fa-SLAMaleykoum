@@ -2,7 +2,6 @@
  * @file motor_runs
  * @brief Test to make the motor run simply
  */
-<<<<<<< HEAD
 #include "test_common.h"
 #include "EncoderCarVelocity.h"
 
@@ -21,9 +20,6 @@ const int ANGLE_INTERVAL_MS = 100; //if odd go back to 300 but one full motor re
 
 
 EncoderCarVelocity carVelocity(&encoder);
-=======
-#include "test_common_esp2.h"
->>>>>>> e6e9515813eebcb681cabec8d04e27c2e1363e0c
 
 
 void setup_motor_runs() {

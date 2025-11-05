@@ -18,9 +18,9 @@ EncoderCarVelocity::EncoderCarVelocity(AS5600Encoder* encoder)
       lastTime(0),
       motorAngularVelocity(0.0f) {} //might not need later, for testing
 
-    // --- Hand
+   
 void EncoderCarVelocity::update(unsigned long currentMillis) {
-    float newAngle = encoder->update(); // degrees 0–360
+    float newAngle = encoder->update(); 
     if (newAngle < 0.0f) return;         // encoder read error
 
     if (lastTime == 0) {
