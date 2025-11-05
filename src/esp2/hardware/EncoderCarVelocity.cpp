@@ -21,10 +21,10 @@ EncoderCarVelocity::EncoderCarVelocity(AS5600Encoder* encoder)
    
 void EncoderCarVelocity::update(unsigned long currentMillis) {
     float newAngle = encoder->update(); 
-    if (newAngle < 0.0f) return;         // encoder read error
+    if (newAngle < 0.0f) return;      
 
     if (lastTime == 0) {
-        // first sample: initialize
+     
         lastAngle = newAngle;
         unwrappedAngle = newAngle;
         lastTime = currentMillis;
@@ -34,27 +34,23 @@ void EncoderCarVelocity::update(unsigned long currentMillis) {
     unsigned long dt_ms = currentMillis - lastTime;
     if (dt_ms == 0) return;
 
-    // --- unwrap angle into continuous degrees ---
+    
     float delta = newAngle - lastAngle;
 
-    // if we jumped across the 0/360 boundary, correct it
     if (delta > 180.0f)      delta -= 360.0f;
     else if (delta < -180.0f) delta += 360.0f;
 
-    unwrappedAngle += delta;   // accumulate continuous angle
+    unwrappedAngle += delta;   
 
-    // --- compute velocity from delta ---
     float dt = dt_ms / 1000.0f;
     float angularVel_rad_s = (delta * DEG_TO_RAD) / dt;
 
-    // optional smoothing
     const float alpha = 0.2f;
     motorAngularVelocity =
         (motorAngularVelocity == 0.0f)
             ? angularVel_rad_s
             : alpha * angularVel_rad_s + (1 - alpha) * motorAngularVelocity;
 
-    // update state for next call
     lastAngle = newAngle;
     lastTime  = currentMillis;
 }
