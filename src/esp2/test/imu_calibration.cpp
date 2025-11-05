@@ -41,23 +41,23 @@
 const char* mqtt_topic_calibration = "slamaleykoum77/imu";
 
 // --- Constants ---
-static constexpr float GYRO_START_TH   = 0.35f;   // rad/s threshold to detect rotation start
-static constexpr float GYRO_STOP_TH    = 0.15f;   // rad/s threshold to detect stop
-static constexpr uint32_t STABLE_MS    = 500;     // ms under threshold before considered stable
-static constexpr float ACC_START_TH    = 0.40f;   // m/s² threshold to detect movement start
-static constexpr float ACC_STOP_TH     = 0.25f;   // m/s² threshold to detect stop
+static constexpr float GYRO_START_TH   = 0.15f;   // rad/s threshold to detect rotation start
+static constexpr float GYRO_STOP_TH    = 0.10f;   // rad/s threshold to detect stop
+static constexpr uint32_t STABLE_MS    = 1000;     // ms under threshold before considered stable
+static constexpr float ACC_START_TH    = 0.20f;   // m/s² threshold to detect movement start
+static constexpr float ACC_STOP_TH     = 0.20f;   // m/s² threshold to detect stop
 static constexpr float V_STOP_TH       = 0.08f;   // m/s velocity threshold for stop
 static constexpr uint32_t LOOP_DT_US   = 10;      // delay between 2 fetch of imu data
-static constexpr uint32_t PRINT_EVERY  = 1000;     // print every 500 ms during integration
+static constexpr uint32_t PRINT_EVERY  = 200;     // print every 500 ms during integration
 
 // --- Calibration data ---
 struct BiasStats {
-  float acc_bias_x = 0, acc_bias_y = 0, acc_bias_z = 0;
-  float gyro_bias_x = 0, gyro_bias_y = 0, gyro_bias_z = 0;
-  float quat_bias_x = 0, quat_bias_y = 0, quat_bias_z = 0;
-  float acc_std_x = 0, acc_std_y = 0, acc_std_z = 0;
-  float gyro_std_x = 0, gyro_std_y = 0, gyro_std_z = 0;
-  float quat_std_x = 0, quat_std_y = 0, quat_std_z = 0;
+  float acc_bias_x = 0.001228, acc_bias_y = 0.000695, acc_bias_z = -0.007815;
+  float gyro_bias_x = 0.001013, gyro_bias_y = -0.001221, gyro_bias_z = -0.000753;
+  float quat_bias_x = -0.023362, quat_bias_y = -0.027338, quat_bias_z = 0.001799;
+  float acc_std_x = 0.018430, acc_std_y = 0.015655, acc_std_z = 0.083933;
+  float gyro_std_x = 0.001739, gyro_std_y = 0.001250, gyro_std_z = 0.001244;
+  float quat_std_x = 0.000230, quat_std_y = 0.000252, quat_std_z = 0.000098;
   uint32_t samples = 0;
 };
 
@@ -221,27 +221,28 @@ static void measure_bias(uint32_t duration_ms) {
 // --- (2) Gyro test (yaw rotation around Z) ---
 static void test_gyro_turn(float angle_true_deg) {
   imu.readAndUpdate();
-  mqtt_printf("Gyro", "Hold the car and start rotating around Z.");
+  delay(LOOP_DT_US);
+  mqtt_printf("Gyro", "Hold the car and start rotating around Z.\n");
 
   // Wait for motion start
   while (fabsf(imu.imu_data.omega_z - g_bias.gyro_bias_z) <= GYRO_START_TH) {
-    delay(LOOP_DT_US);
     imu.readAndUpdate();
+    delay(LOOP_DT_US);
   }
-  mqtt_printf("Gyro", "Detected start. Integrating...");
+  mqtt_printf("Gyro", "Detected start. Integrating...\n");
 
   float angle_rad = 0.f;
   uint32_t t_prev = imu.imu_data.timestamp_ms;
   float wz_prev   = imu.imu_data.omega_z - g_bias.gyro_bias_z;
   uint32_t last_print = millis();
 
+  imu.readAndUpdate();
+  delay(LOOP_DT_US);
   uint32_t stable_cnt = 0;
   while (true) {
-    imu.readAndUpdate();
     float wz = imu.imu_data.omega_z - g_bias.gyro_bias_z;
     uint32_t t_now = imu.imu_data.timestamp_ms;
-    float dt = dt_s(t_now, t_prev); // dt between 2 imu data update
-    Serial.printf("dt = %0.3f", dt);
+    float dt = dt_s(t_now, t_prev);
 
     // trapezoidal integration
     angle_rad += 0.5f * (wz_prev + wz) * dt;
@@ -262,14 +263,14 @@ static void test_gyro_turn(float angle_true_deg) {
 
     t_prev = t_now;
     wz_prev = wz;
+    imu.readAndUpdate();
     delay(LOOP_DT_US);
   }
 
   float angle_deg_meas = angle_rad * 180.f / PI;
-  g_scale.gyro_scale_z = (fabsf(angle_deg_meas) > 1e-3f) ? 
-                            (angle_true_deg / angle_deg_meas) : 1.0f;
+  g_scale.gyro_scale_z = (angle_true_deg / angle_deg_meas);
 
-  mqtt_printf("Gyro", "Measured=%.2f deg, True=%.2f deg, scale_z=%.6f",
+  mqtt_printf("Gyro", "Measured=%.2f deg, True=%.2f deg, scale_z=%.6f\n",
               angle_deg_meas, angle_true_deg, g_scale.gyro_scale_z);
 }
 
@@ -419,15 +420,16 @@ static void handle_command(const String& line) {
       RunningStats gyro_scale_stats;
 
       for (int i = 1; i <= runs; i++) {
+        mqtt_printf("Gyro", "New test begin\n");
         test_gyro_turn(val);
         gyro_scale_stats.update_running_stats(g_scale.gyro_scale_z);
 
-        Serial.printf("Test %d finit \n", i);
-        delay(2000);
+        mqtt_printf("Gyro", "Test %d finit \n", i);
+        delay(500);
       }
 
-      mqtt_printf("IMU", "\n[Final Gyro calibration after %d runs]\n", gyro_scale_stats.n);
-      mqtt_printf("IMU", "Mean scale_z = %.6f  |  Std = %.6f\n", 
+      mqtt_printf("Gyro", "\n[Final Gyro calibration after %d runs]\n", gyro_scale_stats.n);
+      mqtt_printf("Gyro", "Mean scale_z = %.6f  |  Std = %.6f\n", 
                   gyro_scale_stats.mean, gyro_scale_stats.get_std());
       break;
     }
@@ -435,11 +437,12 @@ static void handle_command(const String& line) {
       RunningStats accel_x_scale_stats;
 
       for (int i = 1; i <= runs; i++) {
+        mqtt_printf("IMU", "New test begin\n");
         test_translation_1d_x(val);
         accel_x_scale_stats.update_running_stats(g_scale.acc_scale_x);
 
-        Serial.printf("Test %d finit \n", i);
-        delay(2000);
+        mqtt_printf("IMU", "Test %d finit \n", i);
+        delay(500);
       }
 
       mqtt_printf("IMU", "\n[Final Accel on X axis calibration after %d runs]\n", accel_x_scale_stats.n);
