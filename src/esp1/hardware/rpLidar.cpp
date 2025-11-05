@@ -584,3 +584,230 @@ double  rpLidar::calcAngle(stExpressDataPacket_t* _packets,uint16_t _k)
 	return result;
 
 }
+/*
+LIDAR POSTPROCESSING
+
+// Filename: esp1/hardware/lidar.cpp
+// Description: LiDAR driver + lightweight feature extraction (2D)
+// Works with your headers: common/data_types.h, esp1/hardware/lidar.h
+
+#include "esp1/hardware/lidar.h"
+#include <cmath>
+#include <algorithm>
+#include <chrono>
+
+// ---------------------------
+// Tunable parameters
+// ---------------------------
+namespace {
+constexpr float kMinRangeM           = 0.05f;   // ignore < 5 cm
+constexpr float kMaxRangeM           = 12.0f;   // sensor-dependent
+constexpr float kMinQuality01        = 0.15f;   // 0..1 minimum average quality
+constexpr float kAngleIncrementRad   = static_cast<float>(M_PI/180.0); // ~1 deg default
+constexpr int   kMedianWin           = 5;       // median filter window (odd)
+constexpr float kClusterGapNearM     = 0.08f;   // max gap for clustering at near ranges
+constexpr float kClusterGapFarM      = 0.20f;   // ...at far ranges
+constexpr float kFarRangeThresholdM  = 4.0f;
+constexpr int   kMinClusterPoints    = 5;       // min points to accept a landmark
+constexpr float kMaxAngularSpanRad   = static_cast<float>(8.0*M_PI/180.0); // ~8 degrees
+constexpr float kMaxClusterStdM      = 0.12f;   // reject “spread out” clusters
+//15 Hz prendre ttes les datas sur chaque angle, il faut au moins filtrer le moitié
+
+#define LIDAR_UART Serial2
+#define LIDAR_BAUD 115200      // RPLIDAR C1 default
+#define LIDAR_RX_PIN 5         // ESP32 pin receiving from LiDAR TX
+#define LIDAR_TX_PIN 4         // ESP32 pin sending to LiDAR RX
+
+inline uint32_t now_ms() {
+    using namespace std::chrono;
+    return static_cast<uint32_t>(duration_cast<milliseconds>(
+        steady_clock::now().time_since_epoch()).count());
+}
+inline float wrap_angle(float a) {
+    while (a <= -M_PI) a += 2.f*static_cast<float>(M_PI);
+    while (a >   M_PI) a -= 2.f*static_cast<float>(M_PI);
+    return a;
+}
+template<typename T>
+T clamp(T v, T lo, T hi){ return std::max(lo, std::min(hi, v)); }
+} // namespace
+
+// ---------------------------
+// Lidar class impl
+// ---------------------------
+Lidar::Lidar() {}
+
+// Replace with your real hardware init (UART baud, GPIO motor enable, etc.)
+bool Lidar::initialize() {
+     LIDAR_UART.begin(LIDAR_BAUD, SERIAL_8N1, LIDAR_RX_PIN, LIDAR_TX_PIN);
+
+        return true;
+}
+
+// Read one full 360° sweep into raw_points.
+// Replace the body with your sensor protocol parsing.
+uint32_t Lidar::read_raw_data(std::vector<RawLiDARPoint>& raw_points) {
+    raw_points.clear();
+    raw_points.reserve(MAX_RAW_LIDAR_POINTS);
+
+    // -----------------------------
+    // TODO: Parse your LiDAR stream.
+    // This stub simulates a simple arc of points for wiring tests.
+    // -----------------------------
+    const uint32_t t_ms = now_ms();
+    for (int i = 0; i < static_cast<int>(MAX_RAW_LIDAR_POINTS); ++i) {
+        float ang = i * kAngleIncrementRad;              // 0..~2π
+        if (ang > 2.f*static_cast<float>(M_PI)) break;
+        // Fake wall at y = 2.0 m; compute range along ray (for demo only)
+        float ray_dx = std::cos(ang), ray_dy = std::sin(ang);
+        float r = INFINITY;
+        if (std::fabs(ray_dy) > 1e-4f) {
+            float t = 2.0f / ray_dy; // y = 2, solve (0,0)+t*(dx,dy)
+            if (t > 0.f) r = t;
+        }
+        RawLiDARPoint p;
+        p.angle_rad  = ang;
+        p.distance_m = std::isfinite(r) ? clamp(r + 0.01f*std::sin(6*ang), kMinRangeM, kMaxRangeM) : INFINITY;
+        p.quality    = 200; // mid-high quality
+        raw_points.push_back(p);
+    }
+
+    return t_ms;
+}
+
+// Median filter helper (in-place on ranges keeping angles/quality)
+static void median_filter(std::vector<RawLiDARPoint>& pts, int win) {
+    if (win < 3 || win % 2 == 0 || pts.empty()) return;
+    const int half = win / 2;
+    std::vector<float> buf(pts.size());
+    for (size_t i = 0; i < pts.size(); ++i) buf[i] = pts[i].distance_m;
+
+    std::vector<float> window;
+    window.reserve(win);
+    for (size_t i = 0; i < pts.size(); ++i) {
+        window.clear();
+        for (int k = -half; k <= half; ++k) {
+            long j = static_cast<long>(i) + k;
+            if (j < 0) j = 0;
+            if (j >= static_cast<long>(buf.size())) j = static_cast<long>(buf.size()) - 1;
+            window.push_back(buf[static_cast<size_t>(j)]);
+        }
+        std::nth_element(window.begin(), window.begin()+half, window.end());
+        float med = window[half];
+        pts[i].distance_m = med;
+    }
+}
+
+// Distance between two polar samples accounting for angle step.
+static float euclidean_gap(float r1, float r2, float dtheta) {
+    // Law of cosines: d^2 = r1^2 + r2^2 - 2 r1 r2 cos(dtheta)
+    if (!std::isfinite(r1) || !std::isfinite(r2)) return INFINITY;
+    return std::sqrt(std::max(0.f, r1*r1 + r2*r2 - 2.f*r1*r2*std::cos(dtheta)));
+}
+
+std::vector<LiDARLandmark> Lidar::extract_features(const std::vector<RawLiDARPoint>& raw_points) {
+    std::vector<LiDARLandmark> features;
+    if (raw_points.empty()) return features;
+
+    // Copy and pre-filter
+    std::vector<RawLiDARPoint> pts = raw_points;
+
+    // 1) Range & quality filtering
+    pts.erase(std::remove_if(pts.begin(), pts.end(), [](const RawLiDARPoint& p){
+        if (!std::isfinite(p.distance_m)) return true;
+        if (p.distance_m < kMinRangeM || p.distance_m > kMaxRangeM) return true;
+        float q = p.quality / 255.f;
+        return q < 0.05f; // drop extremely low-quality
+    }), pts.end());
+    if (pts.size() < static_cast<size_t>(kMinClusterPoints)) return features;
+
+    // 2) Median filter on range to suppress spikes
+    median_filter(pts, kMedianWin);
+
+    // 3) Adjacent-point clustering in scan order
+    //    Gap threshold increases with range (beams spread).
+    auto gap_threshold = [](float r)->float {
+        return (r < kFarRangeThresholdM) ? kClusterGapNearM : kClusterGapFarM;
+    };
+
+    std::vector<size_t> cluster_idx;
+    cluster_idx.reserve(32);
+
+    auto flush_cluster = [&](const std::vector<size_t>& idxs){
+        if ((int)idxs.size() < kMinClusterPoints) return;
+
+        // Compute centroid in Cartesian, angular span, quality
+        float cx=0.f, cy=0.f, wsum=0.f, ang_min=+1e9f, ang_max=-1e9f;
+        float qsum=0.f; int n=0;
+        for (size_t k : idxs) {
+            const auto& p = pts[k];
+            float a = p.angle_rad;
+            float r = p.distance_m;
+            float x = r*std::cos(a), y = r*std::sin(a);
+            float w = 1.0f; // equal weights; could weight by quality
+            cx += w*x; cy += w*y; wsum += w;
+            ang_min = std::min(ang_min, a);
+            ang_max = std::max(ang_max, a);
+            qsum += (p.quality/255.f);
+            ++n;
+        }
+        if (wsum <= 0.f) return;
+        cx /= wsum; cy /= wsum;
+        float span = std::fabs(wrap_angle(ang_max - ang_min));
+        if (span > kMaxAngularSpanRad) return; // not point-like, likely a wall
+
+        // radial compactness
+        float std_acc=0.f;
+        for (size_t k : idxs) {
+            const auto& p = pts[k];
+            float a = p.angle_rad;
+            float r = p.distance_m;
+            float x = r*std::cos(a) - cx, y = r*std::sin(a) - cy;
+            std_acc += (x*x + y*y);
+        }
+        float spread = std::sqrt(std_acc / n);
+        if (spread > kMaxClusterStdM) return;
+
+        // Convert centroid back to polar for your LiDARLandmark type
+        float range = std::sqrt(cx*cx + cy*cy);
+        float angle = std::atan2(cy, cx);
+        LiDARLandmark lm;
+        lm.range   = range;
+        lm.angle   = wrap_angle(angle);
+        lm.quality = clamp(qsum / std::max(1, n), 0.f, 1.f);
+        if (lm.quality < kMinQuality01) return;
+
+        features.push_back(lm);
+    };
+
+    cluster_idx.clear();
+    for (size_t i = 0; i+1 < pts.size(); ++i) {
+        cluster_idx.push_back(i);
+        float r1 = pts[i].distance_m, r2 = pts[i+1].distance_m;
+        float gap = euclidean_gap(r1, r2, kAngleIncrementRad);
+        float thr = std::max(gap_threshold(std::min(r1,r2)), 0.05f);
+        if (!(gap < thr)) {        // cluster boundary
+            flush_cluster(cluster_idx);
+            cluster_idx.clear();
+        }
+    }
+    // Add last point and flush
+    if (!pts.empty()) cluster_idx.push_back(pts.size()-1);
+    flush_cluster(cluster_idx);
+
+    return features;
+}
+
+LiDARScan Lidar::get_processed_scan() {
+    std::vector<RawLiDARPoint> raw_points;
+    raw_points.reserve(MAX_RAW_LIDAR_POINTS);
+
+    const uint32_t t_ms = read_raw_data(raw_points);
+    // NOTE: read_raw_data must fill a full sweep in increasing angle order.
+
+    LiDARScan scan;
+    scan.timestamp_ms = t_ms;
+    scan.landmarks    = extract_features(raw_points);
+    return scan;
+}
+ */
