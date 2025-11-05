@@ -3,7 +3,7 @@
  * @brief Test all the components together.
  * @result The ultrasonic sensor cannot initialize..
  */
-#include "test_common.h"
+#include "test_common_esp2.h"
 
 static int drivePower = 20;
 static int angle = 90;

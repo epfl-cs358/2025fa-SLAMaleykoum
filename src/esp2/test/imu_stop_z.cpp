@@ -3,7 +3,7 @@
  * @brief Test to make the motor stop when the car is quickly moved up. This tests the 
  * received data from the imu.
  */
-#include "test_common.h"
+#include "test_common_esp2.h"
 
 static int drivePower = 20;
 

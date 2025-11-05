@@ -3,7 +3,7 @@
  * @brief Test to make the motor runs then stop
  * @result The forward function do not work this way (no movement is observable)
  */
-#include "test_common.h"
+#include "test_common_esp2.h"
 
 static int drivePower = 20;
 

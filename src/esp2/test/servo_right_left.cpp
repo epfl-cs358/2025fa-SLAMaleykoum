@@ -1,8 +1,8 @@
 /**
  * @file servo_right_left.cpp
- * @brief Test to makes the servo of the wheels turns left and right
+ * @brief Test to makes the servo of the wheels turn left and right
  */
-#include "test_common.h"
+#include "test_common_esp2.h"
 
 static int angle = 90;
 static const int stepDeg = 15;
