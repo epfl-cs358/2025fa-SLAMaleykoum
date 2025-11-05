@@ -2,8 +2,10 @@
  * @file motor_runs
  * @brief Test to make the motor run simply
  */
-#include "test_common.h"
+#include "test_common_esp2.h"
 #include "EncoderCarVelocity.h"
+
+const char* mqtt_topic_connection_motor_runs = "slamaleykoum77/print";
 
 //Wheel & motor parameters
 const float GEAR_RATIO = 10.0f; //it takes the motor 10 full rotations to make the wheel turn a full rotation
@@ -43,7 +45,10 @@ void setup_motor_runs() {
     if (!motor.begin()) {
         char msgMotor[50];
         snprintf(msgMotor, sizeof(msgMotor), "Motor init failed!");
-        connection.publish(msgMotor);
+        connection.publish(mqtt_topic_connection_motor_runs, msgMotor);
+
+
+
         while (true);
     }
     
@@ -51,7 +56,7 @@ void setup_motor_runs() {
     if (!encoder.begin()) {
         char msgEncoder[50];
         snprintf(msgEncoder, sizeof(msgEncoder), "Encoder init failed!");
-        connection.publish(msgEncoder);
+        connection.publish(mqtt_topic_connection_motor_runs,msgEncoder);
         while (true);
     }
 
@@ -59,7 +64,7 @@ void setup_motor_runs() {
     connection.check_connection();
     char msgSetup[50];
     snprintf(msgSetup, sizeof(msgSetup), "Setup success!");
-    connection.publish(msgSetup);
+    connection.publish(mqtt_topic_connection_motor_runs,msgSetup);
 
     
 }
@@ -90,7 +95,7 @@ void loop_motor_runs() {
         snprintf(msgVel, sizeof(msgVel), 
                 "angular_v_motor=%.2f rad/s | angular_v_wheel=%.2f rad/s | v_car=%.3f m/s",
                 motorAngularVel, wheelAngularVel, carLinearVel);
-        connection.publish(msgVel);
+        connection.publish(mqtt_topic_connection_motor_runs,msgVel);
         Serial.println(msgVel);
 
         //Stop car after desired target
@@ -102,7 +107,7 @@ void loop_motor_runs() {
             }       
             char msgStop[80];
             snprintf(msgStop, sizeof(msgStop), "Stopped after %.1f° wheel rotation", wheelDeg);
-            connection.publish(msgStop);
+            connection.publish(mqtt_topic_connection_motor_runs,msgStop);
             Serial.println(msgStop);
 
             //completly stop with delay
