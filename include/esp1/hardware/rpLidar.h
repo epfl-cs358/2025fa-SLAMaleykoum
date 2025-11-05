@@ -14,7 +14,7 @@
 class rpLidar{
 	public:
 
-	void begin(uint32_t baud, uint16_t bufferSize); 
+	void begin(uint32_t baud, uint16_t bufferSize, HardwareSerial *_mySerial, int8_t rxPin, int8_t txPin); 
 	
 	/**
 	 * Construcor of Class
@@ -22,7 +22,7 @@ class rpLidar{
 	 * @param pointer to used USART
 	 * @param Baudrate
 	 */
-	rpLidar(HardwareSerial *_serial);
+	rpLidar();
 
 	/**
 	 * Gets the device info from rpLidar

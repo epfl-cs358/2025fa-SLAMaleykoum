@@ -26,6 +26,8 @@ static const uint16_t MAX_POINTS_OUT   = 180;   // hard cap to keep payload smal
 // Scratch
 static uint32_t last_pub_ms = 0;
 
+rpLidar lidar;
+
 // Small helper: append one point as JSON into a char buffer
 static void append_point(char* out, size_t out_sz, double angle_deg, uint16_t dist_mm, uint8_t quality) {
     char tmp[64];
@@ -36,17 +38,19 @@ static void append_point(char* out, size_t out_sz, double angle_deg, uint16_t di
 
 void setup_test_lidar_express() {
     Serial.begin(115200);
-    delay(1000);
+    delay(500);
 
     // --- WiFi/MQTT ---
     connection.setupWifi();
 
-    // --- UART1 pins for LiDAR (set to your wiring) ---
-    Serial1.begin(LIDAR_BAUD, SERIAL_8N1, LIDAR_UART_RX, LIDAR_UART_TX);
-    delay(50);
-
     // rpLidar driver serial/buffer init
-    lidar.begin(LIDAR_BAUD, 4096);
+    //lidar.begin(LIDAR_BAUD, LIDAR_UART_RX, LIDAR_UART_TX, 4096); // a modif!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    // Initialize Serial1 manually
+    //Serial1.setTxBufferSize(4096);
+    //Serial1.begin(LIDAR_BAUD, SERIAL_8N1, LIDAR_UART_RX, LIDAR_UART_TX);
+
+    // Attach Serial1 to lidar
+    lidar.begin(LIDAR_BAUD, 4096, &Serial1, LIDAR_UART_RX, LIDAR_UART_TX);
 
     // FOV restriction (smaller FOV => fewer points)
     lidar.setAngleOfInterest(LEFT_DEG, RIGHT_DEG);
@@ -54,7 +58,7 @@ void setup_test_lidar_express() {
     connection.check_connection();
 
     // Start EXPRESS mode
-    if (!lidar.start(express)) {
+    while (!lidar.start(express)) {
         char msgstart[100];
         snprintf(msgstart, sizeof(msgstart), "je n'arrive pas à me co");
         // Publish data to MQTT
@@ -62,7 +66,6 @@ void setup_test_lidar_express() {
         Serial.println("[LiDAR] Failed to start EXPRESS mode. Rebooting device...");
         lidar.resetDevice();
         delay(500);
-        while(true);
     }
 
     Serial.println("[LiDAR] EXPRESS mode started.");

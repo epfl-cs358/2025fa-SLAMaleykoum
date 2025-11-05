@@ -33,6 +33,8 @@ void setup() {
         setup_test_connection();
     #elif TEST_ID == 3
         setup_test_lidar_express();
+    #elif TEST_ID == 4
+        setup_test_lidar_serial();
     #endif
 }
 
@@ -43,5 +45,7 @@ void loop() {
         loop_test_connection();
     #elif TEST_ID == 3
         loop_test_lidar_express();
+    #elif TEST_ID == 4
+        loop_test_lidar_serial();
     #endif
 }

@@ -5,19 +5,20 @@
  * Library to control an rpLidar S2
  *
  */
-#include "rpLidar.h"
+#include "../esp1/hardware/rpLidar.h"
 #include "Arduino.h"
 
 
-rpLidar::rpLidar(HardwareSerial *_mySerial)
+rpLidar::rpLidar()
 {
-	serial=_mySerial;
+	// serial=_mySerial;
 	status=false;
 }
 
-void rpLidar::begin(uint32_t baud, uint16_t bufferSize) {
+void rpLidar::begin(uint32_t baud, uint16_t bufferSize, HardwareSerial *_mySerial, int8_t rxPin, int8_t txPin) {
+	serial = _mySerial;
 	serial->setTxBufferSize(bufferSize);
-    serial->begin(baud);
+    serial->begin(baud, SERIAL_8N1, rxPin, txPin);
 }
 
 

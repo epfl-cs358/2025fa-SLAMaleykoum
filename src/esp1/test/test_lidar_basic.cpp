@@ -22,11 +22,9 @@ void setup_test_lidar_basic() {
     connection.setupWifi();
 
     // --- UART1 pins for LiDAR (set to your wiring) ---
-    Serial1.begin(LIDAR_BAUD, SERIAL_8N1, LIDAR_UART_RX, LIDAR_UART_TX);
-    delay(50);
 
     // rpLidar driver serial/buffer init
-    lidar.begin(LIDAR_BAUD, 4096);
+    //lidar.begin(LIDAR_BAUD, LIDAR_UART_RX, LIDAR_UART_TX, 4096);
 
     // FOV restriction (smaller FOV => fewer points)
     lidar.setAngleOfInterest(LEFT_DEG, RIGHT_DEG);

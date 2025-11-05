@@ -38,3 +38,4 @@ extern rpLidar lidar;
 void setup_test_lidar_basic();      void loop_test_lidar_basic();
 void setup_test_connection();       void loop_test_connection();
 void setup_test_lidar_express();    void loop_test_lidar_express();
+void setup_test_lidar_serial();     void loop_test_lidar_serial();
