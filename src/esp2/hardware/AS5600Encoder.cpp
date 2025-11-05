@@ -1,3 +1,12 @@
+/**
+ * @file AS5600Encoder.cpp
+ * @brief Implementation of the AS5600Encoder class to be used to measure the absolute position
+ * of the motor rotation.
+ * 
+ * @author SLAMaleykoum & TurboSLAM : Same file as the TurboSLAM but removed all code related to ROS messages
+ * @date Oct 2025
+ */
+
 #include "AS5600Encoder.h"
 #include "I2C_mutex.h"
 #include "I2C_wire.h"

@@ -1,0 +1,78 @@
+#include "Encoder.h"
+
+#define AS5600_ADDR 0x36
+#define ANGLE_REG_HIGH 0x0E
+#define ANGLE_REG_LOW  0x0F
+
+Encoder::Encoder(int sdaPin, int sclPin)
+    : previousAngle(0), totalTicks(0), rotationCount(0), sdaPin(sdaPin), sclPin(sclPin) {}
+
+bool Encoder::begin() {
+    if (sdaPin >= 0 && sclPin >= 0) {
+        Wire.begin(sdaPin, sclPin);
+    } else {
+        Wire.begin();
+    }
+
+    // Optional: check if AS5600 responds
+    Wire.beginTransmission(AS5600_ADDR);
+    if (Wire.endTransmission() != 0) {
+        return false; // Device not found
+    }
+
+    previousAngle = readRawAngle();
+    return true;
+}
+
+void Encoder::update() {
+    uint16_t currentAngle = readRawAngle();
+    int16_t delta = computeDelta(currentAngle, previousAngle);
+
+    totalTicks += delta;
+
+    if (delta > 2048) rotationCount--;
+    else if (delta < -2048) rotationCount++;
+
+    previousAngle = currentAngle;
+}
+
+long Encoder::getTotalTicks() {
+    return totalTicks;
+}
+
+int Encoder::getRotationCount() {
+    return rotationCount;
+}
+
+uint16_t Encoder::getCurrentAngle() {
+    return previousAngle;
+}
+
+void Encoder::reset() {
+    totalTicks = 0;
+    rotationCount = 0;
+    previousAngle = readRawAngle();
+}
+
+uint16_t Encoder::readRawAngle() {
+    Wire.beginTransmission(AS5600_ADDR);
+    Wire.write(ANGLE_REG_HIGH);
+    Wire.endTransmission();
+    Wire.requestFrom(AS5600_ADDR, 1);
+    uint8_t high = Wire.read();
+
+    Wire.beginTransmission(AS5600_ADDR);
+    Wire.write(ANGLE_REG_LOW);
+    Wire.endTransmission();
+    Wire.requestFrom(AS5600_ADDR, 1);
+    uint8_t low = Wire.read();
+
+    return ((high << 8) | low) & 0x0FFF;
+}
+
+int16_t Encoder::computeDelta(uint16_t current, uint16_t previous) {
+    int16_t delta = current - previous;
+    if (delta > 2048) delta -= 4096;
+    else if (delta < -2048) delta += 4096;
+    return delta;
+}

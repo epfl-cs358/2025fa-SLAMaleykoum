@@ -7,8 +7,8 @@
  * @date Oct 2025
  */
 
-#ifndef AS5600_H
-#define AS5600_H
+#ifndef AS5600Encoder_H
+#define AS5600Encoder_H
 
 #include <Arduino.h>
 #include <Wire.h>
