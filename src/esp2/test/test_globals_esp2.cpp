@@ -14,7 +14,8 @@
  */
 #include "test_common_esp2.h"
 
-MotorManager motor(ESC_PIN);
+//MotorManager motor(ESC_PIN);
+MotorController motor(ESC_PIN);
 DMS15 servo_dir(SERVO_DIR_PIN);
 UltraSonicSensor ultrasonic(US_TRIG_PIN, US_ECHO_PIN);
 ImuSensor imu(SDA_PIN, SCL_PIN);

@@ -12,61 +12,58 @@
 #include "I2C_wire.h"
 
 
+
 EncoderCarVelocity::EncoderCarVelocity(AS5600Encoder* encoder)
-    : encoder(encoder),
-      lastAngle(0.0f),
-      lastTime(0),
-      motorAngularVelocity(0.0f) {} //might not need later, for testing
+    : encoder(encoder), timeElapsed(0.0f) {} //might not need later, for testing
 
-   
-void EncoderCarVelocity::update(unsigned long currentMillis) {
-    float newAngle = encoder->update(); 
-    if (newAngle < 0.0f) return;      
+float EncoderCarVelocity :: getMotorAngularVelocity(){
+    unsigned long timeElapsed1 = micros();
 
-    if (lastTime == 0) {
-     
-        lastAngle = newAngle;
-        unwrappedAngle = newAngle;
-        lastTime = currentMillis;
-        return;
-    }
 
-    unsigned long dt_ms = currentMillis - lastTime;
-    if (dt_ms == 0) return;
+    unsigned long time1 = micros();
+    float angle1 = encoder->update();
+
+    unsigned long time2 = micros();
+    float angle2 = encoder->update();
+
+    unsigned long timeElapsed2 = micros();
+
+    timeElapsed = timeElapsed2 - timeElapsed1;
+    
+    unsigned long dt = time2 - time1; 
+    float delta = angle2 - angle1;
 
     
-    float delta = newAngle - lastAngle;
+  
+    
+    //Unwrap using 180° rule, if we measure 2 roations before the magnet was able to do more than half of a full revolution,
+    //we will be able to tell if the rotation was forward or backwards because 0 to 170 degrees means only way was forward
+    //because you need 190 degrees backwards otherwise
+    // 0 to 0 didn't roate beacuse could'nt have don e a full revolution
+    
+    //adjust the degree depending on if the movement was backwards or forwards
+    if (delta > 180.0f) { //could have only been a backwards rotation sicne over 180 degrees forward is impossible
+        delta -= 360.0f;
+    } else if (delta < -180.0f) {
+        delta += 360.0f;
+    }
+    
+    // Calculate velocity
+    float dt_seconds = dt / 1000000.0f;  // micros to seconds
+    float motorAngularVelocity = (delta * DEG_TO_RAD) / dt_seconds;
 
-    if (delta > 180.0f)      delta -= 360.0f;
-    else if (delta < -180.0f) delta += 360.0f;
-
-    unwrappedAngle += delta;   
-
-    float dt = dt_ms / 1000.0f;
-    float angularVel_rad_s = (delta * DEG_TO_RAD) / dt;
-
-    const float alpha = 0.2f;
-    motorAngularVelocity =
-        (motorAngularVelocity == 0.0f)
-            ? angularVel_rad_s
-            : alpha * angularVel_rad_s + (1 - alpha) * motorAngularVelocity;
-
-    lastAngle = newAngle;
-    lastTime  = currentMillis;
-}
-
-float EncoderCarVelocity::getMotorAngularVelocity() const {
     return motorAngularVelocity;
+
 }
 
-float EncoderCarVelocity::getWheelAngularVelocity() const {
-    return motorAngularVelocity / GEAR_RATIO;
+
+
+
+float EncoderCarVelocity::getWheelAngularVelocity() {
+    return getMotorAngularVelocity() / GEAR_RATIO;
 }
 
-float EncoderCarVelocity::getWheelLinearVelocity() const {
+float EncoderCarVelocity::getWheelLinearVelocity(){
     return getWheelAngularVelocity() * WHEEL_RADIUS;
 }
 
-float EncoderCarVelocity::getLastAngle() const {
-    return lastAngle;
-}
