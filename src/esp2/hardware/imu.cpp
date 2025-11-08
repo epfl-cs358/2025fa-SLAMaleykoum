@@ -28,7 +28,7 @@ bool ImuSensor::begin() {
 bool ImuSensor::configureSensor(uint32_t period_us) {
     return bno086.enableReport(SH2_ROTATION_VECTOR, period_us) 
             && bno086.enableReport(SH2_LINEAR_ACCELERATION, period_us)
-            && bno086.enableReport(SH2_GYROSCOPE_UNCALIBRATED, period_us);
+            && bno086.enableReport(SH2_GYROSCOPE_CALIBRATED, period_us);
 }
 
 void ImuSensor::readAndUpdate() {
@@ -52,7 +52,7 @@ void ImuSensor::readAndUpdate() {
     }
 
     // Angular velocity (rad/s)
-    if (sensorValue.sensorId == SH2_GYROSCOPE_UNCALIBRATED) {
+    if (sensorValue.sensorId == SH2_GYROSCOPE_CALIBRATED) {
         const auto& g = sensorValue.un.gyroscope;
         imu_data.omega_x = g.x;
         imu_data.omega_y = g.y;

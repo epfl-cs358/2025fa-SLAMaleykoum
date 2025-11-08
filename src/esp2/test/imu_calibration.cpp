@@ -274,6 +274,47 @@ static void test_gyro_turn(float angle_true_deg) {
               angle_deg_meas, angle_true_deg, g_scale.gyro_scale_z);
 }
 
+static void test_gyro_turn_basic() {
+  imu.readAndUpdate();
+  delay(LOOP_DT_US);
+  mqtt_printf("Gyro", "Hold the car and start rotating around Z.\n");
+
+  // Wait for motion start
+  while (fabsf(imu.imu_data.omega_z - g_bias.gyro_bias_z) <= GYRO_START_TH) {
+    imu.readAndUpdate();
+    delay(LOOP_DT_US);
+  }
+  mqtt_printf("Gyro", "Detected start. Integrating...\n");
+
+  float angle_rad = 0.f;
+  uint32_t t_prev = imu.imu_data.timestamp_ms;
+  float wz_prev   = imu.imu_data.omega_z - g_bias.gyro_bias_z;
+  uint32_t last_print = millis();
+
+  imu.readAndUpdate();
+  delay(LOOP_DT_US);
+  while (true) {
+    float wz = imu.imu_data.omega_z - g_bias.gyro_bias_z;
+    uint32_t t_now = imu.imu_data.timestamp_ms;
+    float dt = dt_s(t_now, t_prev);
+
+    // trapezoidal integration
+    angle_rad += 0.5f * (wz_prev + wz) * dt;
+
+    if ((uint32_t)(millis() - last_print) > PRINT_EVERY) {
+      last_print = millis();
+      mqtt_printf("Gyro", "angle=%.2f deg, wz=%.3f rad/s",
+                  angle_rad * 180.f / PI, wz);
+    }
+
+    t_prev = t_now;
+    wz_prev = wz;
+    imu.readAndUpdate();
+    delay(LOOP_DT_US);
+  }
+
+}
+
 // --- (3) Translation test (1D along X) ---
 static void test_translation_1d_x(float dist_true_m) {
   mqtt_printf("Trans", "Keep still, then push straight ~1–2 m and stop sharply.");
@@ -466,6 +507,9 @@ static void handle_command(const String& line) {
                   accel_y_scale_stats.mean, accel_y_scale_stats.get_std());
       break;
     }
+    case '5': {
+      test_gyro_turn_basic();
+    }
     default:
       break;
   }
@@ -500,7 +544,7 @@ void setup_imu_calibration() {
 void loop_imu_calibration() {
   // connection.check_connection();
 
-  handle_command("2 90");
+  handle_command("5");
 
   while (true) {delay(10000);}
   
