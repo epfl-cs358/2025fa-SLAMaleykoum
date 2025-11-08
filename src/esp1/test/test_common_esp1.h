@@ -24,14 +24,22 @@
 #include "common/wifi_connection.h"
 #include "esp1/hardware/rpLidar.h"
 
-// Pins used by the hardware components on the esp 2
-#define LIDAR_UART_RX 4
-#define LIDAR_UART_TX 5
-#define LIDAR_BAUD 115200
+// Pins used by the hardware components on the esp 1
+constexpr int MAX_RANGE = 8000; // Maximum range for LIDAR in mm
+constexpr int LIDAR_BAUDRATE = 460800; // Baud rate for LIDAR communication
+constexpr int LIDAR_TIMEOUT_MS = 5000; // Timeout for LIDAR read operations in milliseconds
+constexpr int LIDAR_ANGLE_OF_INTEREST_START = 0; // Start angle for LIDAR
+constexpr int LIDAR_ANGLE_OF_INTEREST_END = 360; // End angle for LIDAR
+constexpr int MAX_LIDAR_POINTS = 1024; 
+constexpr int HEIGHT = 200; // Height of the map in pixels
+constexpr int WIDTH = 200; // Width of the map in pixels
+#define LIDAR_SERIAL Serial2     // Lidar connected to Serial2 (TX:GPIO17, RX:GPIO16 by default)
+#define LIDAR_BAUDRATE 460800 // Common for RPLIDAR S2/A3/M1. Adjust if using A1/A2 (115200) or other models.
+#define LIDAR_SERIAL_BUFFER_SIZE 5000 // HardwareSerial TX buffer size for Lidar commands
 
 // Harwdare objects
 extern Connection connection;
-extern rpLidar lidar;
+extern rpLidar* lidar;
 
 // Prototypes of the functions
 //void setup_all_together();          void loop_all_together();
@@ -39,3 +47,4 @@ void setup_test_lidar_basic();      void loop_test_lidar_basic();
 void setup_test_connection();       void loop_test_connection();
 void setup_test_lidar_express();    void loop_test_lidar_express();
 void setup_test_lidar_serial();     void loop_test_lidar_serial();
+void setup_test_read_lidar();       void loop_test_read_lidar();

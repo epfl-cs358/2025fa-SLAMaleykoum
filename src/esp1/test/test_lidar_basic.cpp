@@ -15,11 +15,32 @@ static const uint16_t DOWNSAMPLE_N     = 8;     // keep every Nth point (bigger 
 static const uint16_t MAX_POINTS_OUT   = 180;   // hard cap to keep payload small
 
 void setup_test_lidar_basic() {
-    
+
     Serial.begin(115200);
     delay(2000);
 
     connection.setupWifi();
+
+    Serial2.setRxBufferSize(5000);
+
+    lidar->resetDevice();
+    stDeviceStatus_t sdst = lidar->getDeviceHealth();
+    printf("sdst.errorCode_high=%d  sdst.errorCode_low=%d sdst.status=%d\r\n", sdst.errorCode_high, sdst.errorCode_low, sdst.status);
+
+    lidar->setAngleOfInterest(LIDAR_ANGLE_OF_INTEREST_START, LIDAR_ANGLE_OF_INTEREST_END);
+
+    connection.check_connection();
+
+    bool ret = lidar->start(standard);
+    if (ret) {
+        char msg[6000];
+        strcpy(msg, "🟢 Rplidar C1 started correctly!\r\n");
+        connection.publish(mqtt_topic_lidar_basic, msg);
+    } else {
+        char msg[6000];
+        strcpy(msg, "🔴 Error starting Rplidar C1\r\n");
+        connection.publish(mqtt_topic_lidar_basic, msg);
+    }
 
     // --- UART1 pins for LiDAR (set to your wiring) ---
 
@@ -27,17 +48,9 @@ void setup_test_lidar_basic() {
     //lidar.begin(LIDAR_BAUD, LIDAR_UART_RX, LIDAR_UART_TX, 4096);
 
     // FOV restriction (smaller FOV => fewer points)
-    lidar.setAngleOfInterest(LEFT_DEG, RIGHT_DEG);
-
     // Start EXPRESS mode
-    if (!lidar.start(express)) {
-        Serial.println("[LiDAR] Failed to start EXPRESS mode. Rebooting device...");
-        lidar.resetDevice();
-        delay(500);
-        lidar.start(express);
-    }
 
-    Serial.println("[LiDAR] EXPRESS mode started.");
+    Serial.println("[LiDAR] STANDART mode started.");
 }
 
 // test loop

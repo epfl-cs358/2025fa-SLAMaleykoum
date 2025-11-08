@@ -14,6 +14,6 @@
  */
 #include "test_common_esp1.h"
 
-//rpLidar lidar(&Serial1);
+rpLidar* lidar = new rpLidar(&Serial2, LIDAR_BAUDRATE, 16, 17);
 
 Connection connection;

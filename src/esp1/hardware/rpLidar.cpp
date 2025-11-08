@@ -5,21 +5,17 @@
  * Library to control an rpLidar S2
  *
  */
-#include "../esp1/hardware/rpLidar.h"
+#include "esp1/hardware/rpLidar.h"
 #include "Arduino.h"
 
 
-rpLidar::rpLidar()
+rpLidar::rpLidar(HardwareSerial *_mySerial,uint32_t baud,int rxPin,int txPin)
 {
-	// serial=_mySerial;
-	status=false;
+	serial=_mySerial;
+	serial->setRxBufferSize(5000);
+	serial->begin(baud, SERIAL_8N1, rxPin, txPin);
 }
 
-void rpLidar::begin(uint32_t baud, uint16_t bufferSize, HardwareSerial *_mySerial, int8_t rxPin, int8_t txPin) {
-	serial = _mySerial;
-	serial->setTxBufferSize(bufferSize);
-    serial->begin(baud, SERIAL_8N1, rxPin, txPin);
-}
 
 
 stDeviceInfo_t rpLidar::getDeviceInfo()
@@ -98,10 +94,10 @@ bool rpLidar::start(uint8_t _mode)
 	if(!checkForTimeout(100,7)) //wait for response
 	{
 		serial->readBytes((uint8_t*)&descr,7);
-		//printf("descr: ");
-		//for(int i=0;i<7;i++)
-		//	printf("%x ", descr[i]);
-		//printf("\r\n");
+		printf("descr: ");
+		for(int i=0;i<7;i++)
+			printf("%x ", descr[i]);
+		printf("\r\n");
 		switch(_mode)
 		{
 			case standard:
