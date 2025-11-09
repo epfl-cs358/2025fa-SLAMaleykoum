@@ -1,6 +1,6 @@
-/*
- *  @author KKest
- *		@created 10.01.2022
+/**
+ * @author KKest
+ * @created 10.01.2022
  *	
  * Library to control an rpLidar S2
  *
@@ -58,7 +58,7 @@ class rpLidar{
 	 * Starts the Lidar and its measurement system
 	 * 
 	 * @param modus to run the lidar
-	 * @return true if mode started correctly, fals if not 
+	 * @return true if mode started correctly, false if not 
 	 */	
 	bool start(uint8_t _mode);
 	
