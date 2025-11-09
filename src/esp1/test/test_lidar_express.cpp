@@ -39,13 +39,41 @@ static void append_point(char* out, size_t out_sz, double angle_deg, uint16_t di
 void setup_test_lidar_express() {
     Serial.begin(115200);
     LIDAR_expr.setRxBufferSize(5000);
-    LIDAR_expr.begin(LIDAR_BAUDRATE, SERIAL_8N1, 16, 17);
+    LIDAR_expr.begin(LIDAR_BAUDRATE, SERIAL_8N1, 17, 16);
     delay(3000);
 
     connection.setupWifi();
     connection.check_connection();
 
-    rpLidar* lidar_expr = new rpLidar(&LIDAR_expr, LIDAR_BAUDRATE, 16, 17);
+    uint8_t getInfoCmd[2] = {0xA5, 0x50}; // commande GET_INFO
+    LIDAR_expr.write(getInfoCmd, 2);
+
+    delay(1000);  // petite attente de réponse
+
+    if (LIDAR_expr.available()) {
+        connection.publish(MQTT_TOPIC_LIDAR_debug,"[LIDAR] Data available after GET_INFO:");
+        
+        char buffer[512];
+        int idx = 0;
+        int count = 0;
+        while (LIDAR_expr.available() && idx < sizeof(buffer) - 3) {
+            uint8_t b = LIDAR_expr.read();
+            count++;
+            idx += snprintf(buffer + idx, sizeof(buffer) - idx, "%02X ", b);
+        }
+        buffer[idx] = '\0';
+        char msg[64];
+        snprintf(msg, sizeof(msg), "[LIDAR] read %d bytes", count);
+        connection.publish(MQTT_TOPIC_LIDAR_debug, msg);
+
+        if (idx > 0) {
+            connection.publish(MQTT_TOPIC_LIDAR_debug, buffer);
+        }
+    } else {
+        connection.publish(MQTT_TOPIC_LIDAR_debug,"[LIDAR] No data received (check wiring, power, baudrate)");
+    }
+
+    /*rpLidar* lidar_expr = new rpLidar(&LIDAR_expr, LIDAR_BAUDRATE, 16, 17);
 
     bool ret = lidar_expr->start(standard);
     delay(1000);
@@ -56,10 +84,10 @@ void setup_test_lidar_express() {
     }
 
     stDeviceStatus_t sdst = lidar_expr->getDeviceHealth();
-    printf("sdst.errorCode_high=%d  sdst.errorCode_low=%d sdst.status=%d\r\n",
+    printf("sdst.errorCode_high=%u  sdst.errorCode_low=%u sdst.status=%u\r\n",
            sdst.errorCode_high, sdst.errorCode_low, sdst.status);
 
-    lidar_expr->setAngleOfInterest(LEFT_DEG, RIGHT_DEG);
+    lidar_expr->setAngleOfInterest(LEFT_DEG, RIGHT_DEG);*/
 
     Serial.println("[LiDAR] STANDARD mode started.");
 }
