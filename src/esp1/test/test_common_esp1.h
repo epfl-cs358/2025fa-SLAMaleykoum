@@ -26,7 +26,6 @@
 
 // Pins used by the hardware components on the esp 1
 constexpr int MAX_RANGE = 8000; // Maximum range for LIDAR in mm
-constexpr int LIDAR_BAUDRATE = 460800; // Baud rate for LIDAR communication
 constexpr int LIDAR_TIMEOUT_MS = 5000; // Timeout for LIDAR read operations in milliseconds
 constexpr int LIDAR_ANGLE_OF_INTEREST_START = 0; // Start angle for LIDAR
 constexpr int LIDAR_ANGLE_OF_INTEREST_END = 360; // End angle for LIDAR
@@ -34,7 +33,8 @@ constexpr int MAX_LIDAR_POINTS = 1024;
 constexpr int HEIGHT = 200; // Height of the map in pixels
 constexpr int WIDTH = 200; // Width of the map in pixels
 #define LIDAR_SERIAL Serial2     // Lidar connected to Serial2 (TX:GPIO17, RX:GPIO16 by default)
-#define LIDAR_BAUDRATE 460800 // Common for RPLIDAR S2/A3/M1. Adjust if using A1/A2 (115200) or other models.
+#define LIDAR_BAUDRATE 256000 // Common for RPLIDAR S2/A3/M1 (460800). Adjust if using A1/A2 (115200) or other models.
+                                // S1/S2/C1 (256000)
 #define LIDAR_SERIAL_BUFFER_SIZE 5000 // HardwareSerial TX buffer size for Lidar commands
 
 // Harwdare objects

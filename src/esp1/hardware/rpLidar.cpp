@@ -91,7 +91,7 @@ bool rpLidar::start(uint8_t _mode)
 
 	rp_descriptor_t descr;
 
-	if(!checkForTimeout(100,7)) //wait for response
+	if(!checkForTimeout(5000,7)) //wait for response
 	{
 		serial->readBytes((uint8_t*)&descr,7);
 		printf("descr: ");

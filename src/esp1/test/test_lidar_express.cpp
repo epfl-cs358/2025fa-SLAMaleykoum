@@ -40,7 +40,6 @@ void setup_test_lidar_express() {
 
     connection.setupWifi();
 
-    //Serial2.setRxBufferSize(5000);
     lidar->resetDevice();
 
     stDeviceStatus_t sdst = lidar->getDeviceHealth();
@@ -50,21 +49,14 @@ void setup_test_lidar_express() {
     lidar->setAngleOfInterest(LEFT_DEG, RIGHT_DEG);
     connection.check_connection();
 
-    bool ret = lidar->start(express);
+    bool ret = lidar->start(standard);
     if (ret) {
         connection.publish(MQTT_TOPIC_LIDAR_debug, "🟢 Rplidar C1 started correctly!\r\n");
     } else {
         connection.publish(MQTT_TOPIC_LIDAR_debug, "🔴 Error starting Rplidar C1\r\n");
     }
 
-    // Retry loop
-    while (!lidar->start(express)) {
-        connection.publish(MQTT_TOPIC_LIDAR_debug, "⚠️ Retrying LIDAR start...");
-        lidar->resetDevice();
-        delay(500);
-    }
-
-    Serial.println("[LiDAR] EXPRESS mode started.");
+    Serial.println("[LiDAR] STANDARD mode started.");
 }
 
 void loop_test_lidar_express() {
