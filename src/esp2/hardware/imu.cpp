@@ -26,9 +26,9 @@ bool ImuSensor::begin() {
 }
 
 bool ImuSensor::configureSensor(uint32_t period_us) {
-    return bno086.enableReport(SH2_ROTATION_VECTOR, period_us) 
-            && bno086.enableReport(SH2_LINEAR_ACCELERATION, period_us)
-            && bno086.enableReport(SH2_GYROSCOPE_CALIBRATED, period_us);
+    return bno086.enableReport(SH2_GAME_ROTATION_VECTOR, period_us) 
+            && bno086.enableReport(SH2_LINEAR_ACCELERATION, period_us);
+            //&& bno086.enableReport(SH2_GYROSCOPE_UNCALIBRATED, period_us);
 }
 
 void ImuSensor::readAndUpdate() {
@@ -36,8 +36,9 @@ void ImuSensor::readAndUpdate() {
     if (!bno086.wasReset() && !bno086.getSensorEvent(&sensorValue)) return;
 
     // Orientation quaternion
-    if (sensorValue.sensorId == SH2_ROTATION_VECTOR) {
+    if (sensorValue.sensorId == SH2_GAME_ROTATION_VECTOR) {
         const auto& rv = sensorValue.un.rotationVector;
+        imu_data.qw = rv.real;
         imu_data.qx = rv.i;
         imu_data.qy = rv.j;
         imu_data.qz = rv.k;
@@ -52,12 +53,12 @@ void ImuSensor::readAndUpdate() {
     }
 
     // Angular velocity (rad/s)
-    if (sensorValue.sensorId == SH2_GYROSCOPE_CALIBRATED) {
-        const auto& g = sensorValue.un.gyroscope;
-        imu_data.omega_x = g.x;
-        imu_data.omega_y = g.y;
-        imu_data.omega_z = g.z;
-    }
+    // if (sensorValue.sensorId == SH2_GYROSCOPE_UNCALIBRATED) {
+    //     const auto& g = sensorValue.un.gyroscope;
+    //     imu_data.omega_x = g.x;
+    //     imu_data.omega_y = g.y;
+    //     imu_data.omega_z = g.z;
+    // }
 
     imu_data.timestamp_ms = millis();
 }

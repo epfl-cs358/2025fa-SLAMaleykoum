@@ -5,7 +5,7 @@
 #include "test_common_esp2.h"
 
 static int angle = 90;
-static const int stepDeg = 15;
+static const int stepDeg = 30;
 static const int minAngle = 60;
 static const int maxAngle = 120;
 
@@ -27,16 +27,14 @@ void setup_servo_right_left() {
 // test loop
 void loop_servo_right_left() {
     // test the servo for the wheels direction (left)
-    angle = max(minAngle, angle - stepDeg);
-    servo_dir.setAngle(angle);
+    servo_dir.setAngle(60);
     Serial.print("Steer Left: "); 
     Serial.println(angle);
 
     delay(2000);
 
     // test the servo for the wheels direction (right)
-    angle = min(maxAngle, angle + stepDeg);
-    servo_dir.setAngle(angle);
+    servo_dir.setAngle(130);
     Serial.print("Steer Right: "); 
     Serial.println(angle);
 
