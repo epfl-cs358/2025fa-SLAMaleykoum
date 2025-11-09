@@ -29,7 +29,6 @@ static char debugmsg[128];
 uint32_t last_pub_ms = 0;
 
 HardwareSerial LIDAR_expr(2);
-rpLidar* lidar_expr = new rpLidar(&LIDAR_expr, LIDAR_BAUDRATE, 16, 17);
 
 static void append_point(char* out, size_t out_sz, double angle_deg, uint16_t dist_mm, uint8_t quality) {
     char tmp[64];
@@ -39,31 +38,34 @@ static void append_point(char* out, size_t out_sz, double angle_deg, uint16_t di
 
 void setup_test_lidar_express() {
     Serial.begin(115200);
-    delay(1000);
+    LIDAR_expr.setRxBufferSize(5000);
+    LIDAR_expr.begin(LIDAR_BAUDRATE, SERIAL_8N1, 16, 17);
+    delay(3000);
 
     connection.setupWifi();
-
-    lidar_expr->resetDevice();
-
-    stDeviceStatus_t sdst = lidar_expr->getDeviceHealth();
-    printf("sdst.errorCode_high=%d  sdst.errorCode_low=%d sdst.status=%d\r\n",
-           sdst.errorCode_high, sdst.errorCode_low, sdst.status);
-
-    lidar_expr->setAngleOfInterest(LEFT_DEG, RIGHT_DEG);
     connection.check_connection();
 
+    rpLidar* lidar_expr = new rpLidar(&LIDAR_expr, LIDAR_BAUDRATE, 16, 17);
+
     bool ret = lidar_expr->start(standard);
+    delay(1000);
     if (ret) {
         connection.publish(MQTT_TOPIC_LIDAR_debug, "🟢 Rplidar C1 started correctly!\r\n");
     } else {
         connection.publish(MQTT_TOPIC_LIDAR_debug, "🔴 Error starting Rplidar C1\r\n");
     }
 
+    stDeviceStatus_t sdst = lidar_expr->getDeviceHealth();
+    printf("sdst.errorCode_high=%d  sdst.errorCode_low=%d sdst.status=%d\r\n",
+           sdst.errorCode_high, sdst.errorCode_low, sdst.status);
+
+    lidar_expr->setAngleOfInterest(LEFT_DEG, RIGHT_DEG);
+
     Serial.println("[LiDAR] STANDARD mode started.");
 }
 
 void loop_test_lidar_express() {
-    connection.check_connection();
+    /*connection.check_connection();
 
     uint16_t blocks = lidar_expr->readMeasurePoints();
     (void)blocks;
@@ -100,4 +102,5 @@ void loop_test_lidar_express() {
     connection.publish(MQTT_TOPIC_LIDAR, msg);
 
     Serial.printf("[LiDAR] published %d points\n", kept);
+    */
 }

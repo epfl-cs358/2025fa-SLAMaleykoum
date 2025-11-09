@@ -20,7 +20,7 @@ class rpLidar{
 	 * @param pointer to used USART
 	 * @param Baudrate
 	 */
-	rpLidar(HardwareSerial *_serial,uint32_t baud,int rxPin,int txPin);
+	rpLidar(HardwareSerial *_serial,unsigned long _baud,int _rxPin,int _txPin);
 
 	/**
 	 * Gets the device info from rpLidar
@@ -89,6 +89,9 @@ class rpLidar{
 	
 	private:
 	
+	int8_t rxPin;
+	int8_t txPin;
+	unsigned long baud;
 	stExpressDataPacket_t ExpressDataBuffer[79];	///<Storge to save the Data of an Express Scan
 	uint16_t interestAngleLeft;		///< left border of needed angle 180-360°
 	uint16_t interestAngleRight;	///< right border of needed angle 0-180°

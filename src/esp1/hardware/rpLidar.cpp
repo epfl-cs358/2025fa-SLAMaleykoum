@@ -9,13 +9,13 @@
 #include "Arduino.h"
 
 
-rpLidar::rpLidar(HardwareSerial *_mySerial,uint32_t baud,int rxPin,int txPin)
+rpLidar::rpLidar(HardwareSerial *_mySerial,unsigned long _baud,int _rxPin,int _txPin)
 {
 	serial=_mySerial;
-	serial->setRxBufferSize(5000);
-	serial->begin(baud, SERIAL_8N1, rxPin, txPin);
+	baud = _baud;
+	rxPin = _rxPin;
+	txPin = _txPin;
 }
-
 
 
 stDeviceInfo_t rpLidar::getDeviceInfo()
@@ -61,9 +61,8 @@ uint16_t rpLidar::scanStandard()
 
 void rpLidar::resetDevice()
 {
-	serial->write((uint8_t*)&req_message[rq_reset],2); //send reset request
-	Serial.printf("J'ai write %u \n", (uint8_t*)&req_message[rq_reset]);
-	delay(800); //wait for reboot
+	serial->write(req_message[rq_reset],2); //send reset request
+	delay(1000); //wait for reboot
 	clearSerialBuffer(); //remove old data in SerialBuffer
 	status=false;
 }
@@ -473,7 +472,6 @@ void rpLidar::clearSerialBuffer()
 {
 	while(serial->available())//read as long the hardware buffer is not empty
 	{
-		Serial.println("je clean");
 		serial->read();
 	}
 }
