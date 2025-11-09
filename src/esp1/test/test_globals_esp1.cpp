@@ -14,6 +14,8 @@
  */
 #include "test_common_esp1.h"
 
+//const HardwareSerial LIDAR(2);
 rpLidar* lidar = new rpLidar(&Serial2, LIDAR_BAUDRATE, 16, 17);
+DMS15 servo_dir(SERVO_DIR_PIN);
 
 Connection connection;

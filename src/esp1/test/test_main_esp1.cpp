@@ -37,6 +37,8 @@ void setup() {
         setup_test_lidar_serial();
     #elif TEST_ID == 5
         setup_test_read_lidar();
+    #elif TEST_ID == 6
+        setup_servo_lidar();
     #endif
 }
 
@@ -51,5 +53,7 @@ void loop() {
         loop_test_lidar_serial();
     #elif TEST_ID == 5
         loop_test_read_lidar();
+    #elif TEST_ID == 6
+        loop_servo_lidar();
     #endif
 }

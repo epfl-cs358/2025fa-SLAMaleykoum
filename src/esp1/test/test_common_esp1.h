@@ -21,6 +21,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <PubSubClient.h>
+#include "servo.h"
 #include "common/wifi_connection.h"
 #include "esp1/hardware/rpLidar.h"
 
@@ -32,19 +33,22 @@ constexpr int LIDAR_ANGLE_OF_INTEREST_END = 360; // End angle for LIDAR
 constexpr int MAX_LIDAR_POINTS = 1024; 
 constexpr int HEIGHT = 200; // Height of the map in pixels
 constexpr int WIDTH = 200; // Width of the map in pixels
+const extern HardwareSerial LIDAR;
 #define LIDAR_SERIAL Serial2     // Lidar connected to Serial2 (TX:GPIO17, RX:GPIO16 by default)
-#define LIDAR_BAUDRATE 256000 // Common for RPLIDAR S2/A3/M1 (460800). Adjust if using A1/A2 (115200) or other models.
+#define LIDAR_BAUDRATE 460800 // Common for RPLIDAR S2/A3/M1 (460800). Adjust if using A1/A2 (115200) or other models.
                                 // S1/S2/C1 (256000)
 #define LIDAR_SERIAL_BUFFER_SIZE 5000 // HardwareSerial TX buffer size for Lidar commands
+#define SERVO_DIR_PIN 7     // the servo that modifies the direction of the wheels
 
 // Harwdare objects
 extern Connection connection;
 extern rpLidar* lidar;
+extern DMS15 servo_dir;
 
 // Prototypes of the functions
-//void setup_all_together();          void loop_all_together();
 void setup_test_lidar_basic();      void loop_test_lidar_basic();
 void setup_test_connection();       void loop_test_connection();
 void setup_test_lidar_express();    void loop_test_lidar_express();
 void setup_test_lidar_serial();     void loop_test_lidar_serial();
 void setup_test_read_lidar();       void loop_test_read_lidar();
+void setup_servo_lidar();           void loop_servo_lidar();

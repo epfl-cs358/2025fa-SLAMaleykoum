@@ -28,6 +28,9 @@ static char debugmsg[128];
 
 uint32_t last_pub_ms = 0;
 
+HardwareSerial LIDAR_expr(2);
+rpLidar* lidar_expr = new rpLidar(&LIDAR_expr, LIDAR_BAUDRATE, 16, 17);
+
 static void append_point(char* out, size_t out_sz, double angle_deg, uint16_t dist_mm, uint8_t quality) {
     char tmp[64];
     snprintf(tmp, sizeof(tmp), "{\"angle\":%.2f,\"distance\":%u,\"quality\":%u}", angle_deg, (unsigned)dist_mm, (unsigned)quality);
@@ -36,20 +39,20 @@ static void append_point(char* out, size_t out_sz, double angle_deg, uint16_t di
 
 void setup_test_lidar_express() {
     Serial.begin(115200);
-    delay(500);
+    delay(1000);
 
     connection.setupWifi();
 
-    lidar->resetDevice();
+    lidar_expr->resetDevice();
 
-    stDeviceStatus_t sdst = lidar->getDeviceHealth();
+    stDeviceStatus_t sdst = lidar_expr->getDeviceHealth();
     printf("sdst.errorCode_high=%d  sdst.errorCode_low=%d sdst.status=%d\r\n",
            sdst.errorCode_high, sdst.errorCode_low, sdst.status);
 
-    lidar->setAngleOfInterest(LEFT_DEG, RIGHT_DEG);
+    lidar_expr->setAngleOfInterest(LEFT_DEG, RIGHT_DEG);
     connection.check_connection();
 
-    bool ret = lidar->start(standard);
+    bool ret = lidar_expr->start(standard);
     if (ret) {
         connection.publish(MQTT_TOPIC_LIDAR_debug, "🟢 Rplidar C1 started correctly!\r\n");
     } else {
@@ -62,7 +65,7 @@ void setup_test_lidar_express() {
 void loop_test_lidar_express() {
     connection.check_connection();
 
-    uint16_t blocks = lidar->readMeasurePoints();
+    uint16_t blocks = lidar_expr->readMeasurePoints();
     (void)blocks;
 
     uint32_t now = millis();
@@ -76,8 +79,8 @@ void loop_test_lidar_express() {
     uint16_t stride = (DOWNSAMPLE_N == 0 ? 1 : DOWNSAMPLE_N);
 
     for (uint16_t i = 0, step = 0; i < SCAN_WINDOW && kept < MAX_POINTS_OUT; ++i, ++step) {
-        double angle = lidar->Data[i].angle;
-        uint16_t dist = lidar->Data[i].distance;
+        double angle = lidar_expr->Data[i].angle;
+        uint16_t dist = lidar_expr->Data[i].distance;
 
         // Avoid publishing debug per point — too heavy!
         //snprintf(debugmsg, sizeof(debugmsg), "angle: %.1f ; dist: %u", angle, dist);

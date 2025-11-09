@@ -23,9 +23,10 @@ stDeviceInfo_t rpLidar::getDeviceInfo()
 	clearSerialBuffer();
 	stDeviceInfo_t info;
 	rp_descriptor_t descr;
-	serial->write((uint8_t*)&req_message[rq_info],2); //send Device Info request
-	if(!checkForTimeout(10,27))	//wait for Response
+	serial->write(req_message[rq_info],2); //send Device Info request
+	if(!checkForTimeout(3000,27))	//wait for Response
 	{
+		Serial.println("PAS timeout des le debuttt");
 		serial->readBytes((uint8_t*)&descr,7);
 		serial->readBytes((uint8_t*)&info,20);
 	}
@@ -61,6 +62,7 @@ uint16_t rpLidar::scanStandard()
 void rpLidar::resetDevice()
 {
 	serial->write((uint8_t*)&req_message[rq_reset],2); //send reset request
+	Serial.printf("J'ai write %u \n", (uint8_t*)&req_message[rq_reset]);
 	delay(800); //wait for reboot
 	clearSerialBuffer(); //remove old data in SerialBuffer
 	status=false;
@@ -471,6 +473,7 @@ void rpLidar::clearSerialBuffer()
 {
 	while(serial->available())//read as long the hardware buffer is not empty
 	{
+		Serial.println("je clean");
 		serial->read();
 	}
 }
