@@ -49,13 +49,15 @@ static constexpr float ACC_STOP_TH     = 0.20f;   // m/s² threshold to detect s
 static constexpr float V_STOP_TH       = 0.08f;   // m/s velocity threshold for stop
 static constexpr uint32_t LOOP_DT_US   = 5;      // delay between 2 fetch of imu data
 static constexpr uint32_t PRINT_EVERY  = 100;     // print every 100 ms during integration
+const float ACC_STILL_THRESH  = 0.01f;   // m/s^2
+const float GYRO_STILL_THRESH = 0.02f;   // rad/s
 
 // --- Calibration data ---
 struct BiasStats {
-  float acc_bias_x = 0.006156, acc_bias_y = 0.003307, acc_bias_z = -0.013545;
-  float quat_bias_x = -0.034643, quat_bias_y = -0.027338, quat_bias_z = 0.001799, quat_bias_w = 0;
-  float acc_std_x = 0.018430, acc_std_y = 0.015655, acc_std_z = 0.083933;
-  float quat_std_x = 0.000230, quat_std_y = 0.000252, quat_std_z = 0.000098, quat_std_w = 0;
+  float acc_bias_x = -0.001039, acc_bias_y = 0.000227, acc_bias_z = -0.016825;
+  float quat_bias_x = -0.021069, quat_bias_y = -0.025061, quat_bias_z = 0.001512, quat_bias_w = 0.999;
+  float acc_std_x = 0.025340, acc_std_y = 0.014414, acc_std_z = 0.037240;
+  float quat_std_x = 0.00015, quat_std_y = 0.00024, quat_std_z = 0.00032, quat_std_w = 0;
   uint32_t samples = 0;
 };
 
@@ -80,6 +82,13 @@ struct RunningStats {
   float get_std() {
     return (n > 1) ? sqrt(m2 / (n - 1)) : 0.0f;
   }
+};
+
+struct quat_t {
+    float x;   // quaternion (absolute orientation)
+    float y;
+    float z;
+    float w;
 };
 
 static BiasStats g_bias;
@@ -301,38 +310,55 @@ static void test_translation_1d_x(float dist_true_m) {
 static void test_translation_1d_x_basic() {
   mqtt_printf("Trans", "Translation on x");
 
+  const float ACC_STILL = 0.03f;   // m/s^2
+  const float Q_STILL   = 1e-4f;   // variation de quat très faible
+
   delay(LOOP_DT_US);
   imu.readAndUpdate();
 
+  quat_t q_prev = {imu.imu_data.qx, imu.imu_data.qy, imu.imu_data.qz, imu.imu_data.qw};
   float v = 0.f, x = 0.f;
   uint32_t t_prev = imu.imu_data.timestamp_ms;
   float ax_prev   = imu.imu_data.acc_x - g_bias.acc_bias_x;
   uint32_t last_print = millis();
 
-  delay(LOOP_DT_US);
-  imu.readAndUpdate();
-
   while (true) {
-    float ax = imu.imu_data.acc_x - g_bias.acc_bias_x;
+    imu.readAndUpdate();
+
     uint32_t t_now = imu.imu_data.timestamp_ms;
     float dt = dt_s(t_now, t_prev);
 
-    // trapezoidal integration: accel -> vel -> pos
+    t_prev = t_now;
+
+    float ax = imu.imu_data.acc_x - g_bias.acc_bias_x;
+
+    // petit deadband pour tuer le bruit
+    if (fabsf(ax) < ACC_STILL) ax = 0.f;
+
     float a_mid = 0.5f * (ax_prev + ax);
     float v_new = v + a_mid * dt;
-    float x_new = x + v * dt + 0.5f * a_mid * dt * dt; // not accurate ---------------
+    float x_new = x + v * dt + 0.5f * a_mid * dt * dt;
 
-    v = v_new; x = x_new;
+    quat_t q = {imu.imu_data.qx, imu.imu_data.qy, imu.imu_data.qz, imu.imu_data.qw};
+    float dq =
+        fabsf(q.w - q_prev.w) +
+        fabsf(q.x - q_prev.x) +
+        fabsf(q.y - q_prev.y) +
+        fabsf(q.z - q_prev.z);
+
+    if (ax == 0.f && dq < Q_STILL) {
+        v_new = 0.f;  // ZUPT soft
+    }
+
+    v = v_new; x = x_new, ax_prev = ax, q_prev = q;
 
     if ((uint32_t)(millis() - last_print) > PRINT_EVERY) {
       last_print = millis();
-      mqtt_printf("Trans", "x=%.2f m, v=%.2f m/s, ax=%.2f m/s^2", x, v, ax);
+      mqtt_printf("Trans", "t=%lu ms, x=%.2f cm, v=%.2f m/s, ax=%.2f m/s^2", 
+                  (unsigned long)millis(), x*100, v, ax);
     }
 
-    t_prev = t_now;
-    ax_prev = ax;
     delay(LOOP_DT_US);
-    imu.readAndUpdate();
   }
 }
 
@@ -429,7 +455,7 @@ static void handle_command(const String& line) {
   char cmd = line.charAt(0);
   float val = line.substring(1).toFloat();
 
-  int runs = 10;
+  int runs = 5;
   switch (cmd) {
     case '1': {
       BiasStats global_stats; // to accumulate the final stats
@@ -511,6 +537,8 @@ void setup_imu_calibration() {
   mqtt_printf("IMU", "Calibration and accuracy test started");  
 
   i2cMutexInit();
+
+  delay(200);
   if (!imu.begin()) {
       Serial.println("IMU init failed!");
       while(true);
@@ -528,7 +556,7 @@ void setup_imu_calibration() {
 void loop_imu_calibration() {
   // connection.check_connection();
 
-  handle_command("5");
+  handle_command("2");
 
   while (true) {delay(10000);}
   

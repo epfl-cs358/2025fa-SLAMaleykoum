@@ -37,7 +37,7 @@ void ImuSensor::readAndUpdate() {
 
     // Orientation quaternion
     if (sensorValue.sensorId == SH2_GAME_ROTATION_VECTOR) {
-        const auto& rv = sensorValue.un.rotationVector;
+        const auto& rv = sensorValue.un.gameRotationVector;
         imu_data.qw = rv.real;
         imu_data.qx = rv.i;
         imu_data.qy = rv.j;
@@ -46,7 +46,7 @@ void ImuSensor::readAndUpdate() {
 
     // Linear acceleration (m/s²)
     if (sensorValue.sensorId == SH2_LINEAR_ACCELERATION) {
-        const auto& a = sensorValue.un.accelerometer;
+        const auto& a = sensorValue.un.linearAcceleration;
         imu_data.acc_x = a.x;
         imu_data.acc_y = a.y;
         imu_data.acc_z = a.z;
