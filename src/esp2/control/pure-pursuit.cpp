@@ -14,11 +14,16 @@
 
 #include <cstring>
 #include <cmath>
-#include <algorithm>
 #include "common/data_types.h"
 #include "common/transforms.h"
 #include "esp2/control/pure_pursuit.h"
 
+template <typename T>
+T clamp(T value, T minVal, T maxVal) {
+  if (value < minVal) return minVal;
+  if (value > maxVal) return maxVal;
+  return value;
+}
 
 // Note: Since we're constanly re-computing the path from the current pose to the goal,
 //      we can just overwrite the current path even if we're in the middle of following one.
@@ -52,7 +57,7 @@ MotionCommand PurePursuit::compute_command(const Pose2D& current_pose, const Vel
     if (path_length_ == 0) return {0.0f, 0.0f}; // No path to follow
     
     // Calculate Adaptive Lookahead Distance
-    float Ld = calculate_lookahead_distance(vel.linear_velocity);
+    float Ld = calculate_lookahead_distance(vel.v_linear);
 
     // Find the Lookahead Target Point (in GLOBAL frame)
     Waypoint target_point_global = find_lookahead_point(current_pose, Ld);
@@ -71,7 +76,7 @@ MotionCommand PurePursuit::compute_command(const Pose2D& current_pose, const Vel
     float v_target = calculate_target_speed(delta_target);
 
     // Clamp the theoretical angle to the car's physical limits.
-    float steering_command_rad = std::clamp(delta_target, 
+    float steering_command_rad = clamp(delta_target, 
                                             MIN_STEERING_ANGLE_RAD_, 
                                             MAX_STEERING_ANGLE_RAD_);
 
@@ -135,11 +140,11 @@ Waypoint PurePursuit::find_lookahead_point(const Pose2D& current_pose, float Ld)
 float PurePursuit::calculate_lookahead_distance(float current_speed) const {
     // Linear relationship between speed and lookahead distance. (when going faster, look further ahead)
     float Ld = K_dd_ * current_speed;
-    return std::clamp(Ld, min_lookahead_dist_, max_lookahead_dist_);
+    return clamp(Ld, min_lookahead_dist_, max_lookahead_dist_);
 }
 
 float PurePursuit::calculate_target_speed(float steering_angle) const {
     // Inverse relationship: Faster for smaller angles, slower for larger.
     float v_target = max_speed_ * (1.0f - K_v_ * std::abs(steering_angle));
-    return std::clamp(v_target, min_speed_, max_speed_);
+    return clamp(v_target, min_speed_, max_speed_);
 }

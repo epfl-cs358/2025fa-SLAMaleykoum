@@ -27,7 +27,7 @@ public:
      * @param current_pose The robot's current local pose from the EKFLocalizer.
      * @return The required MotionCommand (target velocity and steering angle).
      */
-    MotionCommand compute_command(const Pose2D& current_pose);
+    MotionCommand compute_command(const Pose2D& current_pose, const Velocity& vel);
 
     // TODO: Do we actually need this???? Seems useless since we shouldn't ever "finish" a path...
     /**
@@ -51,6 +51,10 @@ private:
     // TODO: Check these speeds with @cléa
     float max_speed_ = 0.5f;
     float min_speed_ = 0.2f;
+
+    // TODO: change this ------------------------
+    float MIN_STEERING_ANGLE_RAD_ = 0.5;
+    float MAX_STEERING_ANGLE_RAD_ = 0.5;
 
     // Helper functions
     float calculate_lookahead_distance(float current_speed) const;
