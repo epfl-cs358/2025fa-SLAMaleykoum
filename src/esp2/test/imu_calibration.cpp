@@ -319,7 +319,7 @@ static void test_translation_1d_x_basic() {
   quat_t q_prev = {imu.imu_data.qx, imu.imu_data.qy, imu.imu_data.qz, imu.imu_data.qw};
   float v = 0.f, x = 0.f;
   uint32_t t_prev = imu.imu_data.timestamp_ms;
-  float ax_prev   = imu.imu_data.acc_x; // - g_bias.acc_bias_x;
+  float ax_prev   = imu.imu_data.acc_x;
   uint32_t last_print = millis();
 
   delay(LOOP_DT_US);
@@ -332,7 +332,7 @@ static void test_translation_1d_x_basic() {
 
     t_prev = t_now;
 
-    float ax = imu.imu_data.acc_x ; //- g_bias.acc_bias_x;
+    float ax = imu.imu_data.acc_x ;
 
     // petit deadband pour tuer le bruit
     if (fabsf(ax) < ACC_STILL) ax = 0.f;
@@ -365,33 +365,58 @@ static void test_translation_1d_x_basic() {
 }
 
 static void test_translation_1d_y_basic() {
-  mqtt_printf("Trans", "Translation on y");
+  mqtt_printf("Trans", "Translation on x");
 
+  const float ACC_STILL = 0.03f;   // m/s^2
+  const float Q_STILL   = 1e-4f;   // variation de quat très faible
+
+  delay(LOOP_DT_US);
+  imu.readAndUpdate();
+
+  quat_t q_prev = {imu.imu_data.qx, imu.imu_data.qy, imu.imu_data.qz, imu.imu_data.qw};
   float v = 0.f, y = 0.f;
   uint32_t t_prev = imu.imu_data.timestamp_ms;
-  float ay_prev   = imu.imu_data.acc_y - g_bias.acc_bias_y;
+  float ay_prev   = imu.imu_data.acc_y;
   uint32_t last_print = millis();
+
+  delay(LOOP_DT_US);
 
   while (true) {
     imu.readAndUpdate();
-    float ay = imu.imu_data.acc_y - g_bias.acc_bias_y;
+
     uint32_t t_now = imu.imu_data.timestamp_ms;
     float dt = dt_s(t_now, t_prev);
 
-    // trapezoidal integration: accel -> vel -> pos
+    t_prev = t_now;
+
+    float ay = imu.imu_data.acc_y ;
+
+    // petit deadband pour tuer le bruit
+    if (fabsf(ay) < ACC_STILL) ay = 0.f;
+
     float a_mid = 0.5f * (ay_prev + ay);
     float v_new = v + a_mid * dt;
-    float y_new = y + 0.5f * (v + v_new) * dt;
+    float y_new = y + v * dt + 0.5f * a_mid * dt * dt;
 
-    v = v_new; y = y_new;
+    quat_t q = {imu.imu_data.qx, imu.imu_data.qy, imu.imu_data.qz, imu.imu_data.qw};
+    float dq =
+        fabsf(q.w - q_prev.w) +
+        fabsf(q.x - q_prev.x) +
+        fabsf(q.y - q_prev.y) +
+        fabsf(q.z - q_prev.z);
+
+    if (ay == 0.f && dq < Q_STILL) {
+        v_new = 0.f;  // ZUPT soft
+    }
+
+    v = v_new; y = y_new, ay_prev = ay, q_prev = q;
 
     if ((uint32_t)(millis() - last_print) > PRINT_EVERY) {
       last_print = millis();
-      mqtt_printf("Trans", "y=%.3f m, v=%.2f m/s, ay=%.2f m/s^2", y, v, ay);
+      mqtt_printf("Trans", "t=%lu ms, y=%.2f cm, v=%.2f m/s, ay=%.2f m/s^2", 
+                  (unsigned long)millis(), y*100, v, ay);
     }
 
-    t_prev = t_now;
-    ay_prev = ay;
     delay(LOOP_DT_US);
   }
 }
@@ -559,7 +584,7 @@ void setup_imu_calibration() {
 void loop_imu_calibration() {
   // connection.check_connection();
 
-  handle_command("5");
+  handle_command("6");
 
   while (true) {delay(10000);}
   
