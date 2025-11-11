@@ -28,8 +28,8 @@
 // Pins used by the hardware components on the esp 1
 constexpr int MAX_RANGE = 8000; // Maximum range for LIDAR in mm
 constexpr int LIDAR_TIMEOUT_MS = 5000; // Timeout for LIDAR read operations in milliseconds
-constexpr uint16_t LIDAR_ANGLE_OF_INTEREST_START = 0; // Start angle for LIDAR
-constexpr uint16_t LIDAR_ANGLE_OF_INTEREST_END = 360; // End angle for LIDAR
+constexpr int LIDAR_ANGLE_OF_INTEREST_START = 0; // Start angle for LIDAR
+constexpr int LIDAR_ANGLE_OF_INTEREST_END = 360; // End angle for LIDAR
 constexpr int MAX_LIDAR_POINTS = 1024; 
 constexpr int HEIGHT = 200; // Height of the map in pixels
 constexpr int WIDTH = 200; // Width of the map in pixels
@@ -49,9 +49,11 @@ extern DMS15 servo_dir;
 void initGlobals();
 
 // Prototypes of the functions
-void setup_test_lidar_basic();      void loop_test_lidar_basic();
-void setup_test_connection();       void loop_test_connection();
-void setup_test_lidar_express();    void loop_test_lidar_express();
-void setup_test_lidar_serial();     void loop_test_lidar_serial();
-void setup_test_read_lidar();       void loop_test_read_lidar();
-void setup_servo_lidar();           void loop_servo_lidar();
+void setup_test_lidar_basic();              void loop_test_lidar_basic();
+void setup_test_connection();               void loop_test_connection();
+void setup_test_lidar_express();            void loop_test_lidar_express();
+void setup_test_lidar_serial();             void loop_test_lidar_serial();
+void setup_test_read_lidar();               void loop_test_read_lidar();
+void setup_servo_lidar();                   void loop_servo_lidar();
+void setup_test_lidar_express_get_info();   void loop_test_lidar_express_get_info();
+void setup_test_lidar_standard();           void loop_test_lidar_standard();

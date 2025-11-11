@@ -1,10 +1,17 @@
+/**
+ * @file test_read_lidar.cpp
+ * @brief Runs RPLIDAR S2 in STANDARD mode, read measure points, and publishes compact JSON over MQTT.
+ *
+ * Output topic: slamaleykoum77/lidar ; slamaleykoum77/print
+ */
 #include <Arduino.h>
 #include "test_common_esp1.h"
 #include "esp1/hardware/rpLidar.h"
 #include "esp1/hardware/rpLidarTypes.h"
 #include "Config.h"
 
-const char* mqtt_topic_lidar_real = "slamaleykoum77/lidar";
+const char* MQTT_TOPIC_LIDAR_READ = "slamaleykoum77/lidar";
+const char* MQTT_TOPIC_LIDAR_READ_DEBUG = "slamaleykoum77/print";
 
 void printLidarAsciiMap(int count) {
     Serial.println("🟢 Printing Lidar ASCII map...");
@@ -70,7 +77,7 @@ void setup_test_read_lidar() {
         strcpy(msg, "🔴 Error starting RPLidar!\r\n");
         Serial.println(msg);
     }
-    connection.publish(mqtt_topic_lidar_real, msg);
+    connection.publish(MQTT_TOPIC_LIDAR_READ_DEBUG, msg);
 }
 
 // Boucle principale
@@ -111,7 +118,7 @@ void loop_test_read_lidar() {
     }
 
     strcat(msg, "]}");
-    connection.publish(mqtt_topic_lidar_real, msg);
+    connection.publish(MQTT_TOPIC_LIDAR_READ, msg);
 
     Serial.printf("📡 Published %d lidar points\n", valid);
 

@@ -10,7 +10,7 @@ const char* MQTT_TOPIC_SERIAL_DEBUG = "slamaleykoum77/print";
 
 void setup_test_lidar_serial() {
     Serial.begin(115200);
-    Serial1.begin(460800, SERIAL_8N1, 5, 4);  // or 256000 depending on model
+    Serial1.begin(460800, SERIAL_8N1, 5, 4);
 
     connection.setupWifi();
 }

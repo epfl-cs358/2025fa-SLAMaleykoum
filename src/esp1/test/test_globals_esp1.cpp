@@ -21,11 +21,11 @@ DMS15 servo_dir(SERVO_DIR_PIN);
 Connection connection;
 
 void initGlobals() {
-    // Initialise le port série matériel du LIDAR
+    // Initialize the material serial port of the LIDAR
     LIDAR_SERIAL.setRxBufferSize(5000);
     LIDAR_SERIAL.begin(LIDAR_BAUDRATE, SERIAL_8N1, LIDAR_RX_PIN, LIDAR_TX_PIN);
     delay(100);
 
-    // Crée l’objet rpLidar
+    // Create LIDAR object
     lidar = new rpLidar(&LIDAR_SERIAL, LIDAR_BAUDRATE, LIDAR_RX_PIN, LIDAR_TX_PIN);
 }

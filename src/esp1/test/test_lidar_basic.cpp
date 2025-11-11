@@ -1,6 +1,6 @@
 /**
  * @file test_lidar_basic.cpp
- * @brief Test to send fake data of the lidar to the MQTT broker
+ * @brief Test to send fake data of the lidar to the MQTT broker (to test MQTT)
  * @result Create a fake map with the mqtt_client.py file
  */
 #include "test_common_esp1.h"
