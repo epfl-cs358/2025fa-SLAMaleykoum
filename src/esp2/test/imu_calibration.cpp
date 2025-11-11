@@ -319,8 +319,10 @@ static void test_translation_1d_x_basic() {
   quat_t q_prev = {imu.imu_data.qx, imu.imu_data.qy, imu.imu_data.qz, imu.imu_data.qw};
   float v = 0.f, x = 0.f;
   uint32_t t_prev = imu.imu_data.timestamp_ms;
-  float ax_prev   = imu.imu_data.acc_x - g_bias.acc_bias_x;
+  float ax_prev   = imu.imu_data.acc_x; // - g_bias.acc_bias_x;
   uint32_t last_print = millis();
+
+  delay(LOOP_DT_US);
 
   while (true) {
     imu.readAndUpdate();
@@ -330,7 +332,7 @@ static void test_translation_1d_x_basic() {
 
     t_prev = t_now;
 
-    float ax = imu.imu_data.acc_x - g_bias.acc_bias_x;
+    float ax = imu.imu_data.acc_x ; //- g_bias.acc_bias_x;
 
     // petit deadband pour tuer le bruit
     if (fabsf(ax) < ACC_STILL) ax = 0.f;
@@ -552,11 +554,12 @@ void setup_imu_calibration() {
  *   2                : gyro test;
  *   3 <distance_m>   : translation test for x; enter true distance (e.g. "3 1.20")
  *   4 <distance_m>   : translation test for y; enter true distance (e.g. "4 1.20")
+ *   5                : accel basic on x 
  */
 void loop_imu_calibration() {
   // connection.check_connection();
 
-  handle_command("2");
+  handle_command("5");
 
   while (true) {delay(10000);}
   
