@@ -5,7 +5,7 @@ const char* mqtt_topic_serial2 = "slamaleykoum77/lidar";
 
 void setup_test_lidar_serial() {
     Serial.begin(115200);
-    Serial1.begin(256000, SERIAL_8N1, 4, 5);  // or 256000 depending on model
+    Serial1.begin(460800, SERIAL_8N1, 5, 4);  // or 256000 depending on model
 
     connection.setupWifi();
 }

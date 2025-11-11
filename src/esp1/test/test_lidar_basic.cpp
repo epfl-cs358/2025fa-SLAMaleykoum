@@ -8,8 +8,6 @@
 const char* mqtt_topic_lidar_basic = "slamaleykoum77/lidar";
 
 // ---- Tunables ----
-static const uint16_t LEFT_DEG         = 0;     // inclusive
-static const uint16_t RIGHT_DEG        = 360;   // inclusive
 static const uint32_t PUBLISH_PERIOD_MS= 200;   // publish every 200 ms
 static const uint16_t DOWNSAMPLE_N     = 8;     // keep every Nth point (bigger => fewer points)
 static const uint16_t MAX_POINTS_OUT   = 180;   // hard cap to keep payload small
@@ -20,8 +18,6 @@ void setup_test_lidar_basic() {
     delay(2000);
 
     connection.setupWifi();
-
-    Serial2.setRxBufferSize(5000);
 
     lidar->resetDevice();
     stDeviceStatus_t sdst = lidar->getDeviceHealth();
@@ -41,14 +37,6 @@ void setup_test_lidar_basic() {
         strcpy(msg, "🔴 Error starting Rplidar C1\r\n");
         connection.publish(mqtt_topic_lidar_basic, msg);
     }
-
-    // --- UART1 pins for LiDAR (set to your wiring) ---
-
-    // rpLidar driver serial/buffer init
-    //lidar.begin(LIDAR_BAUD, LIDAR_UART_RX, LIDAR_UART_TX, 4096);
-
-    // FOV restriction (smaller FOV => fewer points)
-    // Start EXPRESS mode
 
     Serial.println("[LiDAR] STANDART mode started.");
 }

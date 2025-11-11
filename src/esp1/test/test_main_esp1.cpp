@@ -27,6 +27,7 @@
 #endif
 
 void setup() {
+    initGlobals();
     #if TEST_ID == 1
         setup_test_lidar_basic();
     #elif TEST_ID == 2

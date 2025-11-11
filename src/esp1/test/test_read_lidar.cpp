@@ -51,10 +51,6 @@ void setup_test_read_lidar() {
 
     connection.setupWifi();
     connection.check_connection();
-
-    // --- Initialisation UART2 pour le lidar ---
-    //Serial2.begin(LIDAR_BAUDRATE, SERIAL_8N1, RXD2, TXD2);
-    Serial2.setRxBufferSize(LIDAR_SERIAL_BUFFER_SIZE);
     
     // --- Reset et health check ---
     lidar->resetDevice();

@@ -15,8 +15,6 @@
 static const char* MQTT_TOPIC_LIDAR = "slamaleykoum77/lidar";
 static const char* MQTT_TOPIC_LIDAR_debug = "slamaleykoum77/print";
 
-static const uint16_t LEFT_DEG         = 0;
-static const uint16_t RIGHT_DEG        = 360;
 static const uint32_t PUBLISH_PERIOD_MS= 200;
 static const uint16_t DOWNSAMPLE_N     = 8;
 static const uint16_t MAX_POINTS_OUT   = 180;
@@ -28,8 +26,6 @@ static char debugmsg[128];
 
 uint32_t last_pub_ms = 0;
 
-HardwareSerial LIDAR_expr(2);
-
 static void append_point(char* out, size_t out_sz, double angle_deg, uint16_t dist_mm, uint8_t quality) {
     char tmp[64];
     snprintf(tmp, sizeof(tmp), "{\"angle\":%.2f,\"distance\":%u,\"quality\":%u}", angle_deg, (unsigned)dist_mm, (unsigned)quality);
@@ -38,14 +34,16 @@ static void append_point(char* out, size_t out_sz, double angle_deg, uint16_t di
 
 void setup_test_lidar_express() {
     Serial.begin(115200);
-    LIDAR_expr.setRxBufferSize(5000);
-    LIDAR_expr.begin(LIDAR_BAUDRATE, SERIAL_8N1, 17, 16);
-    delay(3000);
+
+    /*uint8_t getInfoCmd[2] = {0xA5, 0x50};
+    LIDAR_SERIAL.write(getInfoCmd, 2);
+    LIDAR_SERIAL.flush();
+    delay(200);*/ // A TESTER !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
     connection.setupWifi();
     connection.check_connection();
 
-    uint8_t getInfoCmd[2] = {0xA5, 0x50}; // commande GET_INFO
+    /*uint8_t getInfoCmd[2] = {0xA5, 0x50}; // commande GET_INFO
     LIDAR_expr.write(getInfoCmd, 2);
 
     delay(1000);  // petite attente de réponse
@@ -71,11 +69,9 @@ void setup_test_lidar_express() {
         }
     } else {
         connection.publish(MQTT_TOPIC_LIDAR_debug,"[LIDAR] No data received (check wiring, power, baudrate)");
-    }
+    }*/
 
-    /*rpLidar* lidar_expr = new rpLidar(&LIDAR_expr, LIDAR_BAUDRATE, 16, 17);
-
-    bool ret = lidar_expr->start(standard);
+    bool ret = lidar->start(standard);
     delay(1000);
     if (ret) {
         connection.publish(MQTT_TOPIC_LIDAR_debug, "🟢 Rplidar C1 started correctly!\r\n");
@@ -83,19 +79,19 @@ void setup_test_lidar_express() {
         connection.publish(MQTT_TOPIC_LIDAR_debug, "🔴 Error starting Rplidar C1\r\n");
     }
 
-    stDeviceStatus_t sdst = lidar_expr->getDeviceHealth();
+    stDeviceStatus_t sdst = lidar->getDeviceHealth();
     printf("sdst.errorCode_high=%u  sdst.errorCode_low=%u sdst.status=%u\r\n",
            sdst.errorCode_high, sdst.errorCode_low, sdst.status);
 
-    lidar_expr->setAngleOfInterest(LEFT_DEG, RIGHT_DEG);*/
+    lidar->setAngleOfInterest(LIDAR_ANGLE_OF_INTEREST_START, LIDAR_ANGLE_OF_INTEREST_END);
 
     Serial.println("[LiDAR] STANDARD mode started.");
 }
 
 void loop_test_lidar_express() {
-    /*connection.check_connection();
+    connection.check_connection();
 
-    uint16_t blocks = lidar_expr->readMeasurePoints();
+    uint16_t blocks = lidar->readMeasurePoints();
     (void)blocks;
 
     uint32_t now = millis();
@@ -109,8 +105,8 @@ void loop_test_lidar_express() {
     uint16_t stride = (DOWNSAMPLE_N == 0 ? 1 : DOWNSAMPLE_N);
 
     for (uint16_t i = 0, step = 0; i < SCAN_WINDOW && kept < MAX_POINTS_OUT; ++i, ++step) {
-        double angle = lidar_expr->Data[i].angle;
-        uint16_t dist = lidar_expr->Data[i].distance;
+        double angle = lidar->Data[i].angle;
+        uint16_t dist = lidar->Data[i].distance;
 
         // Avoid publishing debug per point — too heavy!
         //snprintf(debugmsg, sizeof(debugmsg), "angle: %.1f ; dist: %u", angle, dist);
@@ -130,5 +126,4 @@ void loop_test_lidar_express() {
     connection.publish(MQTT_TOPIC_LIDAR, msg);
 
     Serial.printf("[LiDAR] published %d points\n", kept);
-    */
 }
