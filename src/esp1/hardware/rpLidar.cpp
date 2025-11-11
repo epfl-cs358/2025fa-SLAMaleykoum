@@ -12,11 +12,10 @@
 rpLidar::rpLidar(HardwareSerial *_mySerial,unsigned long _baud,int _rxPin,int _txPin)
 {
 	serial=_mySerial;
-	baud = _baud;
-	rxPin = _rxPin;
-	txPin = _txPin;
+	baud=_baud;
+	rxPin=_rxPin;
+	txPin=_txPin;
 }
-
 
 stDeviceInfo_t rpLidar::getDeviceInfo()
 {

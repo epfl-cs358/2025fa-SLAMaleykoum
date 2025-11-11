@@ -5,7 +5,7 @@
  */
 #include "test_common_esp1.h"
 
-const char* mqtt_topic_lidar_basic = "slamaleykoum77/lidar";
+const char* MQTT_TOPIC_LIDAR_BASIC = "slamaleykoum77/lidar";
 
 // ---- Tunables ----
 static const uint32_t PUBLISH_PERIOD_MS= 200;   // publish every 200 ms
@@ -31,11 +31,11 @@ void setup_test_lidar_basic() {
     if (ret) {
         char msg[6000];
         strcpy(msg, "🟢 Rplidar C1 started correctly!\r\n");
-        connection.publish(mqtt_topic_lidar_basic, msg);
+        connection.publish(MQTT_TOPIC_LIDAR_BASIC, msg);
     } else {
         char msg[6000];
         strcpy(msg, "🔴 Error starting Rplidar C1\r\n");
-        connection.publish(mqtt_topic_lidar_basic, msg);
+        connection.publish(MQTT_TOPIC_LIDAR_BASIC, msg);
     }
 
     Serial.println("[LiDAR] STANDART mode started.");
@@ -63,7 +63,7 @@ void loop_test_lidar_basic() {
 
     strcat(msg, "]");  // close JSON array
 
-    connection.publish(mqtt_topic_lidar_basic, msg);
+    connection.publish(MQTT_TOPIC_LIDAR_BASIC, msg);
 
     delay(1000);
 }

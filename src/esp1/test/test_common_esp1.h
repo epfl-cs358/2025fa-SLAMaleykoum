@@ -21,7 +21,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <PubSubClient.h>
-#include "servo.h"
+#include "esp1/hardware/servo.h"
 #include "common/wifi_connection.h"
 #include "esp1/hardware/rpLidar.h"
 
