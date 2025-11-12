@@ -1,51 +1,45 @@
 /**
  * @file pid_velocity
- * @brief Test to 
+ * @brief Fixed PID velocity control test
  */
 #include "test_common_esp2.h"
 #include "EncoderCarVelocity.h"
 #include "motor_pid.h"
+
 const char* mqtt_topic_connection_pid_velocity = "slamaleykoum77/print";
 
-//Wheel & motor parameters
-const float GEAR_RATIO = 10.0f; //it takes the motor 10 full rotations to make the wheel turn a full rotation
-const float WHEEL_RADIUS_M = 0.045f; //wheel radius in meters
-const float TARGET_MOTOR_DEGREES = 360.0f *30; //target to reach to make the motor stop -> *# of rotations
+// Wheel & motor parameters
+//const float GEAR_RATIO = 10.0f;
+const float WHEEL_RADIUS_M = 0.045f;
+const float TARGET_MOTOR_DEGREES = 360.0f * 30;
 
+// Timing variables
+static unsigned long lastVelocityUpdate = 0;
+const int VELOCITY_UPDATE_INTERVAL_MS = 10; // Update velocity every 50ms
 
-static unsigned long lastVelocity = 0; //previous velocity
+// Control parameters
+const float DESIRED_VELOCITY = 1.5f; // m/s target speed
+const float VELOCITY_TOLERANCE = 0.02f; // ±2 cm/s tolerance for "reached"
+const float PWM_SAFE_MIN = 0.17f;
+const float PWM_SAFE_MAX = 0.25f;
 
-static int drivePower = 20; 
-
-const int ANGLE_INTERVAL_MS = 5; //if odd go back to 300 but one full motor revolution takes around 370 milliseconds
-// 300; // velocity sample interval in milliseconds
-
-
-
-const float desiredVelocity = 0.4f; // 0.3 m/s (example target speed)
-
-
-
-
-MotorPID pid(2.0f, 0.0f, 0.00f);
-static EncoderCarVelocity carVelocity(&encoder);
-
+// PID controller and velocity estimator
+//MotorPID pid(2.0f, 0.0f, 0.00f);
 
 void setup_pid_velocity() {
-    
     Serial.begin(115200);
     delay(2000);
 
-    //Wifi setup
+    // Wifi setup
     connection.setupWifi();
 
-    //Light setup
+    // Light setup
     pinMode(LED_BUILTIN, OUTPUT);
 
-    //I2C setup for IMU and Encoder
+    // I2C setup for IMU and Encoder
     i2cMutexInit();
 
-    //Wifi connection 
+    // Wifi connection 
     connection.check_connection();
     
     // Initialize motor
@@ -53,121 +47,124 @@ void setup_pid_velocity() {
         char msgMotor[50];
         snprintf(msgMotor, sizeof(msgMotor), "Motor init failed!");
         connection.publish(mqtt_topic_connection_pid_velocity, msgMotor);
-
-
-
         while (true);
     }
     
-    //Initialize encoder
-    if (!encoder.begin()) {
-        char msgEncoder[50];
-        snprintf(msgEncoder, sizeof(msgEncoder), "Encoder init failed!");
-        connection.publish(mqtt_topic_connection_pid_velocity,msgEncoder);
-        while (true);
-    }
+    // Initialize encoder
+    encoder.begin();
 
-    //check again the connection before sending the message to see if the setup succeeded
+    // Confirm setup success
     connection.check_connection();
     char msgSetup[50];
     snprintf(msgSetup, sizeof(msgSetup), "Setup success!");
-    connection.publish(mqtt_topic_connection_pid_velocity,msgSetup);
-
-    
+    connection.publish(mqtt_topic_connection_pid_velocity, msgSetup);
 }
 
-
-// test loop
 void loop_pid_velocity() {
-    
-    //make sure connection is established
+    // Ensure connection is established
     connection.check_connection();
 
+    static unsigned long lastPIDTime = 0;
+    static unsigned long targetReachedTime = 0;
+    static bool velocityReached = false;
     
-    static unsigned long lastTime = 0; // persists across loops
-    unsigned long now = millis();      // using milliseconds
+    unsigned long now = millis();
 
-    // Initialize first loop
-    if (lastTime == 0) {
-        lastTime = now;
+    // Initialize on first loop
+    if (lastPIDTime == 0) {
+        lastPIDTime = now;
+        lastVelocityUpdate = now;
         return;
     }
 
-    // dt in seconds - divide by 1000 since millis() returns milliseconds
-    float dt = (now - lastTime) / 1000.0f;  // ← FIXED: divide by 1000, not 1000000
-    lastTime = now;
+    // Calculate dt for PID (in seconds)
+    float dt = (now - lastPIDTime) / 1000.0f;
+    lastPIDTime = now;
 
-    // ignore extremely small dt
-    //if (dt <= 0.001f) return;  // ← FIXED: 1ms minimum instead of 0.00001
+    // Skip if dt is too small (shouldn't happen with millis)
+    if (dt <= 0.001f) return;
 
-
-
-
-    char msgdt[80];
-    snprintf(msgdt, sizeof(msgdt), "The dt = %.6f  s", dt);
-    connection.publish(mqtt_topic_connection_pid_velocity,msgdt);
-    Serial.println(msgdt);
-
-
-
-    // 1️⃣ Update encoder data and compute current car velocity
-    
-    if (now - lastVelocity >= ANGLE_INTERVAL_MS) {
-        //carVelocity.update(now);
-        lastVelocity = now;
+    // ========== 1️⃣ Update velocity at fixed intervals ==========
+    if (now - lastVelocityUpdate >= VELOCITY_UPDATE_INTERVAL_MS) {
+        encoder.getMotorAngularVelocity();  // Updates internal angle measurements
+        lastVelocityUpdate = now;
     }
-    float currentLinearVel = carVelocity.getWheelLinearVelocity();
+    
+    float currentLinearVel = encoder.getWheelLinearVelocity();
 
-    // 2️⃣ Get your desired velocity (manual test or pure pursuit output)
-    Velocity targetVel = { .v_linear = desiredVelocity, .v_angular = 0.0f };
+    // ========== 2️⃣ Set target velocity ==========
+    Velocity targetVel = { .v_linear = DESIRED_VELOCITY, .v_angular = 0.0f };
     Velocity currentVel = { .v_linear = currentLinearVel, .v_angular = 0.0f };
 
-    // 3️⃣ Compute PID PWM output
-    MotorOutputs pwm = pid.compute_pwm_output(targetVel, currentVel, dt);
+    // ========== 3️⃣ Compute PID output ==========
+    float pwm_output = pid.compute_pwm_output(targetVel, currentVel, dt);
 
-    // 4️⃣ Apply PWM to the motor
-    float safe_signal = constrain(pwm, -0.25f, 0.25f); // your known safe range
-    
-    motor.setTargetPercent(safe_signal);
-    
-
+    // ========== 4️⃣ Apply safety limits and send to motor ==========
+    float safe_pwm = constrain(pwm_output, PWM_SAFE_MIN, PWM_SAFE_MAX);
+    motor.forward(safe_pwm);
+    //motor.setTargetPercent(safe_pwm);
     motor.update();
 
-    // 5️⃣ (Optional) Debug info
-    
-    char msgTarget[180];
-    snprintf(msgTarget, sizeof(msgTarget),"Target=%.3f m/s | Current=%.3f m/s | PWM=%d\n",
-                  targetVel.v_linear, currentLinearVel, pwm);
-    connection.publish(mqtt_topic_connection_pid_velocity,msgTarget);
-    Serial.println(msgTarget);
+    // ========== 5️⃣ Debug output ==========
+    char msgStatus[200];
+    snprintf(msgStatus, sizeof(msgStatus),
+             "dt=%.3fs | Target=%.3f m/s | Current=%.3f m/s | PWM=%.3f (safe=%.3f)",
+             dt, targetVel.v_linear, currentLinearVel, pwm_output, safe_pwm);
+    connection.publish(mqtt_topic_connection_pid_velocity, msgStatus);
+    Serial.println(msgStatus);
 
-    //float wheelDeg = carVelocity.getUnwrappedAngle() / GEAR_RATIO;
-    if (targetVel.v_linear == currentLinearVel) {
-        delay(6000);// to check if the speed stay constant let it continnue for 6 seconds
-        for(int i =0; i <3; i++){
-            motor.emergencyStop();
-            motor.update();
-            Serial.println("Target reached — stopping motor.");
+    // ========== 6️⃣ Check if target velocity reached ==========
+    float velocityError = fabs(targetVel.v_linear - currentLinearVel);
+    
+    if (velocityError <= VELOCITY_TOLERANCE) {
+        if (!velocityReached) {
+            // Just reached target
+            velocityReached = true;
+            targetReachedTime = now;
+            
+            char msgReached[100];
+            snprintf(msgReached, sizeof(msgReached), 
+                     "Target velocity reached! Error: %.4f m/s", velocityError);
+            connection.publish(mqtt_topic_connection_pid_velocity, msgReached);
+            Serial.println(msgReached);
         }
-        char msgStop[80];
-        snprintf(msgStop, sizeof(msgStop), "Stopped after since it got to desired speed");
-        connection.publish(mqtt_topic_connection_pid_velocity,msgStop);
-        Serial.println(msgStop);
+        
+        // If maintained for 6 seconds, stop
+        if (now - targetReachedTime >= 6000) {
+            // Stop the motor
+            for (int i = 0; i < 3; i++) {
+                motor.stop();
+                //motor.emergencyStop();
+                motor.update();
+                delay(10);
+            }
+            
+            char msgStop[100];
+            snprintf(msgStop, sizeof(msgStop), 
+                     "Maintained target for 6s - stopping motor");
+            connection.publish(mqtt_topic_connection_pid_velocity, msgStop);
+            Serial.println(msgStop);
 
-
-        char msgStopVel[160];
-        snprintf(msgStopVel, sizeof(msgStopVel), 
-        "For motor STOP : angular_v_motor=%.2f rad/s | angular_v_wheel=%.2f rad/s | v_car=%.3f m/s",
-        carVelocity.getMotorAngularVelocity(), 
-        carVelocity.getWheelAngularVelocity(), 
-        carVelocity.getWheelLinearVelocity());
-        connection.publish(mqtt_topic_connection_pid_velocity,msgStopVel);
-
-        delay(4000);
-    }  
-    
-    
-
-
-
+            // Final velocity reading
+            char msgFinal[180];
+            snprintf(msgFinal, sizeof(msgFinal), 
+                     "FINAL: motor_angular_v=%.2f rad/s | wheel_angular_v=%.2f rad/s | linear_v=%.3f m/s",
+                     encoder.getMotorAngularVelocity(), 
+                     encoder.getWheelAngularVelocity(), 
+                     encoder.getWheelLinearVelocity());
+            connection.publish(mqtt_topic_connection_pid_velocity, msgFinal);
+            
+            // Hold for a moment then stop completely
+            delay(4000);
+            while(true) {
+                motor.stop();
+                //motor.emergencyStop();
+                motor.update();
+                delay(100);
+            }
+        }
+    } else {
+        // Reset if we drop out of tolerance
+        velocityReached = false;
+    }
 }

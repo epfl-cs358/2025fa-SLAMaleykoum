@@ -39,7 +39,7 @@ void MotorPID::reset() {
 MotorOutputs MotorPID::compute_pwm_output(const Velocity& target_vel, const Velocity& current_velocity, float dt) {
     
     // Prevent division by zero or negative time
-    if (dt <= 0.0f) {
+    if (dt <= 0.000001f) {
         return NEUTRAL_US; // Return neutral if time has not advanced
     }
 
@@ -60,15 +60,6 @@ MotorOutputs MotorPID::compute_pwm_output(const Velocity& target_vel, const Velo
     prev_err_ = e;
 
     // Clamp the control signal
-    control_signal = constrain(control_signal, PID_CONTROL_MIN, PID_CONTROL_MAX);
+    return constrain(control_signal, PID_CONTROL_MIN, PID_CONTROL_MAX);
 
-    // Scale control signal [-1.0, 1.0] to the ESC's PWM range [1000, 2000]
-    //  The "span" from neutral (1500) is 500µs in either direction.
-    float pwm_float = NEUTRAL_US + (control_signal * 500.0f);
-
-    // Cast to the final output type
-    MotorOutputs final_pwm = static_cast<MotorOutputs>(pwm_float);
-
-    // Final safety clamp to the absolute hardware limits and return
-    return constrain(final_pwm, MAX_REVERSE_US, MAX_FORWARD_US);
 }

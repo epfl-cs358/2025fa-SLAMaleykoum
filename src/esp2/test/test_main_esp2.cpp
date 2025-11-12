@@ -23,7 +23,7 @@
 
 // Change the id depending on the test to run
 #ifndef TEST_ID
-#define TEST_ID 5
+#define TEST_ID 9
 #endif
 
 void setup() {
@@ -42,7 +42,9 @@ void setup() {
     #elif TEST_ID == 7
         setup_encoder();
     #elif TEST_ID == 8
-        setup_pid_velocity();    
+        setup_pid_velocity();   
+    #elif TEST_ID == 9
+        setup_path_pid();        
     #endif
 }
 
@@ -63,6 +65,8 @@ void loop() {
         loop_encoder();
     #elif TEST_ID == 8
         loop_pid_velocity();
+    #elif TEST_ID == 9
+        loop_path_pid();
 
     #endif
 }
