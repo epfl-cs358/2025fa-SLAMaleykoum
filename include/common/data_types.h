@@ -174,3 +174,18 @@ struct MissionGoal {
     Pose2D target_pose;
     MissionGoalType type;
 };
+
+// --- ESPS COMMUNICATION ---
+/**
+ * @enum MsgID : The IDs of the messages
+ * @brief Each message sent begins by a unique id. When receiving, the esp reads the ID 
+ * and knos what to do with the following message.
+ */
+enum MsgId : uint8_t {
+  MSG_PATH   = 1,       // GloablPathMessage ESP1->ESP2
+  MSG_CORR   = 2,       // LoopClosureCorrection ESP1->ESP2
+  MSG_POSE   = 3,       // Pose2D ESP2->ESP1
+  MSG_PING = 250,
+  MSG_PONG = 251,
+  // maybe more to add
+};
