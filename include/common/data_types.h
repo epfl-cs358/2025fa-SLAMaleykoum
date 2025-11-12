@@ -97,7 +97,7 @@ struct IMUData : public Printable {
 
 };
 
-typedef uint16_t MotorOutputs; // PWM = pulse duration in microseconds 
+typedef float MotorOutputs; // PWM = pulse duration in microseconds 
 // (1000 µs = full reverse, 1500 µs = neutral, 2000 µs = full forward)
 
 // --- MAPPING AND PLANNING DATA ---

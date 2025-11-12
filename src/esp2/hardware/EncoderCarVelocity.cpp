@@ -7,66 +7,79 @@
  * @date Nov 2025
  */
 #include "EncoderCarVelocity.h"
-#include "AS5600Encoder.h"
-#include "I2C_mutex.h"
-#include "I2C_wire.h"
+#include <Wire.h>
 
 
-EncoderCarVelocity::EncoderCarVelocity(AS5600Encoder* encoder)
-    : encoder(encoder),
-      lastAngle(0.0f),
-      lastTime(0),
-      motorAngularVelocity(0.0f) {} //might not need later, for testing
+EncoderCarVelocity::EncoderCarVelocity() {}
 
-   
-void EncoderCarVelocity::update(unsigned long currentMillis) {
-    float newAngle = encoder->update(); 
-    if (newAngle < 0.0f) return;      
-
-    if (lastTime == 0) {
-     
-        lastAngle = newAngle;
-        unwrappedAngle = newAngle;
-        lastTime = currentMillis;
-        return;
+// Initialize I2C and AS5600
+void EncoderCarVelocity::begin() {
+    Wire.begin();  // default SDA/SCL pins
+    if (!as5600.begin()) {
+        Serial.println("AS5600 not detected!");
+        while (1); 
     }
 
-    unsigned long dt_ms = currentMillis - lastTime;
-    if (dt_ms == 0) return;
-
-    
-    float delta = newAngle - lastAngle;
-
-    if (delta > 180.0f)      delta -= 360.0f;
-    else if (delta < -180.0f) delta += 360.0f;
-
-    unwrappedAngle += delta;   
-
-    float dt = dt_ms / 1000.0f;
-    float angularVel_rad_s = (delta * DEG_TO_RAD) / dt;
-
-    const float alpha = 0.2f;
-    motorAngularVelocity =
-        (motorAngularVelocity == 0.0f)
-            ? angularVel_rad_s
-            : alpha * angularVel_rad_s + (1 - alpha) * motorAngularVelocity;
-
-    lastAngle = newAngle;
-    lastTime  = currentMillis;
+    // Set clockwise rotation, small noise filter
+    as5600.setDirection(AS5600_CLOCK_WISE);
+    as5600.setHysteresis(2);     // suppress small noise
+    as5600.setSlowFilter(2);     // optional, reduces jitter
+   
 }
 
-float EncoderCarVelocity::getMotorAngularVelocity() const {
-    return motorAngularVelocity;
+// Returns motor angular velocity in rad/sec
+float EncoderCarVelocity::getMotorAngularVelocity() {
+    // library handles delta / dt internally
+    return as5600.getAngularSpeed(AS5600_MODE_RADIANS, true);
 }
 
-float EncoderCarVelocity::getWheelAngularVelocity() const {
-    return motorAngularVelocity / GEAR_RATIO;
+
+float EncoderCarVelocity::getFilteredAngularVelocity() {
+    /*static float filteredVel = 0.0f;
+    const float alpha = 0.02f;
+
+    float rawVel = getMotorAngularVelocity();
+    filteredVel = alpha * rawVel + (1 - alpha) * filteredVel;
+
+    return filteredVel;*/
+     static float emaVel = 0.0f;
+    static float buffer[5] = {0};
+    static int idx = 0;
+
+    const float alpha = 0.02f;
+
+    // Update EMA
+    float rawVel = getMotorAngularVelocity();
+    emaVel = alpha * rawVel + (1 - alpha) * emaVel;
+
+    // Update buffer
+    buffer[idx] = emaVel;
+    idx = (idx + 1) % 5;
+
+
+    // Compute small moving average
+    float sum = 0;
+    for (int i = 0; i < 5; i++) sum += buffer[i];
+
+
+    return sum / 5.0f;
 }
 
-float EncoderCarVelocity::getWheelLinearVelocity() const {
+
+
+float EncoderCarVelocity::getWheelAngularVelocity() {
+    return getFilteredAngularVelocity() / GEAR_RATIO;
+}
+
+
+
+
+
+float EncoderCarVelocity::getWheelLinearVelocity() {
     return getWheelAngularVelocity() * WHEEL_RADIUS;
 }
 
-float EncoderCarVelocity::getLastAngle() const {
-    return lastAngle;
+
+int32_t EncoderCarVelocity::getCumulativePosition() {
+    return as5600.getCumulativePosition();
 }

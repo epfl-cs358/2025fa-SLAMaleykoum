@@ -1,37 +1,30 @@
+
 #ifndef ENCODER_CAR_VELOCITY_H
 #define ENCODER_CAR_VELOCITY_H
 
-#include <Arduino.h>
-class AS5600Encoder;
+#include <AS5600.h>
+
+#define GEAR_RATIO 10.0f      
+#define WHEEL_RADIUS 0.0495f //maybe needs to be adapted but 9.9 diametre  
+
 
 class EncoderCarVelocity {
 public:
-    EncoderCarVelocity(AS5600Encoder* encoder);
+    EncoderCarVelocity();
 
-    void update(unsigned long currentMillis);
+    void begin();  
 
-    float getMotorAngularVelocity() const;
-    float getWheelAngularVelocity() const;
-    float getWheelLinearVelocity() const;
- 
-    float getLastAngle() const;
- 
-    float getUnwrappedAngle() const { return unwrappedAngle; }
+
+    float getMotorAngularVelocity();  
+    float getFilteredAngularVelocity();
+    float getWheelAngularVelocity();   
+    float getWheelLinearVelocity();    
+    float getFilteredMotorAngularVelocity();
+  
+    int32_t getCumulativePosition();
 
 private:
-    AS5600Encoder* encoder;
-
-    float lastAngle;          
-    float unwrappedAngle;      
-    unsigned long lastTime;
-    float motorAngularVelocity;
-
-
-    
-    const float GEAR_RATIO = 10.0f; //it takes the motor 10 full rotations to make the wheel turn a full rotation
-    const float WHEEL_RADIUS = 0.045f; //wheel radius in meters
-    const uint8_t AS5600_ADDR = 0x36;
-    const uint8_t RAW_ANGLE_REG = 0x0C;
+    AS5600 as5600;
 };
 
 #endif
