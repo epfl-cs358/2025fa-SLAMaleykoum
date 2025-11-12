@@ -71,20 +71,29 @@ def on_message(client, userdata, msg):
                 if len(lidar_points) > 5000:
                     lidar_points = lidar_points[-3000:]
         return
-
-    # (keep this if you also send JSON in /lidar)
+    
     if topic.endswith("/lidar"):
         try:
-            data = json.loads(payload)
-            if data.get("type") != "lidar":
-                return
-            points = data.get("points", [])
+            points = json.loads(payload)
             with lock:
                 lidar_points.extend(points)
-                if len(lidar_points) > 5000:
-                    lidar_points = lidar_points[-3000:]
+                lidar_points = lidar_points[-3000:]
         except Exception as e:
-            print("⚠️ Error decoding LIDAR payload:", e)
+            print("JSON parse error:", e)
+
+    # # (keep this if you also send JSON in /lidar)
+    # if topic.endswith("/lidar"):
+    #     try:
+    #         data = json.loads(payload)
+    #         if data.get("type") != "lidar":
+    #             return
+    #         points = data.get("points", [])
+    #         with lock:
+    #             lidar_points.extend(points)
+    #             if len(lidar_points) > 5000:
+    #                 lidar_points = lidar_points[-3000:]
+    #     except Exception as e:
+    #         print("⚠️ Error decoding LIDAR payload:", e)
 
 def mqtt_loop():
     client = mqtt.Client()

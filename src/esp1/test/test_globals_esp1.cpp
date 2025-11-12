@@ -22,7 +22,7 @@ Connection connection;
 
 void initGlobals() {
     // Initialize the material serial port of the LIDAR
-    LIDAR_SERIAL.setRxBufferSize(5000);
+    LIDAR_SERIAL.setRxBufferSize(LIDAR_SERIAL_BUFFER_SIZE);
     LIDAR_SERIAL.begin(LIDAR_BAUDRATE, SERIAL_8N1, LIDAR_RX_PIN, LIDAR_TX_PIN);
     delay(100);
 
