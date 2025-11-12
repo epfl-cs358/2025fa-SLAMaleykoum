@@ -32,9 +32,10 @@ def on_message(client, userdata, msg):
             print(f"{message}")
 
         elif sensor_type == "imu":
-            ax = data.get("tag")
-            ay = data.get("message")
-            print(f"IMU Acceleration: tag={ax}, message={ay}")
+            ax = data.get("ax")
+            ay = data.get("ay")
+            az = data.get("az")
+            print(f"IMU Acceleration: ax={ax}, ay={ay}, az={az}")
 
         elif sensor_type == "ultrasonic":
             dist = data.get("distance")
