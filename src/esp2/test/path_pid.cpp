@@ -11,12 +11,12 @@ const char* mqtt_topic_connection_path_pid = "slamaleykoum77/print";
 // ===== Motor and control parameters =====
 const float GEAR_RATIO1 = 10.0f;
 const float WHEEL_RADIUS_M = 0.0495f;
-const float TARGET_SEGMENT_1_M = 60.5f;
-const float TARGET_SEGMENT_2_M = 1.0f;
-const float DESIRED_VELOCITY = 1.0f; // target speed in m/s
+const float TARGET_SEGMENT_1_M = 0.3f;
+const float TARGET_SEGMENT_2_M = 0.1f;
+const float DESIRED_VELOCITY = 0.45f; // target speed in m/s
 const float VELOCITY_TOLERANCE = 0.05f;
 const float PWM_SAFE_MIN = 0.0f;
-const float PWM_SAFE_MAX = 0.30f;
+const float PWM_SAFE_MAX = 0.24f;
 
 // ===== Servo angles =====
 const int STRAIGHT_ANGLE = 90;
@@ -92,7 +92,7 @@ void setup_path_pid() {
 void loop_path_pid() {
     connection.check_connection();
     unsigned long now = millis();
-    float dt = (now - lastTime);
+    float dt = (now - lastTime)/1000.0f;
     lastTime = now;
 
     // --- Update velocity estimation periodically ---
@@ -155,7 +155,7 @@ void loop_path_pid() {
             }
 
             // Drive forward slowly while turning left
-            float turn_pwm = constrain(safe_pwm*1.2 , PWM_SAFE_MIN, 0.25f); // slightly slower * 0.8f
+            float turn_pwm = constrain(safe_pwm*0.8 , PWM_SAFE_MIN, 0.24f); // slightly slower * 0.8f
             motor.forward(turn_pwm);
             //motor.forward(max(turn_pwm, 0.25f));
 
@@ -165,9 +165,9 @@ void loop_path_pid() {
             estimatedDistance += currentVel * dt;
 
             // End condition: after 1.5 s or small distance (~0.5 m)
-            if ((now - turnStartTime > 4500) || (estimatedDistance >= 0.6f)) {
-                motor.emergencyStop();
-                motor.update();
+            if ((estimatedDistance >= 1.0f)) { //(now - turnStartTime > 7500) || 
+                //motor.emergencyStop();
+                //motor.update();
                 servo_dir.setAngle(STRAIGHT_ANGLE);
                 delay(400);
                 estimatedDistance = 0.0f;
@@ -179,37 +179,44 @@ void loop_path_pid() {
         }
 
         case DRIVE_SECOND_SEGMENT: {
-            static bool initialized = false;
+        static bool initialized = false;
 
-            if (!initialized) {
-                initialized = true;
-                estimatedDistance = 0.0f;
-                pid.reset(); // optional, if your PID class supports it
-                connection.publish(mqtt_topic_connection_path_pid, "Starting second straight segment");
-            }
+    if (!initialized) {
+        initialized = true;
+        estimatedDistance = 0.0f;
+        pid.reset(); // reset integral/derivative state if supported
+        connection.publish(mqtt_topic_connection_path_pid, "Starting second straight segment");
+    }
 
-            // Boost at start to overcome friction
-            if (estimatedDistance < 0.05f) {
-                motor.forward(PWM_SAFE_MAX);  // quick kick
-            } else {
-                motor.forward(safe_pwm);
-            }
+    // --- PID control for second segment ---
+    Velocity target2 = { .v_linear = DESIRED_VELOCITY, .v_angular = 0.0f };
+    Velocity current2 = { .v_linear = currentVel, .v_angular = 0.0f };
+    float pwm_output2 = pid.compute_pwm_output(target2, current2, dt);
+    float safe_pwm2   = constrain(pwm_output2, PWM_SAFE_MIN, PWM_SAFE_MAX);
 
-            motor.update();
-            estimatedDistance += currentVel * dt;
+    // Optional boost at very start to overcome static friction
+    if (estimatedDistance < 0.05f) {
+        motor.forward(PWM_SAFE_MAX);
+    } else {
+        motor.forward(safe_pwm2);  // use PID output
+    }
 
-            if (estimatedDistance >= TARGET_SEGMENT_2_M) {
-                motor.stop();
-                motor.update();
-                servo_dir.setAngle(STRAIGHT_ANGLE);
-                digitalWrite(LED_BUILTIN, HIGH);
-                connection.publish(mqtt_topic_connection_path_pid, "Reached final 1m, stopping");
+    motor.update();
+    estimatedDistance += currentVel * dt;
 
-                initialized = false;
-                state = STOPPED;
-            }
-            break;
-        }
+    if (estimatedDistance >= TARGET_SEGMENT_2_M) {
+        motor.stop();
+        motor.update();
+        servo_dir.setAngle(STRAIGHT_ANGLE);
+        digitalWrite(LED_BUILTIN, HIGH);
+        connection.publish(mqtt_topic_connection_path_pid, "Reached final segment, stopping");
+
+        initialized = false;
+        state = STOPPED;
+    }
+    break;
+}
+
 
 
         case STOPPED:
