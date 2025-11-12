@@ -12,7 +12,7 @@ class EncoderCarVelocity {
 public:
     EncoderCarVelocity();
 
-    void begin();  
+    bool begin();  
 
 
     float getMotorAngularVelocity();  

@@ -56,9 +56,10 @@ class Connection {
     const char* pass = "rienattergrabandedehaineux"; 
 
     WiFiClient _espClient;  // Underlying TCP client used by the MQTT client.
-    PubSubClient client;    // MQTT client for broker communication.
 
     public:
+    PubSubClient client;    // MQTT client for broker communication.
+    
     /**
      * @brief Constructs a new Connection object.
      *

@@ -24,7 +24,6 @@
 #include "UltraSonicSensor.h"
 #include "ImuSensor.h"
 #include "I2C_mutex.h"
-#include "AS5600Encoder.h"
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include "common/wifi_connection.h"
@@ -58,6 +57,7 @@ void setup_imu_stop_z();            void loop_imu_stop_z();
 void setup_motor_start_stop();      void loop_motor_start_stop();
 void setup_servo_right_left();      void loop_servo_right_left();
 void setup_motor_runs();            void loop_motor_runs();
+void setup_imu_calibration();       void loop_imu_calibration();
 void setup_encoder();               void loop_encoder();
 void setup_test_connection();       void loop_test_connection();
 void setup_pid_velocity();          void loop_pid_velocity();

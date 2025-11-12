@@ -40,10 +40,12 @@ void setup() {
     #elif TEST_ID == 6
         setup_test_connection();
     #elif TEST_ID == 7
-        setup_encoder();
+        setup_imu_calibration();
     #elif TEST_ID == 8
-        setup_pid_velocity();   
+        setup_encoder();
     #elif TEST_ID == 9
+        setup_pid_velocity();   
+    #elif TEST_ID == 10
         setup_path_pid();        
     #endif
 }
@@ -62,11 +64,12 @@ void loop() {
     #elif TEST_ID == 6
         loop_test_connection();
     #elif TEST_ID == 7
-        loop_encoder();
+        loop_imu_calibration();
     #elif TEST_ID == 8
-        loop_pid_velocity();
+        loop_encoder();
     #elif TEST_ID == 9
+        loop_pid_velocity();
+    #elif TEST_ID == 10
         loop_path_pid();
-
     #endif
 }

@@ -12,9 +12,8 @@
  *  It supports both smooth oscillation and manual control.
  */
 
-
-#include "DMS15.h"
 #include <Arduino.h>
+#include "esp1/hardware/servo.h"
 
 // Servo constructor => create an instance of the DMS15 servo class
 DMS15::DMS15(int pin) : servoPin(pin) {}
@@ -23,7 +22,7 @@ DMS15::DMS15(int pin) : servoPin(pin) {}
 bool DMS15::begin() {
     servo.attach(servoPin);
     Serial.printf("Servo attached to pin %d\n", servoPin);
-    servo.write(110); 
+    servo.write(90); 
     return servo.attached(); 
 }
 
