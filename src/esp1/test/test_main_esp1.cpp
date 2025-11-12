@@ -23,14 +23,27 @@
 
 // Change the id depending on the test to run
 #ifndef TEST_ID
-#define TEST_ID 1
+#define TEST_ID 3
 #endif
 
 void setup() {
+    initGlobals();
     #if TEST_ID == 1
         setup_test_lidar_basic();
     #elif TEST_ID == 2
         setup_test_connection();
+    #elif TEST_ID == 3
+        setup_test_lidar_express();
+    #elif TEST_ID == 4
+        setup_test_lidar_serial();
+    #elif TEST_ID == 5
+        setup_test_read_lidar();
+    #elif TEST_ID == 6
+        setup_servo_lidar();
+    #elif TEST_ID == 7
+        setup_test_lidar_express_get_info();
+    #elif TEST_ID == 8
+        setup_test_lidar_standard();
     #endif
 }
 
@@ -39,5 +52,17 @@ void loop() {
         loop_test_lidar_basic();
     #elif TEST_ID == 2
         loop_test_connection();
+    #elif TEST_ID == 3
+        loop_test_lidar_express();
+    #elif TEST_ID == 4
+        loop_test_lidar_serial();
+    #elif TEST_ID == 5
+        loop_test_read_lidar();
+    #elif TEST_ID == 6
+        loop_servo_lidar();
+    #elif TEST_ID == 7
+        loop_test_lidar_express_get_info();
+    #elif TEST_ID == 8
+        loop_test_lidar_standard();
     #endif
 }
