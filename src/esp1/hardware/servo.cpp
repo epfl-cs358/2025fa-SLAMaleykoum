@@ -12,9 +12,8 @@
  *  It supports both smooth oscillation and manual control.
  */
 
-
-#include "servo.h"
 #include <Arduino.h>
+#include "esp1/hardware/servo.h"
 
 // Servo constructor => create an instance of the DMS15 servo class
 DMS15::DMS15(int pin) : servoPin(pin) {}
