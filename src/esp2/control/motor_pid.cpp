@@ -39,7 +39,7 @@ void MotorPID::reset() {
 MotorOutputs MotorPID::compute_pwm_output(const Velocity& target_vel, const Velocity& current_velocity, float dt) {
     
     // Prevent division by zero or negative time
-    if (dt <= 0.000001f) {
+    if (dt <= 0.0f) {
         return NEUTRAL_US; // Return neutral if time has not advanced
     }
 
@@ -61,5 +61,4 @@ MotorOutputs MotorPID::compute_pwm_output(const Velocity& target_vel, const Velo
 
     // Clamp the control signal
     return constrain(control_signal, PID_CONTROL_MIN, PID_CONTROL_MAX);
-
 }
