@@ -1,5 +1,5 @@
 /**
- * @file test_lidar_express.cpp
+ * @file test_lidar_standard.cpp
  * @brief Runs RPLIDAR S2 in EXPRESS mode, downsamples points, and publishes compact JSON over MQTT.
  *
  * Output topic: slamaleykoum77/lidar ; slamaleykoum77/print
@@ -18,7 +18,7 @@ static const uint16_t SCAN_WINDOW      = 1200;
 // 👉 Move big arrays to static/global (outside stack)
 static char msg[4096];
 
-uint32_t last_pub_ms = 0;
+uint32_t last_pub_ms_st = 0;
 
 static void append_point(char* out, size_t out_sz, double angle_deg, uint16_t dist_mm, uint8_t quality) {
     char tmp[64];
@@ -26,7 +26,7 @@ static void append_point(char* out, size_t out_sz, double angle_deg, uint16_t di
     strlcat(out, tmp, out_sz);
 }
 
-void setup_test_lidar_express() {
+void setup_test_lidar_standard() {
     Serial.begin(115200);
 
     uint8_t getInfoCmd[2] = {0xA5, 0x50};
@@ -37,7 +37,7 @@ void setup_test_lidar_express() {
     connection.setupWifi();
     connection.check_connection();
 
-    bool ret = lidar->start(express);
+    bool ret = lidar->start(standard);
     delay(1000);
     if (ret) {
         char msgdbg[60];
@@ -62,17 +62,14 @@ void setup_test_lidar_express() {
     Serial.println("[LiDAR] STANDARD mode started.");
 }
 
-void loop_test_lidar_express() {
+void loop_test_lidar_standard() {
     connection.check_connection();
 
     uint32_t now = millis();
-    if (now - last_pub_ms < PUBLISH_PERIOD_MS) return;
-    last_pub_ms = now;
+    if (now - last_pub_ms_st < PUBLISH_PERIOD_MS) return;
+    last_pub_ms_st = now;
 
     uint16_t count = lidar->readMeasurePoints();  // Each Express scan returns multiple cabins
-    char db[60];
-    snprintf(db, sizeof(db), "count is: %u", count);
-    connection.publish(MQTT_TOPIC_LIDAR_EXPRESS_DEBUG, db);
     if (count == 0) return;
 
     // Build JSON (start)
@@ -81,7 +78,7 @@ void loop_test_lidar_express() {
     uint16_t kept = 0;
     uint16_t stride = (DOWNSAMPLE_N == 0 ? 1 : DOWNSAMPLE_N);
 
-    /*for (uint16_t i = 0, step = 0; i < SCAN_WINDOW && kept < MAX_POINTS_OUT; ++i, ++step) {
+    for (uint16_t i = 0, step = 0; i < SCAN_WINDOW && kept < MAX_POINTS_OUT; ++i, ++step) {
         // double angle = lidar->Data[i].angle;
         // float angle = ((lidar->Data[i].angle_high << 7) | (lidar->DataBuffer[i].angle_low >> 1)) / 64.0f;
         // uint16_t dist = lidar->Data[i].distance;
@@ -99,21 +96,6 @@ void loop_test_lidar_express() {
         if (dist == 0) continue;
         if (step % stride != 0) continue;
 
-        if (kept > 0) strlcat(msg, ",", sizeof(msg));
-        append_point(msg, sizeof(msg), angle, dist, 0);
-        kept++;
-    }*/
-    for (uint16_t i = 0, step = 0; i < SCAN_WINDOW && kept < MAX_POINTS_OUT; ++i, ++step) {
-        float angle = lidar->Data[i].angle;
-        uint16_t dist = lidar->Data[i].distance;
-
-        if (!std::isfinite(angle) || dist == 0) continue;
-
-        char msgdbg[60];
-        snprintf(msgdbg, sizeof(msgdbg), "angle: %.1f ; dist: %u", angle, dist);
-        connection.publish(MQTT_TOPIC_LIDAR_EXPRESS_DEBUG, msgdbg);
-
-        // append to JSON
         if (kept > 0) strlcat(msg, ",", sizeof(msg));
         append_point(msg, sizeof(msg), angle, dist, 0);
         kept++;

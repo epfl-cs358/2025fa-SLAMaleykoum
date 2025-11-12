@@ -14,6 +14,18 @@
  */
 #include "test_common_esp1.h"
 
-//rpLidar lidar(&Serial1);
+HardwareSerial LIDAR_SERIAL(2);
+rpLidar* lidar = nullptr;
+DMS15 servo_dir(SERVO_DIR_PIN);
 
 Connection connection;
+
+void initGlobals() {
+    // Initialize the material serial port of the LIDAR
+    LIDAR_SERIAL.setRxBufferSize(5000);
+    LIDAR_SERIAL.begin(LIDAR_BAUDRATE, SERIAL_8N1, LIDAR_RX_PIN, LIDAR_TX_PIN);
+    delay(100);
+
+    // Create LIDAR object
+    lidar = new rpLidar(&LIDAR_SERIAL, LIDAR_BAUDRATE, LIDAR_RX_PIN, LIDAR_TX_PIN);
+}

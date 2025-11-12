@@ -1,14 +1,14 @@
-// Filename: esp1/hardware/lidar.h
-// Description: Contract for the LiDAR sensor driver and
-//              feature extraction pipeline on ESP_1.
-
-// Note: the raw sensor data must be simplified and refined
-//      before it can be used by the sophisticated mathematical
-//      models like the EKF SLAM or the Bayesian Occupancy Grid.
-
-// Job: Run the raw data through Feature Extraction to create a
-//      simplified version of the scan.
-
+/** @filename: esp1/hardware/lidar.h
+ *  @description: Contract for the LiDAR sensor driver and
+ *               feature extraction pipeline on ESP_1.
+ * 
+ *  @note: the raw sensor data must be simplified and refined
+ *       before it can be used by the sophisticated mathematical
+ *       models like the EKF SLAM or the Bayesian Occupancy Grid.
+ * 
+ *  @job: Run the raw data through Feature Extraction to create a
+ *        simplified version of the scan.
+ */
 
 #pragma once
 

@@ -1,6 +1,6 @@
-/*
- *  @author KKest
- *		@created 10.01.2022
+/**
+ * @author KKest
+ * @created 10.01.2022
  *	
  * Library to control an rpLidar S2
  *
@@ -13,8 +13,6 @@
 
 class rpLidar{
 	public:
-
-	void begin(uint32_t baud, uint16_t bufferSize, HardwareSerial *_mySerial, int8_t rxPin, int8_t txPin); 
 	
 	/**
 	 * Construcor of Class
@@ -22,7 +20,7 @@ class rpLidar{
 	 * @param pointer to used USART
 	 * @param Baudrate
 	 */
-	rpLidar();
+	rpLidar(HardwareSerial *_serial,unsigned long _baud,int _rxPin,int _txPin);
 
 	/**
 	 * Gets the device info from rpLidar
@@ -60,7 +58,7 @@ class rpLidar{
 	 * Starts the Lidar and its measurement system
 	 * 
 	 * @param modus to run the lidar
-	 * @return true if mode started correctly, fals if not 
+	 * @return true if mode started correctly, false if not 
 	 */	
 	bool start(uint8_t _mode);
 	
@@ -89,8 +87,11 @@ class rpLidar{
 	point_t Data[3250]; ///< stores the raw scan data
 	stScanDataPoint_t DataBuffer[3250];	///<Storage to save the Data of a Standard Scan
 	
-	//private:
+	private:
 	
+	int8_t rxPin;
+	int8_t txPin;
+	unsigned long baud;
 	stExpressDataPacket_t ExpressDataBuffer[79];	///<Storge to save the Data of an Express Scan
 	uint16_t interestAngleLeft;		///< left border of needed angle 180-360°
 	uint16_t interestAngleRight;	///< right border of needed angle 0-180°

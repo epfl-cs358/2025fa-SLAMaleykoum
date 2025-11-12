@@ -5,31 +5,27 @@
  * Library to control an rpLidar S2
  *
  */
-#include "../esp1/hardware/rpLidar.h"
+#include "esp1/hardware/rpLidar.h"
 #include "Arduino.h"
 
 
-rpLidar::rpLidar()
+rpLidar::rpLidar(HardwareSerial *_mySerial,unsigned long _baud,int _rxPin,int _txPin)
 {
-	// serial=_mySerial;
-	status=false;
+	serial=_mySerial;
+	baud=_baud;
+	rxPin=_rxPin;
+	txPin=_txPin;
 }
-
-void rpLidar::begin(uint32_t baud, uint16_t bufferSize, HardwareSerial *_mySerial, int8_t rxPin, int8_t txPin) {
-	serial = _mySerial;
-	serial->setTxBufferSize(bufferSize);
-    serial->begin(baud, SERIAL_8N1, rxPin, txPin);
-}
-
 
 stDeviceInfo_t rpLidar::getDeviceInfo()
 {
 	clearSerialBuffer();
 	stDeviceInfo_t info;
 	rp_descriptor_t descr;
-	serial->write((uint8_t*)&req_message[rq_info],2); //send Device Info request
-	if(!checkForTimeout(10,27))	//wait for Response
+	serial->write(req_message[rq_info],2); //send Device Info request
+	if(!checkForTimeout(3000,27))	//wait for Response
 	{
+		Serial.println("PAS timeout des le debuttt");
 		serial->readBytes((uint8_t*)&descr,7);
 		serial->readBytes((uint8_t*)&info,20);
 	}
@@ -64,8 +60,8 @@ uint16_t rpLidar::scanStandard()
 
 void rpLidar::resetDevice()
 {
-	serial->write((uint8_t*)&req_message[rq_reset],2); //send reset request
-	delay(800); //wait for reboot
+	serial->write(req_message[rq_reset],2); //send reset request
+	delay(1000); //wait for reboot
 	clearSerialBuffer(); //remove old data in SerialBuffer
 	status=false;
 }
@@ -95,13 +91,13 @@ bool rpLidar::start(uint8_t _mode)
 
 	rp_descriptor_t descr;
 
-	if(!checkForTimeout(100,7)) //wait for response
+	if(!checkForTimeout(5000,7)) //wait for response
 	{
 		serial->readBytes((uint8_t*)&descr,7);
-		//printf("descr: ");
-		//for(int i=0;i<7;i++)
-		//	printf("%x ", descr[i]);
-		//printf("\r\n");
+		printf("descr: ");
+		for(int i=0;i<7;i++)
+			printf("%x ", descr[i]);
+		printf("\r\n");
 		switch(_mode)
 		{
 			case standard:

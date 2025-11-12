@@ -1,43 +1,44 @@
 /**
  * @file test_lidar_basic.cpp
- * @brief Test to send fake data of the lidar to the MQTT broker
+ * @brief Test to send fake data of the lidar to the MQTT broker (to test MQTT)
  * @result Create a fake map with the mqtt_client.py file
  */
 #include "test_common_esp1.h"
 
-const char* mqtt_topic_lidar_basic = "slamaleykoum77/lidar";
+const char* MQTT_TOPIC_LIDAR_BASIC = "slamaleykoum77/lidar";
 
 // ---- Tunables ----
-static const uint16_t LEFT_DEG         = 0;     // inclusive
-static const uint16_t RIGHT_DEG        = 360;   // inclusive
 static const uint32_t PUBLISH_PERIOD_MS= 200;   // publish every 200 ms
 static const uint16_t DOWNSAMPLE_N     = 8;     // keep every Nth point (bigger => fewer points)
 static const uint16_t MAX_POINTS_OUT   = 180;   // hard cap to keep payload small
 
 void setup_test_lidar_basic() {
-    
+
     Serial.begin(115200);
     delay(2000);
 
     connection.setupWifi();
 
-    // --- UART1 pins for LiDAR (set to your wiring) ---
+    lidar->resetDevice();
+    stDeviceStatus_t sdst = lidar->getDeviceHealth();
+    printf("sdst.errorCode_high=%d  sdst.errorCode_low=%d sdst.status=%d\r\n", sdst.errorCode_high, sdst.errorCode_low, sdst.status);
 
-    // rpLidar driver serial/buffer init
-    //lidar.begin(LIDAR_BAUD, LIDAR_UART_RX, LIDAR_UART_TX, 4096);
+    lidar->setAngleOfInterest(LIDAR_ANGLE_OF_INTEREST_START, LIDAR_ANGLE_OF_INTEREST_END);
 
-    // FOV restriction (smaller FOV => fewer points)
-    lidar.setAngleOfInterest(LEFT_DEG, RIGHT_DEG);
+    connection.check_connection();
 
-    // Start EXPRESS mode
-    if (!lidar.start(express)) {
-        Serial.println("[LiDAR] Failed to start EXPRESS mode. Rebooting device...");
-        lidar.resetDevice();
-        delay(500);
-        lidar.start(express);
+    bool ret = lidar->start(standard);
+    if (ret) {
+        char msg[6000];
+        strcpy(msg, "🟢 Rplidar C1 started correctly!\r\n");
+        connection.publish(MQTT_TOPIC_LIDAR_BASIC, msg);
+    } else {
+        char msg[6000];
+        strcpy(msg, "🔴 Error starting Rplidar C1\r\n");
+        connection.publish(MQTT_TOPIC_LIDAR_BASIC, msg);
     }
 
-    Serial.println("[LiDAR] EXPRESS mode started.");
+    Serial.println("[LiDAR] STANDART mode started.");
 }
 
 // test loop
@@ -62,7 +63,7 @@ void loop_test_lidar_basic() {
 
     strcat(msg, "]");  // close JSON array
 
-    connection.publish(mqtt_topic_lidar_basic, msg);
+    connection.publish(MQTT_TOPIC_LIDAR_BASIC, msg);
 
     delay(1000);
 }
