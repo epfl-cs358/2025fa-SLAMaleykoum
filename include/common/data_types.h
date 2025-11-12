@@ -6,6 +6,7 @@
 
 #include <vector>
 #include <cstdint>
+#include <Arduino.h>
 
 // --- Core Geometric Structures ---
 /**
@@ -40,8 +41,7 @@ struct Waypoint {
  * @brief Raw data from wheel encoders.
  */
 struct OdometryData {
-    float delta_distance_left;  // Change in distance for left wheel (m)
-    float delta_distance_right; // Change in distance for right wheel (m)
+    float delta_distance;  // Change in distance for rear wheels (m)
     uint32_t timestamp_ms;      // Timestamp of the measurement
 };
 
@@ -50,19 +50,53 @@ struct OdometryData {
  * Updated to include full 3-axis gyroscope and accelerometer data
  * for robust EKF prediction and non-holonomic constraint enforcement.
  */
-struct IMUData {
+struct IMUData : public Printable {
     // Gyroscope data (Angular Velocity)
-    float omega_x;  // Angular velocity around X-axis (rad/s) - typically roll
-    float omega_y;  // Angular velocity around Y-axis (rad/s) - typically pitch
-    float omega_z;  // Angular velocity around Z-axis (rad/s) - typically yaw
+    // float omega_x;  // Angular velocity around X-axis (rad/s) - typically roll
+    // float omega_y;  // Angular velocity around Y-axis (rad/s) - typically pitch
+    // float omega_z;  // Angular velocity around Z-axis (rad/s) - typically yaw
     
     // Accelerometer data (Linear Acceleration)
     float acc_x;    // Acceleration along X-axis (m/s^2) - typically forward
     float acc_y;    // Acceleration along Y-axis (m/s^2) - typically lateral
     float acc_z;    // Acceleration along Z-axis (m/s^2) - typically gravity/vertical
+
+    float qx;   // quaternion (absolute orientation)
+    float qy;
+    float qz;
+    float qw;
     
     uint32_t timestamp_ms; // Timestamp of the measurement
+
+    // Fonction used by Serial.print()
+    size_t printTo(Print& p) const {
+        size_t n = 0;
+        n += p.print(F("IMUData { "));
+        n += p.print(F("omega=("));
+        // n += p.print(omega_x); n += p.print(F(", "));
+        // n += p.print(omega_y); n += p.print(F(", "));
+        // n += p.print(omega_z); n += p.print(F("), "));
+
+        n += p.print(F("acc=("));
+        n += p.print(acc_x); n += p.print(F(", "));
+        n += p.print(acc_y); n += p.print(F(", "));
+        n += p.print(acc_z); n += p.print(F("), "));
+
+        n += p.print(F("quat=("));
+        n += p.print(qx); n += p.print(F(", "));
+        n += p.print(qy); n += p.print(F(", "));
+        n += p.print(qz); n += p.print(F("), "));
+
+        n += p.print(F("timestamp="));
+        n += p.print(timestamp_ms);
+        n += p.print(F(" }"));
+        return n;
+    }
+
 };
+
+typedef uint16_t MotorOutputs; // PWM = pulse duration in microseconds 
+// (1000 µs = full reverse, 1500 µs = neutral, 2000 µs = full forward)
 
 // --- MAPPING AND PLANNING DATA ---
 
