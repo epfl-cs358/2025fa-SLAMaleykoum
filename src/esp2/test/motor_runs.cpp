@@ -374,13 +374,13 @@ void loop_motor_runs() {
     
     motor.forward(drivePower/100.0f);
     motor.update();
-    uint16_t angleRaw = encoder.as5600.readAngle(); // 0..4095
+    /*uint16_t angleRaw = encoder.as5600.readAngle(); // 0..4095
     float angleDeg = angleRaw * AS5600_RAW_TO_DEGREES; // convert to degrees
 
      connection.check_connection();
     char msgSetup[50];
     snprintf(msgSetup, sizeof(msgSetup), "Angle is in degrees %0.2f", angleDeg);
-    connection.publish(mqtt_topic_connection_motor_runs,msgSetup);
+    connection.publish(mqtt_topic_connection_motor_runs,msgSetup);*/
 
     //delay(3000);
 
