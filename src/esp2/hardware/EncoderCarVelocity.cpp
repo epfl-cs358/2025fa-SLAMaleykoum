@@ -13,11 +13,11 @@
 EncoderCarVelocity::EncoderCarVelocity() {}
 
 // Initialize I2C and AS5600
-void EncoderCarVelocity::begin() {
+bool EncoderCarVelocity::begin() {
     Wire.begin();  // default SDA/SCL pins
     if (!as5600.begin()) {
         Serial.println("AS5600 not detected!");
-        while (1); 
+        return false;
     }
 
     // Set clockwise rotation, small noise filter
@@ -25,6 +25,7 @@ void EncoderCarVelocity::begin() {
     as5600.setHysteresis(2);     // suppress small noise
     as5600.setSlowFilter(2);     // optional, reduces jitter
    
+    return true;
 }
 
 // Returns motor angular velocity in rad/sec

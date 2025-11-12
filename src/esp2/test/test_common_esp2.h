@@ -24,7 +24,6 @@
 #include "UltraSonicSensor.h"
 #include "ImuSensor.h"
 #include "I2C_mutex.h"
-#include "AS5600Encoder.h"
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include "common/wifi_connection.h"
