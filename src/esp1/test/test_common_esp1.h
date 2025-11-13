@@ -24,6 +24,7 @@
 #include "esp1/hardware/servo.h"
 #include "common/wifi_connection.h"
 #include "esp1/hardware/rpLidar.h"
+#include "../../include/common/esp_link.h"
 
 // Pins used by the hardware components on the esp 1
 constexpr int MAX_RANGE = 8000; // Maximum range for LIDAR in mm
@@ -57,3 +58,4 @@ void setup_test_read_lidar();               void loop_test_read_lidar();
 void setup_servo_lidar();                   void loop_servo_lidar();
 void setup_test_lidar_express_get_info();   void loop_test_lidar_express_get_info();
 void setup_test_lidar_standard();           void loop_test_lidar_standard();
+void setup_esps_comm_esp1();                void loop_esps_comm_esp1();

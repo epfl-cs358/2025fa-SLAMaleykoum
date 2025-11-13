@@ -2,6 +2,17 @@
 #include <Arduino.h>
 #include "data_types.h"
 
+const uint8_t MSG_ID_SIZE = 3; // can encode up to 7 types of messages (2^3 - 1)
+const uint8_t BYTE_SIZE = 8;
+const uint8_t MSG_ID_MASK = 0x00011111;
+static constexpr size_t QUEUE_CAP_TXT = 16;
+static constexpr size_t MAX_TXT_LEN = 4096;
+
+struct TxtMsg {
+    uint16_t len;                 // longueur réelle du message
+    char     data[MAX_TXT_LEN+1]; // +1 pour le '\0'
+};
+
 /**
  * @class Esp_link 
  * @brief all the communication protocol between the 2 esps.
@@ -58,23 +69,31 @@ class Esp_link {
     bool sendPath(const GlobalPathMessage& gpm);
     
     // just for the tests
-    bool sendPing();
-    bool sendPong();
+    bool sendText(const char* txt);
+
+    bool get_txt(char* &out);
 
     private:
     HardwareSerial ser_;
     int8_t rx_pin_;
     int8_t tx_pin_;
 
+    TxtMsg queue_txt[QUEUE_CAP_TXT];
+    size_t head_txt = 0;
+    size_t tail_txt = 0;
+    size_t count_txt = 0;
+
+    void push_txt(const char* txt);
+
     /**
      * @brief Formates a message and sends it over UART
      * 
      * @param msg_id the id of the message
      * @param data the data to encode depending on the msg_id
-     * @param len the length of the message to encode
+     * @param len the number of bytes of the message
      * 
      * @note used by the more precise functions (sendPose(), ...)
      */
-    bool sendRaw(uint8_t msg_id, const uint8_t* data, uint16_t len);
+    bool sendRaw(uint8_t msg_id, uint8_t* data, uint16_t len);
 
 };
