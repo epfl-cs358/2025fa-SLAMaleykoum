@@ -17,8 +17,8 @@ const char* mqtt_server = "broker.hivemq.com";
 const int mqtt_port = 1883;
 const char* mqtt_topic_commands = "slamaleykoum77/commands";
 
-Connection::Connection() : 
-    client(_espClient) {}
+Connection::Connection(char* clientId = "ESP32_Client") : 
+    client(_espClient), clientId_(clientId) {}
 
 void Connection::setupWifi(){
     delay(100);

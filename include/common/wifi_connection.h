@@ -71,7 +71,7 @@ class Connection {
      * @note You must call `setupWifi()` and `reconnect()` to establish 
      *       Wi-Fi and MQTT connections.
      */
-    Connection(char* clientId = "ESP32_Client") : clientId_(clientId);
+    Connection(char* clientId = "ESP32_Client");
 
     /**
      * @brief Connects the ESP32 to Wi-Fi and configures MQTT.
