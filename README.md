@@ -4,15 +4,21 @@
 Project proposal : https://www.overleaf.com/9942875199zgzbkrmgkkkj#3fbbb2
 
 ## Table of Contents
-1. [Project Overview](#project-overview)
-2. [System Architecture](#system-architecture)
-3. [Hardware Platform](#hardware-platform)
-4. [Software Components](#software-components)
-5. [Data Flow and Communication](#data-flow-and-communication)
-6. [Implementation Details](#implementation-details)
-7. [Mission and Task Management](#mission-and-task-management)
+1. [Set it up](#set-it-up)
+2. [Project Overview](#project-overview)
+3. [System Architecture](#system-architecture)
+4. [Hardware Platform](#hardware-platform)
+5. [Software Components](#software-components)
+6. [Data Flow and Communication](#data-flow-and-communication)
+7. [Implementation Details](#implementation-details)
+8. [Mission and Task Management](#mission-and-task-management)
 
 ---
+
+## Set it up
+We recommend you create a python venv for the project (e.g. `python3 -m venv slamaleykoum_venv`).
+Activate the venv (`source venv/bin/activate`) and install the requirements from our "requirements.txt" file: `pip install -r requirements.txt`
+*You could alternatively manually install every requirement (which you might already have).* 
 
 ## Project Overview
 
