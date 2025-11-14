@@ -11,7 +11,7 @@
  */
 class PurePursuit {
 public:
-    PurePursuit(float wheelbase_m);
+    PurePursuit();
 
     /**
      * @brief Updates the path to track.

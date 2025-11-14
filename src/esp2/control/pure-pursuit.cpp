@@ -66,7 +66,7 @@ MotionCommand PurePursuit::compute_command(const Pose2D& current_pose, const Vel
     // ---
 
     // Find the Lookahead Target Point (in GLOBAL frame)
-    Waypoint target_point_global = find_lookahead_point(current_pose, Ld);
+    Waypoint target_point_global = find_lookahead_point(current_pose, Ld_fixed_);
     
     // Create a copy to hold the robot-frame coordinates
     Waypoint target_point_robot = target_point_global;
