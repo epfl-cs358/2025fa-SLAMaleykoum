@@ -56,8 +56,9 @@ private:
     float max_speed_ = 0.30f;
     float min_speed_ = 0.17f;
 
-    float MIN_STEERING_ANGLE_RAD_ = -1.134467; // ~ -65 degrees
-    float MAX_STEERING_ANGLE_RAD_ = 1.134467;  // ~ 65 degrees
+    // ±45 degrees in radians
+    float MIN_STEERING_ANGLE_RAD_ = -0.785398; // ~ -45 degrees
+    float MAX_STEERING_ANGLE_RAD_ = 0.785398;  // ~ +45 degrees
 
     // Helper functions
     float calculate_lookahead_distance(float current_speed) const;
