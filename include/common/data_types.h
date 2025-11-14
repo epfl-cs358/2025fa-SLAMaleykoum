@@ -8,6 +8,9 @@
 #include <cstdint>
 #include <Arduino.h>
 
+// Define the maximum number of waypoints the controller can handle.
+#define MAX_PATH_LENGTH 50
+
 // --- Core Geometric Structures ---
 /**
  * @brief 2D pose structure (Position and Orientation).
@@ -52,9 +55,9 @@ struct OdometryData {
  */
 struct IMUData : public Printable {
     // Gyroscope data (Angular Velocity)
-    float omega_x;  // Angular velocity around X-axis (rad/s) - typically roll
-    float omega_y;  // Angular velocity around Y-axis (rad/s) - typically pitch
-    float omega_z;  // Angular velocity around Z-axis (rad/s) - typically yaw
+    // float omega_x;  // Angular velocity around X-axis (rad/s) - typically roll
+    // float omega_y;  // Angular velocity around Y-axis (rad/s) - typically pitch
+    // float omega_z;  // Angular velocity around Z-axis (rad/s) - typically yaw
     
     // Accelerometer data (Linear Acceleration)
     float acc_x;    // Acceleration along X-axis (m/s^2) - typically forward
@@ -64,6 +67,7 @@ struct IMUData : public Printable {
     float qx;   // quaternion (absolute orientation)
     float qy;
     float qz;
+    float qw;
     
     uint32_t timestamp_ms; // Timestamp of the measurement
 
@@ -72,9 +76,9 @@ struct IMUData : public Printable {
         size_t n = 0;
         n += p.print(F("IMUData { "));
         n += p.print(F("omega=("));
-        n += p.print(omega_x); n += p.print(F(", "));
-        n += p.print(omega_y); n += p.print(F(", "));
-        n += p.print(omega_z); n += p.print(F("), "));
+        // n += p.print(omega_x); n += p.print(F(", "));
+        // n += p.print(omega_y); n += p.print(F(", "));
+        // n += p.print(omega_z); n += p.print(F("), "));
 
         n += p.print(F("acc=("));
         n += p.print(acc_x); n += p.print(F(", "));
@@ -94,7 +98,7 @@ struct IMUData : public Printable {
 
 };
 
-typedef uint16_t MotorOutputs; // PWM = pulse duration in microseconds 
+typedef float MotorOutputs; // PWM = pulse duration in microseconds 
 // (1000 µs = full reverse, 1500 µs = neutral, 2000 µs = full forward)
 
 // --- MAPPING AND PLANNING DATA ---
@@ -128,12 +132,15 @@ struct MotionCommand {
 };
 
 /**
- * @brief Message containing a vector of waypoints from the Global Planner.
+ * @brief Message containing a fixed-size array of waypoints from the Global Planner.
+ * The path is constantly updated as new waypoints are generated. The current length
+ * indicates how many waypoints in the array are valid, it is also constantly updated.
+ * current_length <= MAX_PATH_LENGTH
  */
-//TODO: This is probably going to change!
 struct GlobalPathMessage {
-    std::vector<Waypoint> path;
-    uint32_t path_id; // Identifier for the path
+    Waypoint path[MAX_PATH_LENGTH]; // Fixed-size array
+    uint16_t current_length;        // Actual number of valid waypoints in the array
+    uint32_t path_id; 
     uint32_t timestamp_ms;
 };
 

@@ -28,7 +28,10 @@
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include "common/wifi_connection.h"
-
+#include "EncoderCarVelocity.h"
+#include "MotorController.h"
+#include "AS5600.h"
+#include "motor_pid.h"
 // Pins used by the hardware components on the esp 2
 #define ESC_PIN 15          // pin used for the motor
 #define SERVO_DIR_PIN 6     // the servo that modifies the direction of the wheels
@@ -39,12 +42,15 @@
 
 // Harwdare objects
 extern MotorManager motor;
+//extern MotorController motor;
 extern DMS15 servo_dir;
 extern UltraSonicSensor ultrasonic;
 extern ImuSensor imu; 
-extern AS5600Encoder encoder;
-
+//extern AS5600Encoder encoder;
+extern EncoderCarVelocity encoder;
 extern Connection connection;
+
+extern MotorPID pid;
 
 // Prototypes of the functions
 void setup_all_together();          void loop_all_together();
@@ -52,4 +58,8 @@ void setup_imu_stop_z();            void loop_imu_stop_z();
 void setup_motor_start_stop();      void loop_motor_start_stop();
 void setup_servo_right_left();      void loop_servo_right_left();
 void setup_motor_runs();            void loop_motor_runs();
+void setup_imu_calibration();       void loop_imu_calibration();
+void setup_encoder();               void loop_encoder();
 void setup_test_connection();       void loop_test_connection();
+void setup_pid_velocity();          void loop_pid_velocity();
+void setup_path_pid();              void loop_path_pid();
