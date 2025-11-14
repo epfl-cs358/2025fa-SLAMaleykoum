@@ -16,8 +16,8 @@ Project proposal : https://www.overleaf.com/9942875199zgzbkrmgkkkj#3fbbb2
 ---
 
 ## Set it up
-We recommend you create a python venv for the project (e.g. `python3 -m venv slamaleykoum_venv`).
-Activate the venv (`source venv/bin/activate`) and install the requirements from our "requirements.txt" file: `pip install -r requirements.txt`
+We recommend you create a python [virtual environment](https://docs.python.org/3/library/venv.html) (venv) for the project (e.g. `python3 -m venv slamaleykoum_venv`).
+Activate the venv (`source slamaleykoum_venv/bin/activate`) and install the requirements from our "requirements.txt" file: `pip install -r requirements.txt`
 *You could alternatively manually install every requirement (which you might already have).* 
 
 ## Project Overview
