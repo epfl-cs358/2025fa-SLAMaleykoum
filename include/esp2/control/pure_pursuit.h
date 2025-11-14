@@ -11,7 +11,7 @@
  */
 class PurePursuit {
 public:
-    PurePursuit();
+    PurePursuit() = default;
 
     /**
      * @brief Updates the path to track.
