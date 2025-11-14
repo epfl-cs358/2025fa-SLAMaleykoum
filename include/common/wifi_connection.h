@@ -54,6 +54,7 @@ class Connection {
     private:
     const char* ssid = "PC-Alex";
     const char* pass = "rienattergrabandedehaineux"; 
+    char* clientId_;
 
     WiFiClient _espClient;  // Underlying TCP client used by the MQTT client.
 
@@ -70,7 +71,7 @@ class Connection {
      * @note You must call `setupWifi()` and `reconnect()` to establish 
      *       Wi-Fi and MQTT connections.
      */
-    Connection();
+    Connection(char* clientId = "ESP32_Client") : clientId_(clientId);
 
     /**
      * @brief Connects the ESP32 to Wi-Fi and configures MQTT.
