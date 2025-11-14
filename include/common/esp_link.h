@@ -4,13 +4,13 @@
 
 const uint8_t MSG_ID_SIZE = 3; // can encode up to 7 types of messages (2^3 - 1)
 const uint8_t BYTE_SIZE = 8;
-const uint8_t MSG_ID_MASK = 0x00011111;
-static constexpr size_t QUEUE_CAP_TXT = 16;
-static constexpr size_t MAX_TXT_LEN = 4096;
+const int MSG_ID_MASK = 0x00011111;
+static constexpr size_t QUEUE_CAP = 8;
+static constexpr size_t MAX_TXT_LEN = 255;
 
 struct TxtMsg {
-    uint16_t len;                 // longueur réelle du message
-    char     data[MAX_TXT_LEN+1]; // +1 pour le '\0'
+    uint8_t len;
+    char     data[MAX_TXT_LEN];
 };
 
 /**
@@ -26,8 +26,7 @@ class Esp_link {
      * @param ser : the serial on which the communication will happen
      * @param rx_pin, tx_pin : the pins for the communication
      */
-    Esp_link(HardwareSerial ser, int rx_pin, int tx_pin) 
-        : ser_(ser), rx_pin_(rx_pin), tx_pin_(tx_pin) {}
+    Esp_link(HardwareSerial& ser) : ser_(ser) {}
 
     /**
      * @brief Configure UART
@@ -35,7 +34,7 @@ class Esp_link {
      * 
      * @param baud : the baudrate for the communication
      */
-    void begin(uint32_t baud);
+    void begin();
 
     /**
      * @brief collect the messages sent over the communication and keeps them in a buffer
@@ -71,19 +70,34 @@ class Esp_link {
     // just for the tests
     bool sendText(const char* txt);
 
-    bool get_txt(char* &out);
+    bool get_txt(char* out);
+    bool get_pos(Pose2D& p_out);
+    bool get_path(GlobalPathMessage& gpm);
 
     private:
-    HardwareSerial ser_;
-    int8_t rx_pin_;
-    int8_t tx_pin_;
+    HardwareSerial& ser_;
+    const uint8_t RX_ESPS = 13;
+    const uint8_t TX_ESPS = 12;
+    const uint32_t ESPS_BAUDRATE = 2000000;
 
-    TxtMsg queue_txt[QUEUE_CAP_TXT];
+    TxtMsg queue_txt[QUEUE_CAP];
     size_t head_txt = 0;
     size_t tail_txt = 0;
     size_t count_txt = 0;
 
+    Pose2D queue_pos[QUEUE_CAP];
+    size_t head_pos = 0;
+    size_t tail_pos = 0;
+    size_t count_pos = 0;
+
+    GlobalPathMessage queue_path[QUEUE_CAP];
+    size_t head_path = 0;
+    size_t tail_path = 0;
+    size_t count_path = 0;
+
     void push_txt(const char* txt);
+    void push_pos(const Pose2D& p);
+    void push_path(const GlobalPathMessage& gpm);
 
     /**
      * @brief Formates a message and sends it over UART
@@ -94,6 +108,6 @@ class Esp_link {
      * 
      * @note used by the more precise functions (sendPose(), ...)
      */
-    bool sendRaw(uint8_t msg_id, uint8_t* data, uint16_t len);
+    bool sendRaw(uint8_t msg_id, const uint8_t* data, uint16_t len);
 
 };

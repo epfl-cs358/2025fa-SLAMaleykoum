@@ -50,6 +50,7 @@ extern ImuSensor imu;
 //extern AS5600Encoder encoder;
 extern EncoderCarVelocity encoder;
 extern Connection connection;
+extern HardwareSerial ESPS;
 
 extern MotorPID pid;
 

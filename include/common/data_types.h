@@ -19,6 +19,7 @@ struct Pose2D {
     float x;     // Global X position (m)
     float y;     // Global Y position (m)
     float theta; // Global Yaw angle (rad)
+    uint32_t timestamp_ms;
 };
 
 /**
@@ -140,7 +141,7 @@ struct MotionCommand {
 struct GlobalPathMessage {
     Waypoint path[MAX_PATH_LENGTH]; // Fixed-size array
     uint16_t current_length;        // Actual number of valid waypoints in the array
-    uint32_t path_id; 
+    uint32_t path_id;
     uint32_t timestamp_ms;
 };
 

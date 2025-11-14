@@ -74,6 +74,6 @@ void loop() {
     #elif TEST_ID == 10
         loop_path_pid();
     #elif TEST_ID == 11
-        setup_esps_comm_esp2();
+        loop_esps_comm_esp2();
     #endif
 }

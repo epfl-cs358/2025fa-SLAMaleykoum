@@ -44,6 +44,7 @@ constexpr int WIDTH = 200; // Width of the map in pixels
 // Harwdare objects
 extern Connection connection;
 extern HardwareSerial LIDAR_SERIAL;
+extern HardwareSerial ESPS;
 extern rpLidar* lidar;
 extern DMS15 servo_dir;
 

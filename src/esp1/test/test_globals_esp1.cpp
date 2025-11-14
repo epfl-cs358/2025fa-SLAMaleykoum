@@ -15,6 +15,7 @@
 #include "test_common_esp1.h"
 
 HardwareSerial LIDAR_SERIAL(2);
+HardwareSerial ESPS(1);
 rpLidar* lidar = nullptr;
 DMS15 servo_dir(SERVO_DIR_PIN);
 

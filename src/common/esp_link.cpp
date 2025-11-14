@@ -1,65 +1,41 @@
 #include "../../include/common/esp_link.h"
 #include <string.h>
 
-void Esp_link::begin(uint32_t baud) {
-  ser_.begin(baud, SERIAL_8N1, rx_pin_, tx_pin_);
+void Esp_link::begin() {
+  ser_.begin(ESPS_BAUDRATE, SERIAL_8N1, RX_ESPS, TX_ESPS);
 }
 
 bool Esp_link::sendPose(const Pose2D& p) {
-  return sendRaw(MSG_POSE, (uint8_t*)(&p), sizeof(Pose2D));
+  return sendRaw(MSG_POSE, reinterpret_cast<const uint8_t*>(&p), sizeof(Pose2D));
 }
 
 bool Esp_link::sendCorrection(const LoopClosureCorrection& c) {
-  return sendRaw(MSG_CORR, (uint8_t*)(&c), sizeof(LoopClosureCorrection));
+  return sendRaw(MSG_CORR, reinterpret_cast<const uint8_t*>(&c), sizeof(LoopClosureCorrection));
 }
 
 bool Esp_link::sendPath(const GlobalPathMessage& gpm) {
-  // n'envoyer que la partie utile du tableau
-  const uint16_t n = gpm.current_length <= MAX_PATH_LENGTH ? gpm.current_length : MAX_PATH_LENGTH;
-
-  // payload = [current_length(2)][path_id(4)][timestamp(4)][n * Waypoint]
-  const uint16_t way_bytes = n * sizeof(Waypoint);
-  const uint16_t payload_len = 2 + 4 + 4 + way_bytes;
-
-  uint8_t buf[2 + 4 + 4 + MAX_PATH_LENGTH*sizeof(Waypoint)];
-  uint8_t* w = buf;
-
-  // pack little-endian simple (ESP32 est little-endian)
-  *w++ = (uint8_t)(n & 0xFF);
-  *w++ = (uint8_t)(n >> 8);
-
-  memcpy(w, &gpm.path_id, 4);      w += 4;
-  memcpy(w, &gpm.timestamp_ms, 4); w += 4;
-
-  memcpy(w, gpm.path, way_bytes);  // seulement n waypoints
-  return sendRaw(MSG_PATH, buf, payload_len);
+  return sendRaw(MSG_PATH, reinterpret_cast<const uint8_t*>(&gpm), sizeof(gpm));
 }
 
 /**
  * @note messages de max 2^(8+5)-1 = 8191 characteres
  */
 bool Esp_link::sendText(const char* txt) { 
-  return sendRaw(MSG_TXT, reinterpret_cast<uint8_t*>(&txt), strlen(txt)); 
+  return sendRaw(MSG_TXT, reinterpret_cast<const uint8_t*>(&txt), strlen(txt)); 
 }
 
-bool Esp_link::sendRaw(uint8_t msg_id, uint8_t* data, uint16_t len) {
-  uint8_t* payload;
+bool Esp_link::sendRaw(uint8_t msg_id, const uint8_t* data, uint16_t len) {
   uint8_t header = (msg_id << (BYTE_SIZE - MSG_ID_SIZE));
   uint8_t len_lo;
 
   switch (msg_id) {
-    case MSG_PATH: {
-      int count = 0; // ------------
-      header |= count;
-      break;
-    }
+    case MSG_PATH:
+    case MSG_POSE: break;
     case MSG_TXT: {
       uint8_t len_hi = (len >> 8) & 0x3F;
       len_lo = len & 0xFF;
 
       uint8_t header = (msg_id << 6) | len_hi;
-      
-      payload = data;
       break;
     }
     default: return false;
@@ -67,18 +43,58 @@ bool Esp_link::sendRaw(uint8_t msg_id, uint8_t* data, uint16_t len) {
 
   ser_.write(header);
   if(msg_id == MSG_TXT) ser_.write(len_lo);
-  ser_.write((uint8_t*)&payload, sizeof(payload));
+  ser_.write(data, sizeof(data));
 
   return true;
 }
 
-void Esp_link::push_txt(const char* txt) {
-  size_t len = strlen(txt);
-  if (len > MAX_TXT_LEN) len = MAX_TXT_LEN;
+void Esp_link::push_pos(const Pose2D& p) {
 
   // if the queue is full, drop the oldest
-  if (count_txt >= QUEUE_CAP_TXT) {
-      head_txt = (head_txt + 1) % QUEUE_CAP_TXT;
+  if (count_pos >= QUEUE_CAP) {
+      head_pos = (head_pos + 1) % QUEUE_CAP;
+      count_pos--;
+  }
+  
+  Pose2D& slot = queue_pos[tail_pos];
+  slot.theta = p.theta;
+  slot.timestamp_ms = p.timestamp_ms;
+  slot.x = p.x;
+  slot.y = p.y;
+
+  tail_pos = (tail_pos + 1) % QUEUE_CAP;
+  count_pos++;
+}
+
+void Esp_link::push_path(const GlobalPathMessage& gpm) {
+
+  // if the queue is full, drop the oldest
+  if (count_path >= QUEUE_CAP) {
+      head_path = (head_path + 1) % QUEUE_CAP;
+      count_path--;
+  }
+  
+  GlobalPathMessage& slot = queue_path[tail_path];
+
+  for (int i = 0; i < MAX_PATH_LENGTH; i++) {
+    slot.path[i] = gpm.path[i];
+  }
+
+  slot.current_length = gpm.current_length;
+  slot.path_id = gpm.path_id;
+  slot.timestamp_ms = gpm.timestamp_ms;
+
+  tail_path = (tail_path + 1) % QUEUE_CAP;
+  count_path++;
+}
+
+void Esp_link::push_txt(const char* txt) {
+  size_t len = strlen(txt);
+  if (len > MAX_TXT_LEN-1) len = MAX_TXT_LEN-1;
+
+  // if the queue is full, drop the oldest
+  if (count_txt >= QUEUE_CAP) {
+      head_txt = (head_txt + 1) % QUEUE_CAP;
       count_txt--;
   }
   
@@ -88,19 +104,44 @@ void Esp_link::push_txt(const char* txt) {
   memcpy(slot.data, txt, len);
   slot.data[len] = '\0';
 
-  tail_txt = (tail_txt + 1) % QUEUE_CAP_TXT;
+  tail_txt = (tail_txt + 1) % QUEUE_CAP;
   count_txt++;
 }
 
-bool Esp_link::get_txt(char* &out) {
+bool Esp_link::get_pos(Pose2D& out){
+  if (count_pos == 0) return false;
+  
+  out = queue_pos[head_pos];
+
+  head_pos = (head_pos + 1) % QUEUE_CAP;
+  count_pos--;
+
+  return true;
+}
+
+bool Esp_link::get_path(GlobalPathMessage& out){
+  if (count_path == 0) return false;
+  
+  out = queue_path[head_path];
+
+  head_path = (head_path + 1) % QUEUE_CAP;
+  count_path--;
+
+  return true;
+}
+
+/**
+ * @note give a buffer out that has MAX_TXT_LEN
+ */
+bool Esp_link::get_txt(char* out) {
   if (count_txt == 0) return false;
   
-  TxtMsg msg = queue_txt[head_txt];
+  TxtMsg& msg = queue_txt[head_txt];
 
-  strncpy(out, msg.data, msg.len - 1);  
-  out[msg.len - 1] = '\0';
+  strncpy(out, msg.data, msg.len);
+  out[msg.len] = '\0';
 
-  head_txt = (head_txt + 1) % QUEUE_CAP_TXT;
+  head_txt = (head_txt + 1) % QUEUE_CAP;
   count_txt--;
 
   return true;
@@ -122,26 +163,25 @@ void Esp_link::poll() {
   uint8_t aux    = header & MSG_ID_MASK;
 
   switch (msg_id) {
-
     case MSG_POSE: {
         if (ser_.available() < sizeof(Pose2D)) return;
         Pose2D p;
-        ser_.readBytes((uint8_t*)&p, sizeof(Pose2D));
-        // traiter p
+        ser_.readBytes(reinterpret_cast<uint8_t*>(&p), sizeof(Pose2D));
+        
+        push_pos(p);
         break;
     }
 
     case MSG_PATH: {
-        uint8_t count = aux;  
-        if (ser_.available() < count * sizeof(Waypoint)) return;
+        if (ser_.available() < sizeof(GlobalPathMessage)) return;
 
-        Waypoint buf[64];
-        ser_.readBytes((uint8_t*)buf, count*sizeof(Waypoint));
-        // traiter buf[0..count-1]
+        GlobalPathMessage path;
+        ser_.readBytes(reinterpret_cast<uint8_t*>(&path), sizeof(GlobalPathMessage));
+        
+        push_path(path);
         break;
     }
-
-    case MSG_CORR: break;
+    
     case MSG_TXT: {
       uint8_t len_hi = aux;
 
