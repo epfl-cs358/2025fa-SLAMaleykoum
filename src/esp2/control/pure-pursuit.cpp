@@ -56,8 +56,14 @@ void PurePursuit::set_path(const GlobalPathMessage& path_msg) {
 MotionCommand PurePursuit::compute_command(const Pose2D& current_pose, const Velocity& vel) {
     if (path_length_ == 0) return {0.0f, 0.0f}; // No path to follow
     
-    // Calculate Adaptive Lookahead Distance
-    float Ld = calculate_lookahead_distance(vel.v_linear);
+    // ---
+    // This part is commented out since we don't have a useful PID for the car speed yet.
+    // Check out issue #42 for more details.
+    // For now we'll use a fixed lookahead distance. (Defined in .h as Ld_fixed_)
+
+    // // Calculate Adaptive Lookahead Distance
+    // float Ld = calculate_lookahead_distance(vel.v_linear);
+    // ---
 
     // Find the Lookahead Target Point (in GLOBAL frame)
     Waypoint target_point_global = find_lookahead_point(current_pose, Ld);
@@ -69,18 +75,30 @@ MotionCommand PurePursuit::compute_command(const Pose2D& current_pose, const Vel
     // Compute the Steering Angle (Pure Pursuit Formula using Bicycle Model)
     // The bicycle model formula is: delta = atan2(2 * L * x_lateral, Ld^2)
     //
+    // delta_target: Steering angle to reach the target point with respect to the car's heading.
+    // -> (radians from the "straight ahead" direction)
+    // 
     // L_ is the car's wheelbase. NOTE: the LATERAL component is target_point_robot.x
     float delta_target = std::atan2(2.0f * L_ * target_point_robot.x, Ld * Ld);
-    
-    // Calculate Adaptive Target Speed
-    float v_target = calculate_target_speed(delta_target);
+
+    // ---
+    // This part is commented out since we don't have a useful PID for the car speed yet.
+    // For now we'll just use a fixed target speed.
+    // (The speed is fixed in the .h as fixed_speed_)
+    // // Calculate Adaptive Target Speed
+    // float v_target = calculate_target_speed(delta_target);
+    // ---
 
     // Clamp the theoretical angle to the car's physical limits.
     float steering_command_rad = clamp(delta_target, 
                                             MIN_STEERING_ANGLE_RAD_, 
                                             MAX_STEERING_ANGLE_RAD_);
 
-    return {v_target, steering_command_rad};
+    // The servo takes angles in degrees from 0 to 180, where 90 is straight.
+    float steering_to_servo = (steering_command_rad * (180.0f / M_PI)) + 90.0f;
+
+    // return {v_target, steering_command_rad};
+    return { /* Fixed Speed */ fixed_speed_, steering_command_rad};
 }
 
 
@@ -137,6 +155,8 @@ Waypoint PurePursuit::find_lookahead_point(const Pose2D& current_pose, float Ld)
     return current_path_[path_length_ - 1];
 }
 
+
+// These functions are currently unused since we're using fixed lookahead distance and speed due to our ESC limitations.
 float PurePursuit::calculate_lookahead_distance(float current_speed) const {
     // Linear relationship between speed and lookahead distance. (when going faster, look further ahead)
     float Ld = K_dd_ * current_speed;
