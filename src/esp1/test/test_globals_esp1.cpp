@@ -19,7 +19,7 @@ HardwareSerial ESPS(1);
 rpLidar* lidar = nullptr;
 DMS15 servo_dir(SERVO_DIR_PIN);
 
-Connection connection;
+Connection connection("esp1");
 
 void initGlobals() {
     // Initialize the material serial port of the LIDAR

@@ -31,9 +31,11 @@ void setup_esps_comm_esp1() {
 }
 
 void loop_esps_comm_esp1() {
+    connection.check_connection();
+
     mqtt_print("esp1 dans la boucle");
     delay(1000);
-    
+
     esp_link.sendText("Ping from ESP1");
     
     esp_link.poll();
@@ -43,8 +45,9 @@ void loop_esps_comm_esp1() {
         // to see what is happenning
         mqtt_print("out = ");
         mqtt_print(out);
-        if (out == "Pong from EPS2"); 
+        if (strcmp(out, "Pong from EPS2") == 0) {
             mqtt_print("[ESP1] got 'PONG' ");
+        }
     }
 
     delay(2000);
