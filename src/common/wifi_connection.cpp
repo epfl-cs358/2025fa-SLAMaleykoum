@@ -43,7 +43,7 @@ void Connection::reconnect() {
   while (!client.connected()) {
     Serial.print("Attempting MQTT connection...");
 
-    if (client.connect("ESP32_Client")) {
+    if (client.connect(clientId_)) {
         Serial.println("connected!");
         client.subscribe(mqtt_topic_commands); // inutile pour nous mais on garde au cas où (manque callback function)
     } else {
