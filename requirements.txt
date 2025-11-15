@@ -3,3 +3,6 @@ paho-mqtt~=1.6
 
 # Plotting and Visualization (plotting of the lidar)
 matplotlib~=3.8
+
+# Visualisation of the bayesian grid for testing: 
+SFML 2.6.1
