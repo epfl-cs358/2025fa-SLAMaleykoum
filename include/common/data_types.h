@@ -6,7 +6,12 @@
 
 #include <vector>
 #include <cstdint>
-#include <Arduino.h>
+
+#ifdef ARDUINO
+    #include <Arduino.h>
+#endif
+  
+
 
 // Define the maximum number of waypoints the controller can handle.
 #define MAX_PATH_LENGTH 50
@@ -54,6 +59,8 @@ struct OdometryData {
  * Updated to include full 3-axis gyroscope and accelerometer data
  * for robust EKF prediction and non-holonomic constraint enforcement.
  */
+
+#ifdef ARDUINO
 struct IMUData : public Printable {
     // Gyroscope data (Angular Velocity)
     // float omega_x;  // Angular velocity around X-axis (rad/s) - typically roll
@@ -98,6 +105,7 @@ struct IMUData : public Printable {
     }
 
 };
+#endif
 
 typedef float MotorOutputs; // PWM = pulse duration in microseconds 
 // (1000 µs = full reverse, 1500 µs = neutral, 2000 µs = full forward)
