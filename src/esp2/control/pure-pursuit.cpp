@@ -54,8 +54,15 @@ void PurePursuit::set_path(const GlobalPathMessage& path_msg) {
  * @return The computed MotionCommand containing speed (in m/s) and steering angle (in radians).
  */
 MotionCommand PurePursuit::compute_command(const Pose2D& current_pose, const Velocity& vel) {
-    if (path_length_ == 0) return {0.0f, 0.0f}; // No path to follow
-    
+    // If no path to follow, or if we've reached the end of the path, stop.
+    if (path_length_ == 0 || is_path_complete(current_pose)) {
+        if (path_length_ > 0) {
+            // Mark as "at goal" if the path exists
+            last_target_index_ = path_length_ - 1; 
+        }
+        return {0.0f, 0.0f}; // Return STOP command
+    }
+
     // ---
     // This part is commented out since we don't have a useful PID for the car speed yet.
     // Check out issue #42 for more details.
@@ -126,9 +133,7 @@ Waypoint PurePursuit::find_lookahead_point(const Pose2D& current_pose, float Ld)
         // Then, find the *first* waypoint beyond the lookahead distance. 
 
         // Distance from current pose to w2
-        float dx = w2.x - current_pose.x;
-        float dy = w2.y - current_pose.y;
-        float dist_sq = dx*dx + dy*dy;
+        float dist_sq = get_dist_sq(current_pose, w2);
         
         // We're looking for the first point just outside the lookahead distance.
         // If the current waypoint is *well* within the lookahead distance, we've passed it.
@@ -156,6 +161,13 @@ Waypoint PurePursuit::find_lookahead_point(const Pose2D& current_pose, float Ld)
 }
 
 
+// Calculates the squared Euclidean distance between the current pose and a waypoint.
+float PurePursuit::get_dist_sq(const Pose2D& pose, const Waypoint& wp) const {
+    float dx = wp.x - pose.x;
+    float dy = wp.y - pose.y;
+    return dx * dx + dy * dy;
+}
+
 // These functions are currently unused since we're using fixed lookahead distance and speed due to our ESC limitations.
 float PurePursuit::calculate_lookahead_distance(float current_speed) const {
     // Linear relationship between speed and lookahead distance. (when going faster, look further ahead)
@@ -167,4 +179,19 @@ float PurePursuit::calculate_target_speed(float steering_angle) const {
     // Inverse relationship: Faster for smaller angles, slower for larger.
     float v_target = max_speed_ * (1.0f - K_v_ * std::abs(steering_angle));
     return clamp(v_target, min_speed_, max_speed_);
+}
+
+// Checks if the robot is within the goal tolerance of the final waypoint.
+bool PurePursuit::is_path_complete(const Pose2D& current_pose) const {
+    if (path_length_ == 0) {
+        return true; // An empty path is "complete"
+    }
+
+    // Get the final waypoint
+    const Waypoint& final_goal = current_path_[path_length_ - 1];
+    
+    // Check squared distance
+    float dist_to_goal_sq = get_dist_sq(current_pose, final_goal);
+
+    return dist_to_goal_sq < (goal_tolerance_ * goal_tolerance_);
 }

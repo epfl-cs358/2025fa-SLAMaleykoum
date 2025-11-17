@@ -60,10 +60,13 @@ private:
     float MIN_STEERING_ANGLE_RAD_ = -0.785398; // ~ -45 degrees
     float MAX_STEERING_ANGLE_RAD_ = 0.785398;  // ~ +45 degrees
 
+    // Goal-reaching tolerance
+    float goal_tolerance_ = 0.1f; // 10 cm tolerance radius
+
     // Helper functions
+    bool is_path_complete(const Pose2D& current_pose) const;
+    float get_dist_sq(const Pose2D& pose, const Waypoint& wp) const;
     float calculate_lookahead_distance(float current_speed) const;
     float calculate_target_speed(float steering_angle) const;
-
-    // Returns the Waypoint struct of the chosen lookahead point
     Waypoint find_lookahead_point(const Pose2D& current_pose, float lookahead_dist); 
 };
