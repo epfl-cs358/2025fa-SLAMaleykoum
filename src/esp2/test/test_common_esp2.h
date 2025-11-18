@@ -24,7 +24,6 @@
 #include "UltraSonicSensor.h"
 #include "ImuSensor.h"
 #include "I2C_mutex.h"
-#include "AS5600Encoder.h"
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include "common/wifi_connection.h"
@@ -32,6 +31,8 @@
 #include "MotorController.h"
 #include "AS5600.h"
 #include "motor_pid.h"
+#include "../../include/common/esp_link.h"
+
 // Pins used by the hardware components on the esp 2
 #define ESC_PIN 15          // pin used for the motor
 #define SERVO_DIR_PIN 6     // the servo that modifies the direction of the wheels
@@ -49,6 +50,9 @@ extern ImuSensor imu;
 //extern AS5600Encoder encoder;
 extern EncoderCarVelocity encoder;
 extern Connection connection;
+extern HardwareSerial ESPS;
+
+extern MotorPID pid;
 
 extern MotorPID pid;
 
@@ -63,3 +67,4 @@ void setup_encoder();               void loop_encoder();
 void setup_test_connection();       void loop_test_connection();
 void setup_pid_velocity();          void loop_pid_velocity();
 void setup_path_pid();              void loop_path_pid();
+void setup_esps_comm_esp2();        void loop_esps_comm_esp2();
