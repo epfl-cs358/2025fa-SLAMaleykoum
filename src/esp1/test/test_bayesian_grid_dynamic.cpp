@@ -8,8 +8,8 @@
 #include "../../../include/esp1/mapping/occupancy/bayesian_grid.h"
 
 int main() {
-    const int grid_size_x = 150;
-    const int grid_size_y = 150;
+    const int grid_size_x = 75;
+    const int grid_size_y = 75;
     const float resolution = 0.05f;
     BayesianOccupancyGrid grid(resolution, grid_size_x, grid_size_y);
 
@@ -43,8 +43,8 @@ int main() {
         bool key_up = false, key_down = false;
         bool key_left = false, key_right = false;
 
-        const float speed = 0.1f;      // vitesse linéaire (m par frame)
-        const float rot_speed = 0.1f;
+        const float speed = 0.3f;      // vitesse linéaire (m par frame)
+        const float rot_speed = 0.3f;
 
         while (auto event = window.pollEvent()) {
             if (event->is<sf::Event::Closed>())

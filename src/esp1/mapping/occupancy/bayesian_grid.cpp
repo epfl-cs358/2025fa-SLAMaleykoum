@@ -131,6 +131,7 @@ const uint8_t* BayesianOccupancyGrid::get_map_data_color() const
     return export_data;
 }
 
+
 const float* BayesianOccupancyGrid::get_map_data() const
 {
     return log_odds;
