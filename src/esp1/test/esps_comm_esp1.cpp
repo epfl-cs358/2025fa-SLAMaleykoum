@@ -1,9 +1,37 @@
 #include "test_common_esp1.h"
 
 Esp_link esp_link(ESPS);
+
 const Pose2D pos_eps1 = {5, 5, 5, 0};
+const Pose2D pos_eps2 = {2, 2, 2, 2};
+
+const GlobalPathMessage path_esp1 = {
+    .path = {
+        {0.0f, 0.0f},
+        {1.0f, 0.0f},
+        {1.0f, 1.0f},
+        {2.0f, 1.0f}
+    },
+    .current_length = 0,
+    .path_id = 0,
+    .timestamp_ms = 0
+};
+const GlobalPathMessage path_esp2 = {
+    .path = {
+        { 5.0f,  5.0f},
+        { 6.0f,  5.0f},
+        { 7.0f,  6.0f},
+        { 7.5f, 7.2f},
+        { 8.0f, 8.0f}
+    },
+    .current_length = 0,
+    .path_id = 0,            // identifiant différent pour ESP2
+    .timestamp_ms = 0     // timestamp de test
+};
 
 const char* mqtt_topic_esps1 = "slamaleykoum77/esps";
+const char* mqtt_topic_esps1_pos = "slamaleykoum77/pos1";
+const char* mqtt_topic_esps1_gpm = "slamaleykoum77/gpm1";
 
 void mqtt_print(const char* str) {
     Serial.println(str);
@@ -11,6 +39,22 @@ void mqtt_print(const char* str) {
     char msg[80];
     snprintf(msg, sizeof(msg), str);
     connection.publish(mqtt_topic_esps1, msg);
+}
+
+void mqtt_print_pos(const char* str) {
+    Serial.println(str);
+
+    char msg[80];
+    snprintf(msg, sizeof(msg), str);
+    connection.publish(mqtt_topic_esps1_pos, msg);
+}
+
+void mqtt_print_gpm(const char* str) {
+    Serial.println(str);
+
+    char msg[80];
+    snprintf(msg, sizeof(msg), str);
+    connection.publish(mqtt_topic_esps1_gpm, msg);
 }
 
 inline bool operator==(const Pose2D& a, const Pose2D& b) {
@@ -44,8 +88,27 @@ const char* pose_to_cstr(const Pose2D& p) {
     return buf;
 }
 
-void test_text();
+const char* gpm_to_cstr(const GlobalPathMessage& gpm) {
+    static char buf[512];   // sufﬁsant pour ~20–30 waypoints
+    size_t pos = 0;
+
+    pos += snprintf(buf + pos, sizeof(buf) - pos,
+                    "PathID=%u, time=%u, len=%u\n",
+                    gpm.path_id, gpm.timestamp_ms, gpm.current_length);
+
+    for (uint16_t i = 0; i < gpm.current_length && pos < sizeof(buf); i++) {
+        pos += snprintf(buf + pos, sizeof(buf) - pos,
+                        "  [%u] (%.3f, %.3f)\n",
+                        i,
+                        gpm.path[i].x,
+                        gpm.path[i].y);
+    }
+
+    return buf;
+}
+
 void test_pos();
+void test_path();
 
 void setup_esps_comm_esp1() {
     Serial.begin(115200);
@@ -67,35 +130,21 @@ void loop_esps_comm_esp1() {
 
     esp_link.poll();
 
-    test_pos();
+    test_path();
 
     delay(2000);
 }
 
-void test_text() {
-    esp_link.sendText("Ping from ESP1");
-    delay(1000);
-
-    char out[MAX_TXT_LEN];
-    if (esp_link.get_txt(out)) {
-        // to see what is happenning
-        mqtt_print("out = ");
-        mqtt_print(out);
-        if (strcmp(out, "Pong from EPS2") == 0) {
-            mqtt_print("[ESP1] got 'PONG' ");
-        }
-    }
-}
-
 void test_pos() {
     esp_link.sendPos(pos_eps1);
+    mqtt_print_pos(pose_to_cstr(pos_eps1));
     delay(1000);
 
     Pose2D out = {};
     Pose2D to_compare = {2, 2, 2, 2};
     if (esp_link.get_pos(out)) {
         mqtt_print("pos recevied on esp1");
-        mqtt_print(pose_to_cstr(out));
+        mqtt_print_pos(pose_to_cstr(out));
         if (out == to_compare) {
             mqtt_print("pos is exact on esp1");
         }
@@ -103,14 +152,16 @@ void test_pos() {
 }
 
 void test_path() {
-    esp_link.sendPath({});
+    esp_link.sendPath(path_esp1);
 
     delay(1000);
 
     GlobalPathMessage out;
-    GlobalPathMessage to_compare = {};
+    GlobalPathMessage to_compare = path_esp2;
+
     if (esp_link.get_path(out)) {
         mqtt_print("path recevied on esp1");
+        mqtt_print_gpm(gpm_to_cstr(out));
         if (out == to_compare) {
             mqtt_print("path is exact on esp1");
         }

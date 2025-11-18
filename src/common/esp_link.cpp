@@ -43,7 +43,14 @@ bool Esp_link::sendRaw(uint8_t msg_id, const uint8_t* data, uint16_t len) {
 
   ser_.write(header);
   if(msg_id == MSG_TXT) ser_.write(len_lo);
-  ser_.write(data, sizeof(data));
+
+  Serial.print("sendRaw bytes: ");
+    for (uint16_t i = 0; i < len; ++i) {
+        Serial.printf("%02X ", data[i]);
+    }
+  Serial.println();
+
+  ser_.write(data, len);
 
   return true;
 }
@@ -140,6 +147,9 @@ void Esp_link::poll() {
         Pose2D p;
         ser_.readBytes(reinterpret_cast<uint8_t*>(&p), sizeof(Pose2D));
         
+        Serial.printf("RX Pose: x=%.3f, y=%.3f, th=%.3f, t=%u\n",
+                  p.x, p.y, p.theta, p.timestamp_ms);
+
         push_pos(p);
         break;
     }
