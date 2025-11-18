@@ -57,3 +57,4 @@ void setup_test_read_lidar();               void loop_test_read_lidar();
 void setup_servo_lidar();                   void loop_servo_lidar();
 void setup_test_lidar_express_get_info();   void loop_test_lidar_express_get_info();
 void setup_test_lidar_standard();           void loop_test_lidar_standard();
+void setup_test_lidar_tcp();                void loop_test_lidar_tcp();

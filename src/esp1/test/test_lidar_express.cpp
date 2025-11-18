@@ -13,10 +13,6 @@ static const char* MQTT_TOPIC_LIDAR_EXPRESS_DEBUG = "slamaleykoum77/print1";
 static const uint32_t PUBLISH_PERIOD_MS= 1000;
 static const uint16_t DOWNSAMPLE_N     = 8;
 static const uint16_t MAX_POINTS_OUT   = 180;
-static const uint16_t SCAN_WINDOW      = 1200;
-
-// 👉 Move big arrays to static/global (outside stack)
-static char msg[4096];
 
 uint32_t last_pub_ms = 0;
 
@@ -66,78 +62,46 @@ void setup_test_lidar_express() {
 void loop_test_lidar_express() {
     connection.check_connection();
 
-    uint32_t now = millis();
-    if (now - last_pub_ms < PUBLISH_PERIOD_MS) return;
-    last_pub_ms = now;
+    static uint32_t lastPub = millis();       // last publish timestamp
+    static uint16_t pointCount = 0;           // number of points buffered
+    static char msg[3000];                    // JSON buffer
 
-    uint16_t count = lidar->readMeasurePoints();  // Each Express scan returns multiple cabins
-    // char db[60];
-    // snprintf(db, sizeof(db), "count is: %u", count);
-    // connection.publish(MQTT_TOPIC_LIDAR_EXPRESS_DEBUG, db);
-    if (count == 0) return;
+    // build / append data into JSON buffer
+    if (pointCount == 0) strlcpy(msg, "[", sizeof(msg));
 
-    uint16_t kept = 0;
-    // uint16_t stride = (DOWNSAMPLE_N == 0 ? 1 : DOWNSAMPLE_N);
+    // always read lidar data (don’t rate-limit reading)
+    uint16_t count = lidar->readMeasurePoints();
+    if (count > 0) {
+        for (uint16_t i = 0; i < count && pointCount < MAX_POINTS_OUT; i += DOWNSAMPLE_N) {
+            float angle = lidar->Data[i].angle;
+            uint16_t dist = lidar->Data[i].distance;
 
-    msg[0] = '\0';
-    strlcat(msg, "[", sizeof(msg));
+            if (!std::isfinite(angle) || dist == 0) continue;
 
-    for (uint16_t i = 0; i < SCAN_WINDOW && kept < MAX_POINTS_OUT; i += DOWNSAMPLE_N) {
-        float angle = lidar->Data[i].angle;
-        uint16_t dist = lidar->Data[i].distance;
+            char tmp[64];
+            snprintf(tmp, sizeof(tmp), "{\"angle\":%.1f,\"distance\":%u},", angle, dist);
+            strlcat(msg, tmp, sizeof(msg));
 
-        if (!std::isfinite(angle) || dist == 0) continue;
-
-        // char msgdbg[60];
-        // snprintf(msgdbg, sizeof(msgdbg), "angle: %.1f ; dist: %u", angle, dist);
-        // connection.publish(MQTT_TOPIC_LIDAR_EXPRESS_DEBUG, msgdbg);
-
-        char tmp[64];
-        snprintf(tmp, sizeof(tmp), "{\"angle\":%.1f,\"distance\":%u},", angle, dist);
-        strlcat(msg, tmp, sizeof(msg));
-
-        kept++;
+            pointCount++;
+        }
     }
 
-    if (kept > 0 && msg[strlen(msg)-1] == ',') msg[strlen(msg)-1] = ']';
-    else strlcat(msg, "]", sizeof(msg));
+    // publish every PUBLISH_PERIOD_MS
+    uint32_t now = millis();
+    if (now - lastPub >= PUBLISH_PERIOD_MS) {
+        if (pointCount > 0) {
+            // close the JSON array cleanly
+            if (msg[strlen(msg) - 1] == ',')
+                msg[strlen(msg) - 1] = ']';
+            else
+                strlcat(msg, "]", sizeof(msg));
 
-    connection.publish(MQTT_TOPIC_LIDAR_EXPRESS, msg);
+            connection.publish(MQTT_TOPIC_LIDAR_EXPRESS, msg);
+            Serial.printf("[LiDAR] published %u points\n", pointCount);
+        }
 
-    Serial.printf("[LiDAR] published %d points\n", kept);
+        // reset for next period
+        pointCount = 0;
+        lastPub = now;
+    }
 }
-/*for (uint16_t i = 0, step = 0; i < SCAN_WINDOW && kept < MAX_POINTS_OUT; ++i, ++step) {
-        // double angle = lidar->Data[i].angle;
-        // float angle = ((lidar->Data[i].angle_high << 7) | (lidar->DataBuffer[i].angle_low >> 1)) / 64.0f;
-        // uint16_t dist = lidar->Data[i].distance;
-        // uint16_t dist = (lidar->Data[i].distance_high * 256 + lidar->DataBuffer[i].distance_low) / 4.0f;
-        float angle = ((lidar->DataBuffer[i].angle_high << 7) | (lidar->DataBuffer[i].angle_low >> 1)) / 64.0f;
-        uint16_t dist = (lidar->DataBuffer[i].distance_high * 256 + lidar->DataBuffer[i].distance_low) / 4.0f;
-
-        // if (angle >= 360.0f) angle = fmod(angle, 360.0f);
-
-        // Avoid publishing debug per point — too heavy!
-        char msgdbg[60];
-        snprintf(msgdbg, sizeof(msgdbg), "angle: %.1f ; dist: %u", angle, dist);
-        connection.publish(MQTT_TOPIC_LIDAR_EXPRESS_DEBUG, msgdbg);
-
-        if (dist == 0) continue;
-        if (step % stride != 0) continue;
-
-        if (kept > 0) strlcat(msg, ",", sizeof(msg));
-        append_point(msg, sizeof(msg), angle, dist, 0);
-        kept++;
-    }*/
-
-
-    // Build JSON (start)
-    // strlcpy(msg, "{\"type\":\"lidar\",\"mode\":\"express\",\"points\":[", sizeof(msg));
-
-    // // append to JSON
-    //     if (kept > 0) strlcat(msg, ",", sizeof(msg));
-    //     append_point(msg, sizeof(msg), angle, dist, 0);
-
-    // strlcat(msg, "]}", sizeof(msg));
-
-    // // Publish final payload
-    // connection.publish(MQTT_TOPIC_LIDAR_EXPRESS, msg);

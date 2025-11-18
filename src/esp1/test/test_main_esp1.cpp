@@ -23,7 +23,7 @@
 
 // Change the id depending on the test to run
 #ifndef TEST_ID
-#define TEST_ID 3
+#define TEST_ID 9
 #endif
 
 void setup() {
@@ -44,6 +44,8 @@ void setup() {
         setup_test_lidar_express_get_info();
     #elif TEST_ID == 8
         setup_test_lidar_standard();
+    #elif TEST_ID == 9
+        setup_test_lidar_tcp();
     #endif
 }
 
@@ -64,5 +66,7 @@ void loop() {
         loop_test_lidar_express_get_info();
     #elif TEST_ID == 8
         loop_test_lidar_standard();
+    #elif TEST_ID == 9
+        loop_test_lidar_tcp();
     #endif
 }
