@@ -46,6 +46,8 @@ void setup() {
         setup_test_lidar_standard();
     #elif TEST_ID == 9
         setup_test_lidar_tcp();
+    #elif TEST_ID == 10
+        setup_esps_comm_esp1();
     #endif
 }
 
@@ -68,5 +70,7 @@ void loop() {
         loop_test_lidar_standard();
     #elif TEST_ID == 9
         loop_test_lidar_tcp();
+    #elif TEST_ID == 10
+        loop_esps_comm_esp1();
     #endif
 }
