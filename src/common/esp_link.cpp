@@ -5,7 +5,7 @@ void Esp_link::begin() {
   ser_.begin(ESPS_BAUDRATE, SERIAL_8N1, RX_ESPS, TX_ESPS);
 }
 
-bool Esp_link::sendPose(const Pose2D& p) {
+bool Esp_link::sendPos(const Pose2D& p) {
   return sendRaw(MSG_POSE, reinterpret_cast<const uint8_t*>(&p), sizeof(Pose2D));
 }
 
@@ -66,28 +66,6 @@ void Esp_link::push_pos(const Pose2D& p) {
   count_pos++;
 }
 
-void Esp_link::push_path(const GlobalPathMessage& gpm) {
-
-  // if the queue is full, drop the oldest
-  if (count_path >= QUEUE_CAP) {
-      head_path = (head_path + 1) % QUEUE_CAP;
-      count_path--;
-  }
-  
-  GlobalPathMessage& slot = queue_path[tail_path];
-
-  for (int i = 0; i < MAX_PATH_LENGTH; i++) {
-    slot.path[i] = gpm.path[i];
-  }
-
-  slot.current_length = gpm.current_length;
-  slot.path_id = gpm.path_id;
-  slot.timestamp_ms = gpm.timestamp_ms;
-
-  tail_path = (tail_path + 1) % QUEUE_CAP;
-  count_path++;
-}
-
 void Esp_link::push_txt(const char* txt) {
   size_t len = strlen(txt);
   if (len > MAX_TXT_LEN-1) len = MAX_TXT_LEN-1;
@@ -120,13 +98,7 @@ bool Esp_link::get_pos(Pose2D& out){
 }
 
 bool Esp_link::get_path(GlobalPathMessage& out){
-  if (count_path == 0) return false;
-  
-  out = queue_path[head_path];
-
-  head_path = (head_path + 1) % QUEUE_CAP;
-  count_path--;
-
+  out = gpm;
   return true;
 }
 
@@ -174,11 +146,7 @@ void Esp_link::poll() {
 
     case MSG_PATH: {
         if (ser_.available() < sizeof(GlobalPathMessage)) return;
-
-        GlobalPathMessage path;
-        ser_.readBytes(reinterpret_cast<uint8_t*>(&path), sizeof(GlobalPathMessage));
-        
-        push_path(path);
+        ser_.readBytes(reinterpret_cast<uint8_t*>(&gpm), sizeof(GlobalPathMessage));
         break;
     }
     

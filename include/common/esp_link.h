@@ -49,7 +49,7 @@ class Esp_link {
      * 
      * @param p the position to be sent
      */
-    bool sendPose(const Pose2D& p);
+    bool sendPos(const Pose2D& p);
 
     /**
      * @brief To send the corrected position
@@ -71,8 +71,8 @@ class Esp_link {
     bool sendText(const char* txt);
 
     bool get_txt(char* out);
-    bool get_pos(Pose2D& p_out);
-    bool get_path(GlobalPathMessage& gpm);
+    bool get_pos(Pose2D& out);
+    bool get_path(GlobalPathMessage& out);
 
     private:
     HardwareSerial& ser_;
@@ -90,14 +90,10 @@ class Esp_link {
     size_t tail_pos = 0;
     size_t count_pos = 0;
 
-    GlobalPathMessage queue_path[QUEUE_CAP];
-    size_t head_path = 0;
-    size_t tail_path = 0;
-    size_t count_path = 0;
+    GlobalPathMessage gpm;
 
     void push_txt(const char* txt);
     void push_pos(const Pose2D& p);
-    void push_path(const GlobalPathMessage& gpm);
 
     /**
      * @brief Formates a message and sends it over UART
