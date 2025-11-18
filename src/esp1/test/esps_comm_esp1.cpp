@@ -123,7 +123,7 @@ void test_path() {
 void mqtt_print(const char* str, const char* topic) {
     Serial.println(str);
 
-    char msg[80];
+    char msg[200];
     snprintf(msg, sizeof(msg), str);
     connection.publish(topic, msg);
 }

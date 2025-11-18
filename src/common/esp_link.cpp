@@ -8,8 +8,7 @@
 static constexpr uint8_t MSG_ID_SIZE = 3; // can encode up to 7 types of messages (2^3 - 1)
 static constexpr uint8_t BYTE_SIZE = 8;
 
-void Esp_link::begin()
- {
+void Esp_link::begin() {
   ser_.begin(ESPS_BAUDRATE, SERIAL_8N1, RX_ESPS, TX_ESPS);
 }
 
@@ -51,6 +50,21 @@ void Esp_link::sendPos(const Pose2D& p) {
 
 void Esp_link::sendPath(const GlobalPathMessage& gpm) {
   ser_.write(MSG_PATH << (BYTE_SIZE - MSG_ID_SIZE));
+  Serial.println("[TX] Sending PATH...");
+  Serial.printf("[TX] Header: 0x%02X\n", MSG_PATH << (BYTE_SIZE - MSG_ID_SIZE));
+  Serial.printf("[TX] sizeof(GlobalPathMessage) = %u bytes\n",
+                (unsigned)sizeof(GlobalPathMessage));
+
+  // Print the struct before sending
+  Serial.println("[TX] PATH content before send:");
+  Serial.printf("  path_id=%u, timestamp=%u, len=%u\n",
+                gpm.path_id, gpm.timestamp_ms, gpm.current_length);
+
+  for (int i = 0; i < gpm.current_length; i++) {
+      Serial.printf("  wp[%d] = (%.3f, %.3f)\n",
+                    i, gpm.path[i].x, gpm.path[i].y);
+  }
+
   ser_.write(reinterpret_cast<const uint8_t*>(&gpm), sizeof(gpm));
 }
 
