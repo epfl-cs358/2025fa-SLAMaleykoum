@@ -1,111 +1,71 @@
+/**
+ * @file Esp_link.cpp
+ * @brief Implementation of the UART communication protocol between two ESP32-S3 boards.
+ */
 #include "../../include/common/esp_link.h"
 #include <string.h>
+
+static constexpr uint8_t MSG_ID_SIZE = 3; // can encode up to 7 types of messages (2^3 - 1)
+static constexpr uint8_t BYTE_SIZE = 8;
 
 void Esp_link::begin() {
   ser_.begin(ESPS_BAUDRATE, SERIAL_8N1, RX_ESPS, TX_ESPS);
 }
 
-bool Esp_link::sendPose(const Pose2D& p) {
-  return sendRaw(MSG_POSE, reinterpret_cast<const uint8_t*>(&p), sizeof(Pose2D));
-}
-
-bool Esp_link::sendCorrection(const LoopClosureCorrection& c) {
-  return sendRaw(MSG_CORR, reinterpret_cast<const uint8_t*>(&c), sizeof(LoopClosureCorrection));
-}
-
-bool Esp_link::sendPath(const GlobalPathMessage& gpm) {
-  return sendRaw(MSG_PATH, reinterpret_cast<const uint8_t*>(&gpm), sizeof(gpm));
-}
-
 /**
- * @note messages de max 2^(8+5)-1 = 8191 characteres
+ * @note UART behavior:
+ *   - available() returns the number of bytes currently stored in the RX buffer.
+ *   - read() reads and returns a single byte (-1 if none available).
+ *   - readBytes(buffer, len) reads exactly len bytes, blocking until all are received.
  */
-bool Esp_link::sendText(const char* txt) { 
-  return sendRaw(MSG_TXT, reinterpret_cast<const uint8_t*>(&txt), strlen(txt)); 
-}
+void Esp_link::poll() {
+  if (ser_.available() < 1) return;
 
-bool Esp_link::sendRaw(uint8_t msg_id, const uint8_t* data, uint16_t len) {
-  uint8_t header = (msg_id << (BYTE_SIZE - MSG_ID_SIZE));
-  uint8_t len_lo;
+  uint8_t header = ser_.read();
+  uint8_t msg_id = header >> (BYTE_SIZE - MSG_ID_SIZE); 
+  //uint8_t aux = header & MSG_ID_MASK; // may be needed later (for the number of waypoint for ex)
 
   switch (msg_id) {
-    case MSG_PATH:
-    case MSG_POSE: break;
-    case MSG_TXT: {
-      uint8_t len_hi = (len >> 8) & 0x3F;
-      len_lo = len & 0xFF;
+    case MSG_POSE: {
+      if (ser_.available() < sizeof(Pose2D)) return;
+      Pose2D p;
+      ser_.readBytes(reinterpret_cast<uint8_t*>(&p), sizeof(Pose2D));
 
-      uint8_t header = (msg_id << 6) | len_hi;
+      push_pos(p);
       break;
     }
-    default: return false;
+    case MSG_PATH: {
+      if (ser_.available() < sizeof(GlobalPathMessage)) return;
+      ser_.readBytes(reinterpret_cast<uint8_t*>(&gpm), sizeof(GlobalPathMessage));
+      break;
+    }
+    default: return;
   }
-
-  ser_.write(header);
-  if(msg_id == MSG_TXT) ser_.write(len_lo);
-  ser_.write(data, sizeof(data));
-
-  return true;
 }
 
-void Esp_link::push_pos(const Pose2D& p) {
-
-  // if the queue is full, drop the oldest
-  if (count_pos >= QUEUE_CAP) {
-      head_pos = (head_pos + 1) % QUEUE_CAP;
-      count_pos--;
-  }
-  
-  Pose2D& slot = queue_pos[tail_pos];
-  slot.theta = p.theta;
-  slot.timestamp_ms = p.timestamp_ms;
-  slot.x = p.x;
-  slot.y = p.y;
-
-  tail_pos = (tail_pos + 1) % QUEUE_CAP;
-  count_pos++;
+void Esp_link::sendPos(const Pose2D& p) {
+  ser_.write(MSG_POSE << (BYTE_SIZE - MSG_ID_SIZE));
+  ser_.write(reinterpret_cast<const uint8_t*>(&p), sizeof(Pose2D));
 }
 
-void Esp_link::push_path(const GlobalPathMessage& gpm) {
+void Esp_link::sendPath(const GlobalPathMessage& gpm) {
+  ser_.write(MSG_PATH << (BYTE_SIZE - MSG_ID_SIZE));
+  Serial.println("[TX] Sending PATH...");
+  Serial.printf("[TX] Header: 0x%02X\n", MSG_PATH << (BYTE_SIZE - MSG_ID_SIZE));
+  Serial.printf("[TX] sizeof(GlobalPathMessage) = %u bytes\n",
+                (unsigned)sizeof(GlobalPathMessage));
 
-  // if the queue is full, drop the oldest
-  if (count_path >= QUEUE_CAP) {
-      head_path = (head_path + 1) % QUEUE_CAP;
-      count_path--;
+  // Print the struct before sending
+  Serial.println("[TX] PATH content before send:");
+  Serial.printf("  path_id=%u, timestamp=%u, len=%u\n",
+                gpm.path_id, gpm.timestamp_ms, gpm.current_length);
+
+  for (int i = 0; i < gpm.current_length; i++) {
+      Serial.printf("  wp[%d] = (%.3f, %.3f)\n",
+                    i, gpm.path[i].x, gpm.path[i].y);
   }
-  
-  GlobalPathMessage& slot = queue_path[tail_path];
 
-  for (int i = 0; i < MAX_PATH_LENGTH; i++) {
-    slot.path[i] = gpm.path[i];
-  }
-
-  slot.current_length = gpm.current_length;
-  slot.path_id = gpm.path_id;
-  slot.timestamp_ms = gpm.timestamp_ms;
-
-  tail_path = (tail_path + 1) % QUEUE_CAP;
-  count_path++;
-}
-
-void Esp_link::push_txt(const char* txt) {
-  size_t len = strlen(txt);
-  if (len > MAX_TXT_LEN-1) len = MAX_TXT_LEN-1;
-
-  // if the queue is full, drop the oldest
-  if (count_txt >= QUEUE_CAP) {
-      head_txt = (head_txt + 1) % QUEUE_CAP;
-      count_txt--;
-  }
-  
-  TxtMsg& slot = queue_txt[tail_txt];
-  slot.len = len;
-
-  memcpy(slot.data, txt, len);
-  slot.data[len] = '\0';
-
-  tail_txt = (tail_txt + 1) % QUEUE_CAP;
-  count_txt++;
+  ser_.write(reinterpret_cast<const uint8_t*>(&gpm), sizeof(gpm));
 }
 
 bool Esp_link::get_pos(Pose2D& out){
@@ -120,86 +80,22 @@ bool Esp_link::get_pos(Pose2D& out){
 }
 
 bool Esp_link::get_path(GlobalPathMessage& out){
-  if (count_path == 0) return false;
-  
-  out = queue_path[head_path];
-
-  head_path = (head_path + 1) % QUEUE_CAP;
-  count_path--;
-
+  out = gpm;
   return true;
 }
 
-/**
- * @note give a buffer out that has MAX_TXT_LEN
- */
-bool Esp_link::get_txt(char* out) {
-  if (count_txt == 0) return false;
-  
-  TxtMsg& msg = queue_txt[head_txt];
-
-  strncpy(out, msg.data, msg.len);
-  out[msg.len] = '\0';
-
-  head_txt = (head_txt + 1) % QUEUE_CAP;
-  count_txt--;
-
-  return true;
-}
-
-/**
- * @note: pour le README : 
- *    - available() renvoie le nbr de bytes qu'on peut lire mtn 
- * (= le nbr de byte deja recus et stockés dans le buffer RX)
- *    - read() lit et retourne 1 seul octet (-1 si pas de data)
- *    - readBytes(buffer, length) lit exactement length bytes dans un buffer 
- * en bloquant jusqu'a tt recevoir
- */
-void Esp_link::poll() {
-  if (ser_.available() < 1) return;
-
-  uint8_t header = ser_.read();
-  uint8_t msg_id = header >> (BYTE_SIZE - MSG_ID_SIZE); 
-  uint8_t aux    = header & MSG_ID_MASK;
-
-  switch (msg_id) {
-    case MSG_POSE: {
-        if (ser_.available() < sizeof(Pose2D)) return;
-        Pose2D p;
-        ser_.readBytes(reinterpret_cast<uint8_t*>(&p), sizeof(Pose2D));
-        
-        push_pos(p);
-        break;
-    }
-
-    case MSG_PATH: {
-        if (ser_.available() < sizeof(GlobalPathMessage)) return;
-
-        GlobalPathMessage path;
-        ser_.readBytes(reinterpret_cast<uint8_t*>(&path), sizeof(GlobalPathMessage));
-        
-        push_path(path);
-        break;
-    }
-    
-    case MSG_TXT: {
-      uint8_t len_hi = aux;
-
-      if (ser_.available() < 1) return;
-      uint8_t len_lo = ser_.read();
-
-      uint16_t len = (len_hi << 8) | len_lo;
-
-      if (ser_.available() < len) return;
-
-      char buf[len + 1];
-      ser_.readBytes((uint8_t*)buf, len);
-      buf[len] = '\0';
-
-      push_txt(buf);
-      break;
-    }
-
-    default: return;
+void Esp_link::push_pos(const Pose2D& p) {
+  if (count_pos >= QUEUE_CAP) {
+      head_pos = (head_pos + 1) % QUEUE_CAP;
+      count_pos--;
   }
+  
+  Pose2D& slot = queue_pos[tail_pos];
+  slot.theta = p.theta;
+  slot.timestamp_ms = p.timestamp_ms;
+  slot.x = p.x;
+  slot.y = p.y;
+
+  tail_pos = (tail_pos + 1) % QUEUE_CAP;
+  count_pos++;
 }
