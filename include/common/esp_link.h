@@ -1,89 +1,119 @@
+/**
+ * @file Esp_link.h
+ * @brief UART-based communication module between two ESP32-S3 boards.
+ *
+ * This file defines the Esp_link class, which implements a lightweight
+ * binary protocol for exchanging structured data over a dedicated high-speed UART link. 
+ * The class handles message framing, raw struct transmission, polling of incoming bytes, 
+ * and small buffers for retrieved messages.
+ *
+ * Only binary data is transmitted; no serialization or dynamic allocation is used.
+ */
 #pragma once
 #include <Arduino.h>
 #include "data_types.h"
 
-const uint8_t MSG_ID_SIZE = 3; // can encode up to 7 types of messages (2^3 - 1)
-const uint8_t BYTE_SIZE = 8;
-const int MSG_ID_MASK = 0x00011111;
-static constexpr size_t QUEUE_CAP = 8;
-static constexpr size_t MAX_TXT_LEN = 255;
-
-struct TxtMsg {
-    uint8_t len;
-    char     data[MAX_TXT_LEN];
-};
-
 /**
- * @class Esp_link 
- * @brief all the communication protocol between the 2 esps.
+ * @class Esp_link
+ * @brief Minimal UART protocol between two ESP32 boards.
+ *
+ * Handles binary message transmission and reception over a dedicated high-speed UART link. 
+ * Provides non-blocking polling, message decoding, and small internal buffers for received data.
+ *
+ * Workflow:
+ *  - begin() must be called once to configure the UART.
+ *  - poll() processes incoming bytes. It must be called often (in loop() for ex.)
  */
 class Esp_link {
     public:
     /**
-     * @brief Constructor for the communication.
-     * Takes the arguments and save these values
-     * 
-     * @param ser : the serial on which the communication will happen
-     * @param rx_pin, tx_pin : the pins for the communication
+     * @brief Constructs an Esp_link object bound to a specific HardwareSerial port.
+     * Stores a reference to the UART instance that will be used for all inter-ESP communication.
+     *
+     * @param ser Reference to the HardwareSerial interface to use.
      */
     Esp_link(HardwareSerial& ser) : ser_(ser) {}
 
     /**
-     * @brief Configure UART
-     * Initialise the serial.
-     * 
-     * @param baud : the baudrate for the communication
+     * @brief Initializes the UART used for ESP-to-ESP communication.
+     *
+     * Sets up the hardware serial port `ser_` with the configured baud rate,
+     * 8N1 frame format, and the designated RX/TX pins. Must be called before
+     * any send or receive operation.
      */
     void begin();
 
     /**
-     * @brief collect the messages sent over the communication and keeps them in a buffer
-     * 
-     * @note call this function in loop
+     * @brief Polls the UART and processes any incoming ESP-to-ESP message.
+     *
+     * Reads the message header, identifies the message type, and retrieves the
+     * corresponding payload. Payloads are pushed into the appropriate internal queues.
+     *
+     * The function returns immediately if not enough bytes are available to
+     * fully decode the current message.
+     *
+     * @note UART behavior:
+     *   - available() returns the number of bytes currently stored in the RX buffer.
+     *   - read() reads and returns a single byte (-1 if none available).
+     *   - readBytes(buffer, len) reads exactly len bytes, blocking until all are received.
      */
     void poll();
 
     /**
-     * @brief To send a position
-     * Serialize a Pose2D and sends it over UART with its ID MSG_POSE
-     * 
-     * @param p the position to be sent
+     * @brief Sends a Pose2D message over the ESP-to-ESP UART link.
+     *
+     * Writes the MSG_POSE header byte and then transmits the Pose2D structure
+     * as raw binary data. The payload is sent exactly as it is laid out in memory,
+     * allowing fast and compact communication.
+     *
+     * @param p Pose2D struct to transmit.
      */
-    bool sendPos(const Pose2D& p);
+    void sendPos(const Pose2D& p);
 
     /**
-     * @brief To send the corrected position
-     * Serialize a LoopClosureCorrection and sends it over UART with its ID MSG_CORR
+     * @brief Sends a GlobalPathMessage message over the ESP-to-ESP UART link.
+     *
+     * Writes the MSG_PATH header byte and then transmits the GlobalPathMessage structure
+     * as raw binary data. The payload is sent exactly as it is laid out in memory,
+     * allowing fast and compact communication.
      * 
-     * @param c the right position
+     * MAX_PATH_LEN waypoints are sent even if some of them are not initialised. 
+     * (may change ---------)
+     *
+     * @param gpm GlobalPathMessage struct to transmit.
      */
-    bool sendCorrection(const LoopClosureCorrection& c);
+    void sendPath(const GlobalPathMessage& gpm);
 
     /**
-     * @brief To send the path
-     * Serialize a GlobalPathMessage and sends it over UART with its ID MSG_PATH
-     * 
-     * @param gpm the path to send
+     * @brief Retrieves the oldest pending Pose2D message from the queue.
+     *
+     * If at least one Pose2D is available, copies it into @p out, advances
+     * the queue head, and returns true. Returns false if the queue is empty.
+     *
+     * @param out Reference where the retrieved Pose2D will be stored.
+     * @return true if a Pose2D was retrieved, false if the queue is empty.
      */
-    bool sendPath(const GlobalPathMessage& gpm);
-    
-    // just for the tests
-    bool sendText(const char* txt);
-
-    bool get_txt(char* out);
     bool get_pos(Pose2D& out);
+
+    /**
+     * @brief Retrieves the most recently received GlobalPathMessage.
+     *
+     * Copies the internally stored GlobalPathMessage into @p out and
+     * returns true. This function does not perform queueing: only the
+     * latest received path is kept.
+     *
+     * @param out Reference where the stored GlobalPathMessage will be written.
+     * @return true always, since a path is always considered available.
+     */
     bool get_path(GlobalPathMessage& out);
 
     private:
-    HardwareSerial& ser_;
-    const uint8_t RX_ESPS = 13;
-    const uint8_t TX_ESPS = 12;
-    const uint32_t ESPS_BAUDRATE = 2000000;
+    static constexpr size_t QUEUE_CAP = 4;
+    static constexpr uint8_t RX_ESPS = 13;
+    static constexpr uint8_t TX_ESPS = 12;
+    static constexpr uint32_t ESPS_BAUDRATE = 2000000;
 
-    TxtMsg queue_txt[QUEUE_CAP];
-    size_t head_txt = 0;
-    size_t tail_txt = 0;
-    size_t count_txt = 0;
+    HardwareSerial& ser_;
 
     Pose2D queue_pos[QUEUE_CAP];
     size_t head_pos = 0;
@@ -92,18 +122,16 @@ class Esp_link {
 
     GlobalPathMessage gpm;
 
-    void push_txt(const char* txt);
-    void push_pos(const Pose2D& p);
-
     /**
-     * @brief Formates a message and sends it over UART
+     * @brief Stores a received Pose2D in the queue.
+     *
+     * Inserts the given Pose2D into the circular buffer used to hold
+     * pending pose messages. 
      * 
-     * @param msg_id the id of the message
-     * @param data the data to encode depending on the msg_id
-     * @param len the number of bytes of the message
-     * 
-     * @note used by the more precise functions (sendPose(), ...)
+     * @note If the queue is full, the oldest entry
+     * is dropped to make room for the new one.
+     *
+     * @param p Pose2D message to enqueue.
      */
-    bool sendRaw(uint8_t msg_id, const uint8_t* data, uint16_t len);
-
+    void push_pos(const Pose2D& p);
 };
