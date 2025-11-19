@@ -385,7 +385,7 @@ void setup_test_freertos_path_follow() {
     xTaskCreatePinnedToCore(TaskMotor,       "Motor",       4096, NULL, 2, &motorTask,   1); // core 1
     //xTaskCreatePinnedToCore(TaskUltrasonic,  "Ultrasonic",  4096, NULL, 2, &ultrasonicTask,1); // core 1
     xTaskCreatePinnedToCore(TaskPose,        "Pose",        4096, NULL, 2, &poseTask,    1); // core 1
-    xTaskCreatePinnedToCore(TaskPurePursuit, "PurePursuit", 4096, NULL, 1, &pursuitTask, 1); // core 1
+    xTaskCreatePinnedToCore(TaskPurePursuit, "PurePursuit", 4096, NULL, 1, &pursuitTask, 1); // core 1*/
 
 
 }
