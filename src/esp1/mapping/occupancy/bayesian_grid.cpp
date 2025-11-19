@@ -2,8 +2,8 @@
 #include <cmath>
 #include <algorithm>
 
-#define LOG_ODDS_FREE     -0.4f
-#define LOG_ODDS_OCCUPIED  0.4f
+#define LOG_ODDS_FREE     -0.04f
+#define LOG_ODDS_OCCUPIED  0.04f
 #define LOG_ODDS_MIN       -4.0f
 #define LOG_ODDS_MAX        4.0f
 

@@ -7,9 +7,98 @@
 #include "../../../include/common/data_types.h"
 #include "../../../include/esp1/mapping/occupancy/bayesian_grid.h"
 
+struct BoxObstacle {
+    sf::Vector2f corners[4];
+
+    BoxObstacle(std::pair<float,float> p1,
+                std::pair<float,float> p2,
+                std::pair<float,float> p3,
+                std::pair<float,float> p4)
+    {
+        corners[0] = sf::Vector2f{p1.first, p1.second};
+        corners[1] = sf::Vector2f{p2.first, p2.second};
+        corners[2] = sf::Vector2f{p3.first, p3.second};
+        corners[3] = sf::Vector2f{p4.first, p4.second};
+    }
+};
+
+bool pointInQuad(float px, float py, const BoxObstacle& box)
+{
+    float angleSum = 0.0f;
+
+    for (int i = 0; i < 4; i++)
+    {
+        sf::Vector2f A = box.corners[i];
+        sf::Vector2f B = box.corners[(i + 1) % 4];
+
+        sf::Vector2f v1(A.x - px, A.y - py);
+        sf::Vector2f v2(B.x - px, B.y - py);
+
+        float dot = v1.x * v2.x + v1.y * v2.y;
+        float det = v1.x * v2.y - v1.y * v2.x;
+        angleSum += std::atan2(det, dot);
+    }
+
+    return std::fabs(angleSum) > 3.14f;
+}
+
+bool lineIntersectsSegment(
+    const sf::Vector2f& p0, const sf::Vector2f& p1,
+    const sf::Vector2f& s0, const sf::Vector2f& s1,
+    sf::Vector2f& intersection)
+{
+    sf::Vector2f r = p1 - p0;
+    sf::Vector2f s = s1 - s0;
+
+    float rxs = r.x * s.y - r.y * s.x;
+    float qpxr = (s0.x - p0.x)*r.y - (s0.y - p0.y)*r.x;
+
+    if (std::abs(rxs) < 1e-8) return false; // parallel
+
+    float t = ((s0.x - p0.x)*s.y - (s0.y - p0.y)*s.x) / rxs;
+    float u = qpxr / rxs;
+
+    if (t >= 0 && t <= 1 && u >= 0 && u <= 1)
+    {
+        intersection = sf::Vector2f(p0.x + t*r.x, p0.y + t*r.y);
+        return true;
+    }
+    return false;
+}
+
+float checkHitQuad(const Pose2D& robot, float angle, float maxRange,
+                   const BoxObstacle& box)
+{
+    sf::Vector2f p0(robot.x, robot.y);
+    sf::Vector2f p1(robot.x + maxRange * std::cos(angle),
+                    robot.y + maxRange * std::sin(angle));
+
+    float bestDist = maxRange;
+    bool found = false;
+
+    for (int i = 0; i < 4; i++)
+    {
+        sf::Vector2f a = box.corners[i];
+        sf::Vector2f b = box.corners[(i+1)%4];
+        sf::Vector2f hit;
+
+        if (lineIntersectsSegment(p0, p1, a, b, hit))
+        {
+            float d = std::hypot(hit.x - robot.x, hit.y - robot.y);
+            if (d < bestDist)
+            {
+                bestDist = d;
+                found = true;
+            }
+        }
+    }
+
+    return found ? bestDist : -1.0f;
+}
+
 int main() {
-    const int grid_size_x = 75;
-    const int grid_size_y = 75;
+    const int grid_size_x = 150;
+    const int grid_size_y = 150;
     const float resolution = 0.05f;
     BayesianOccupancyGrid grid(resolution, grid_size_x, grid_size_y);
 
@@ -32,9 +121,14 @@ int main() {
         {2.0, 2.0}
     };
 
-    const int lidar_points = 20000;
-    const float lidar_max_range = 1.5f;
-    int iteration = 0;
+    std::vector<BoxObstacle> boxes = {
+        BoxObstacle({1.5f, 0.5f}, {2.5f, 0.5f}, {2.5f, 1.5f}, {1.5f, 1.5f}),
+        BoxObstacle({-1.0f, -1.0f}, {-0.5f, -1.0f}, {-0.5f, -0.5f}, {-1.0f, -0.5f})
+    };
+
+    const int lidar_points = 200000;
+    const float lidar_max_range = 1.f;
+    int iteration = 0; 
 
     while (window.isOpen()) {
 
@@ -80,23 +174,30 @@ int main() {
         for (int i = 0; i < lidar_points; ++i) {
             float angle = (i / (float)lidar_points) * 2 * M_PI;
             float range = 0;
+            float angle_world = robot_pose.theta + angle;
 
             for (auto &obs : obstacles) {
                 float dx = obs.first - robot_pose.x;
                 float dy = obs.second - robot_pose.y;
                 float dist = std::sqrt(dx * dx + dy * dy);
                 float obs_angle = std::atan2(dy, dx);
-                float angle_world = robot_pose.theta + angle;
                 
                 float diff = std::fabs(std::atan2(std::sin(angle_world - obs_angle),
                                                    std::cos(angle_world - obs_angle)));
 
-                if (diff < 0.1 && dist < lidar_max_range){
+                if (diff < 0.2 && dist < lidar_max_range){
                     if(range == 0 || dist < range){ // si plusieurs obstacles sur meme trajectoire 
                         range = dist;               // on prend le plus proche comme ferait un vrai lidar
                     }
                 }
             }
+
+            // BOX obstacles
+            for (auto &box : boxes) {
+                float d = checkHitQuad(robot_pose, angle_world, lidar_max_range, box);
+                if (d > 0 && (range == 0 || d < range)) range = d;
+            }
+
 
             LiDARLandmark landmark{range, angle, 1.0f};
             scan.landmarks.push_back(landmark);
