@@ -86,7 +86,7 @@ MotionCommand PurePursuit::compute_command(const Pose2D& current_pose, const Vel
     // -> (radians from the "straight ahead" direction)
     // 
     // L_ is the car's wheelbase. NOTE: the LATERAL component is target_point_robot.x
-    float delta_target = std::atan2(2.0f * L_ * target_point_robot.x, Ld * Ld);
+    float delta_target = std::atan2(2.0f * L_ * target_point_robot.x, Ld_fixed_ * Ld_fixed_);
 
     // ---
     // This part is commented out since we don't have a useful PID for the car speed yet.
