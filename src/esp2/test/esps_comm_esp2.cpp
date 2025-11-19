@@ -34,9 +34,10 @@ const GlobalPathMessage path_esp1 = {
         {0.0f, 0.0f},
         {1.0f, 0.0f},
         {1.0f, 1.0f},
-        {2.0f, 1.0f}
+        {2.0f, 1.0f},
+        {4.0f, 13.0f}
     },
-    .current_length = 4,
+    .current_length = 5,
     .path_id = 12,
     .timestamp_ms = 5
 };
@@ -109,6 +110,7 @@ void test_path() {
     if (esp_link.get_path(out)) {
         mqtt_print("path recevied on esp2");
         mqtt_print(gpm_to_cstr(out), mqtt_topic_esps2_gpm);
+        esp_link.sendPath(path_esp2);
         if (out == path_esp1) {
             esp_link.sendPath(path_esp2);
             mqtt_print("path is exact on esp2");
@@ -119,7 +121,7 @@ void test_path() {
 void mqtt_print(const char* str, const char* topic) {
     Serial.println(str);
 
-    char msg[80];
+    char msg[200];
     snprintf(msg, sizeof(msg), str);
     connection.publish(topic, msg);
 }
@@ -166,7 +168,7 @@ inline bool operator==(const GlobalPathMessage& a, const GlobalPathMessage& b) {
     if (a.path_id        != b.path_id)        return false;
     if (a.timestamp_ms   != b.timestamp_ms)   return false;
 
-    for (uint16_t i = 0; i < 4; i++) {
+    for (uint16_t i = 0; i < a.current_length; i++) {
         if (!(a.path[i] == b.path[i]))
             return false;
     }

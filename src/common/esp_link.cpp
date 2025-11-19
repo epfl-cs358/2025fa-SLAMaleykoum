@@ -23,7 +23,7 @@ void Esp_link::poll() {
 
   uint8_t header = ser_.read();
   uint8_t msg_id = header >> (BYTE_SIZE - MSG_ID_SIZE); 
-  //uint8_t aux = header & MSG_ID_MASK; // may be needed later (for the number of waypoint for ex)
+  uint8_t aux = header & 0b00011111;
 
   switch (msg_id) {
     case MSG_POSE: {
@@ -35,8 +35,17 @@ void Esp_link::poll() {
       break;
     }
     case MSG_PATH: {
-      if (ser_.available() < sizeof(GlobalPathMessage)) return;
-      ser_.readBytes(reinterpret_cast<uint8_t*>(&gpm), sizeof(GlobalPathMessage));
+      int count = aux;
+      if (ser_.available() <  2 * sizeof(uint32_t)) return;
+
+      ser_.readBytes(reinterpret_cast<uint8_t*>(&gpm_.path_id), sizeof(uint32_t));
+      ser_.readBytes(reinterpret_cast<uint8_t*>(&gpm_.timestamp_ms), sizeof(uint32_t));
+
+      if (ser_.available() < count * sizeof(Waypoint)) return;
+      ser_.readBytes(reinterpret_cast<uint8_t*>(gpm_.path), count * sizeof(Waypoint));
+      gpm_.current_length = count;
+      
+      gpm_available = true;
       break;
     }
     default: return;
@@ -49,23 +58,12 @@ void Esp_link::sendPos(const Pose2D& p) {
 }
 
 void Esp_link::sendPath(const GlobalPathMessage& gpm) {
-  ser_.write(MSG_PATH << (BYTE_SIZE - MSG_ID_SIZE));
-  Serial.println("[TX] Sending PATH...");
-  Serial.printf("[TX] Header: 0x%02X\n", MSG_PATH << (BYTE_SIZE - MSG_ID_SIZE));
-  Serial.printf("[TX] sizeof(GlobalPathMessage) = %u bytes\n",
-                (unsigned)sizeof(GlobalPathMessage));
-
-  // Print the struct before sending
-  Serial.println("[TX] PATH content before send:");
-  Serial.printf("  path_id=%u, timestamp=%u, len=%u\n",
-                gpm.path_id, gpm.timestamp_ms, gpm.current_length);
-
-  for (int i = 0; i < gpm.current_length; i++) {
-      Serial.printf("  wp[%d] = (%.3f, %.3f)\n",
-                    i, gpm.path[i].x, gpm.path[i].y);
-  }
-
-  ser_.write(reinterpret_cast<const uint8_t*>(&gpm), sizeof(gpm));
+  uint8_t header = MSG_PATH << (BYTE_SIZE - MSG_ID_SIZE);
+  header |= gpm.current_length;
+  ser_.write(&header, 1);
+  ser_.write(reinterpret_cast<const uint8_t*>(&gpm.path_id), sizeof(gpm.path_id));
+  ser_.write(reinterpret_cast<const uint8_t*>(&gpm.timestamp_ms), sizeof(gpm.timestamp_ms));
+  ser_.write(reinterpret_cast<const uint8_t*>(gpm.path), gpm.current_length * sizeof(Waypoint));
 }
 
 bool Esp_link::get_pos(Pose2D& out){
@@ -80,7 +78,10 @@ bool Esp_link::get_pos(Pose2D& out){
 }
 
 bool Esp_link::get_path(GlobalPathMessage& out){
-  out = gpm;
+  if (!gpm_available) return false;
+
+  out = gpm_;
+  gpm_available = false;
   return true;
 }
 
