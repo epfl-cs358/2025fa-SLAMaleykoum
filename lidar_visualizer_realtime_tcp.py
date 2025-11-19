@@ -72,8 +72,47 @@ class TCPViewer:
         self.lastRightClickTime = self.startTime
         self.lastMidClickTime = self.startTime
 
+    def drawGrid(self):
+        """Draws a metric grid: 1 m spacing (thin white), 5 m spacing (thicker)."""
+        # grid color
+        thin = (180, 180, 180)      # light grey/white thin lines
+        thick = (255, 255, 255)     # bright white for 5 m lines
+
+        # compute pixels per meter
+        px_per_m = self.drawScale
+
+        # draw vertical and horizontal lines around center
+        for sign in (-1, 1):
+            pass  # no-op to remove unused-lambda warnings
+
+        # Determine how many meters fit on screen
+        max_m = int(self.screenSize / px_per_m) + 5
+
+        # Vertical lines
+        for m in range(-max_m, max_m + 1):
+            x = int(self.centerX + m * px_per_m)
+            if m % 5 == 0:
+                color = thick
+                width = 2
+            else:
+                color = thin
+                width = 1
+            pygame.draw.line(self.screen, color, (x, 0), (x, self.screenSize), width)
+
+        # Horizontal lines
+        for m in range(-max_m, max_m + 1):
+            y = int(self.centerY + m * px_per_m)
+            if m % 5 == 0:
+                color = thick
+                width = 3
+            else:
+                color = thin
+                width = 1
+            pygame.draw.line(self.screen, color, (0, y), (self.screenSize, y), width)
+
     def drawPoints(self):
         self.screen.fill(self.bgColour)
+        self.drawGrid()
 
         # draw all points from latest scan
         for x_v, y_v in self.new_points:
@@ -319,6 +358,8 @@ class TCPViewer:
                     dt = now - last_scan_time
                     if dt > 0:
                         self.rotationRate = 1.0 / dt
+                    if self.rotationRate > 500.0:
+                        continue
                     last_scan_time = now
                     self.scanCount += 1
                     self.drawPoints()

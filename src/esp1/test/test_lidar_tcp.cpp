@@ -86,14 +86,10 @@ void loop_test_lidar_tcp() {
     if (!tcpClient || !tcpClient.connected()) {
         WiFiClient newClient = tcpServer.available();
         if (newClient) {
-            if (!tcpClient || !tcpClient.connected()) {
-                tcpClient = newClient;
-                tcpClient.setNoDelay(true);
-                Serial.printf("Client connected from %s\n",
-                              tcpClient.remoteIP().toString().c_str());
-            } else {
-                newClient.stop();  // reject extras
-            }
+            tcpClient = newClient;
+            tcpClient.setNoDelay(true);
+            Serial.printf("Client connected from %s\n",
+                            tcpClient.remoteIP().toString().c_str());
         }
     }
 
@@ -105,15 +101,12 @@ void loop_test_lidar_tcp() {
             stScanDataPoint_t &p = lidar->DataBuffer[i];
 
             // Distance in mm
-            uint16_t dist_mm = (((uint16_t)p.distance_high << 8) | p.distance_low) / 4.0;
+            uint16_t dist_mm = (((uint16_t)p.distance_high << 8) | p.distance_low) / 4;
             if (dist_mm == 0) continue;
 
             // Angle in degrees (Q6)
             uint16_t angle_raw = ((uint16_t)p.angle_high << 7) | p.angle_low >> 1;
             float angle_deg = angle_raw / 64.0f;
-
-            // if(!lidar->isDataBetweenBorders(p))
-            //     continue;
 
             // Store in buffer
             if (pointBufferCount < MAX_BUFFER_POINTS) {
@@ -130,7 +123,8 @@ void loop_test_lidar_tcp() {
         }
     }
 
-    if ((scanComplete || millis() - lastSendTime > 1000) && pointBufferCount > 0) {
+    // Send full scan only when scanComplete is true
+    if ((scanComplete || millis() - lastSendTime > 33) && pointBufferCount > 0) {
         scanComplete = false;
         lastSendTime = millis();
 
@@ -146,23 +140,11 @@ void loop_test_lidar_tcp() {
 
             tcpClient.write((uint8_t*)packet.c_str(), packet.length());
         }
-
         pointBufferCount = 0;
     }
 
-    // if PC sends commands (rare), ignore or handle
+    // read but ignore incoming
     if (tcpClient && tcpClient.connected() && tcpClient.available()) {
-        // read but ignore → prevents TCP buffer blockage
         while (tcpClient.available()) tcpClient.read();
     }
-
-    // periodic serial info
-    static uint32_t lastPrint = 0;
-    if (millis() - lastPrint > 2000) {
-        lastPrint = millis();
-        Serial.printf("AP %s - streaming %u points\n",
-                      WiFi.softAPIP().toString().c_str(), count);
-    }
-
-    delay(1);
 }
