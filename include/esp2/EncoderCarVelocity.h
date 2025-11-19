@@ -3,6 +3,7 @@
 #define ENCODER_CAR_VELOCITY_H
 
 #include <AS5600.h>
+#include "I2C_wire.h"
 
 #define GEAR_RATIO 10.0f      
 #define WHEEL_RADIUS 0.0495f //maybe needs to be adapted but 9.9 diametre  
@@ -20,11 +21,17 @@ public:
     float getWheelAngularVelocity();   
     float getWheelLinearVelocity();    
     float getFilteredMotorAngularVelocity();
-  
+    
     int32_t getCumulativePosition();
 
+    float getDistance();
+
 private:
-    AS5600 as5600;
+    //AS5600 as5600;
+    AS5600 as5600 = AS5600(&I2C_wire);
+
+    int32_t lastCumTicks;
+    float wheelDistanceMeters;
 };
 
 #endif

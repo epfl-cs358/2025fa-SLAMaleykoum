@@ -8,13 +8,19 @@
  */
 #include "EncoderCarVelocity.h"
 #include <Wire.h>
-
+#include "I2C_wire.h"
 
 EncoderCarVelocity::EncoderCarVelocity() {}
 
 // Initialize I2C and AS5600
 bool EncoderCarVelocity::begin() {
-    Wire.begin();  // default SDA/SCL pins
+     
+  
+
+
+    I2C_wire.begin(); 
+
+
     if (!as5600.begin()) {
         Serial.println("AS5600 not detected!");
         return false;
@@ -36,13 +42,7 @@ float EncoderCarVelocity::getMotorAngularVelocity() {
 
 
 float EncoderCarVelocity::getFilteredAngularVelocity() {
-    /*static float filteredVel = 0.0f;
-    const float alpha = 0.02f;
 
-    float rawVel = getMotorAngularVelocity();
-    filteredVel = alpha * rawVel + (1 - alpha) * filteredVel;
-
-    return filteredVel;*/
      static float emaVel = 0.0f;
     static float buffer[5] = {0};
     static int idx = 0;
@@ -74,8 +74,6 @@ float EncoderCarVelocity::getWheelAngularVelocity() {
 
 
 
-
-
 float EncoderCarVelocity::getWheelLinearVelocity() {
     return getWheelAngularVelocity() * WHEEL_RADIUS;
 }
@@ -83,4 +81,23 @@ float EncoderCarVelocity::getWheelLinearVelocity() {
 
 int32_t EncoderCarVelocity::getCumulativePosition() {
     return as5600.getCumulativePosition();
+}
+
+// NEW: Update distance traveled (call this at ~50–100 Hz)
+float EncoderCarVelocity::getDistance() {
+
+    int32_t current = as5600.getCumulativePosition();
+    int32_t deltaTicks = current - lastCumTicks;
+    lastCumTicks = current;
+
+    // Convert motor ticks → motor rotations
+    float motorRot = (float)deltaTicks / 4096.0f;
+
+    // Convert motor → wheel (gear reduction)
+    float wheelRot = motorRot / GEAR_RATIO;
+
+    // Distance = rotations × circumference
+    wheelDistanceMeters += wheelRot * (2.0f * PI * WHEEL_RADIUS);
+
+    return wheelDistanceMeters ;
 }
