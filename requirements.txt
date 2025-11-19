@@ -3,3 +3,6 @@ paho-mqtt~=1.6
 
 # Plotting and Visualization (plotting of the lidar)
 matplotlib~=3.8
+
+# For lidar plotting window
+pygame~=2.6
