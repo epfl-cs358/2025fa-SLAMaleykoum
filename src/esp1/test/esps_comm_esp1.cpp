@@ -34,9 +34,10 @@ const GlobalPathMessage path_esp1 = {
         {0.0f, 0.0f},
         {1.0f, 0.0f},
         {1.0f, 1.0f},
-        {2.0f, 1.0f}
+        {2.0f, 1.0f},
+        {4.0f, 13.0f}
     },
-    .current_length = 4,
+    .current_length = 5,
     .path_id = 12,
     .timestamp_ms = 5
 };
@@ -170,7 +171,7 @@ inline bool operator==(const GlobalPathMessage& a, const GlobalPathMessage& b) {
     if (a.path_id        != b.path_id)        return false;
     if (a.timestamp_ms   != b.timestamp_ms)   return false;
 
-    for (uint16_t i = 0; i < 4; i++) {
+    for (uint16_t i = 0; i < a.current_length; i++) {
         if (!(a.path[i] == b.path[i]))
             return false;
     }

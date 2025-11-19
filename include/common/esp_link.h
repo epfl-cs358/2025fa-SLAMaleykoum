@@ -77,7 +77,7 @@ class Esp_link {
      * as raw binary data. The payload is sent exactly as it is laid out in memory,
      * allowing fast and compact communication.
      * 
-     * MAX_PATH_LEN waypoints are sent even if some of them are not initialised. 
+     * gpm.current_length waypoints are sent even if some of them are not initialised. 
      * (may change ---------)
      *
      * @param gpm GlobalPathMessage struct to transmit.
@@ -120,7 +120,8 @@ class Esp_link {
     size_t tail_pos = 0;
     size_t count_pos = 0;
 
-    GlobalPathMessage gpm;
+    GlobalPathMessage gpm_;
+    bool gpm_available = false;
 
     /**
      * @brief Stores a received Pose2D in the queue.
