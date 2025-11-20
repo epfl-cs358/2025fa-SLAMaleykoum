@@ -19,6 +19,7 @@ struct Pose2D {
     float x;     // Global X position (m)
     float y;     // Global Y position (m)
     float theta; // Global Yaw angle (rad)
+    uint32_t timestamp_ms;
 };
 
 /**
@@ -173,4 +174,18 @@ enum MissionGoalType {
 struct MissionGoal {
     Pose2D target_pose;
     MissionGoalType type;
+};
+
+// --- ESPS COMMUNICATION ---
+/**
+ * @enum MsgID : The IDs of the messages
+ * @brief Each message sent begins by a unique id. When receiving, the esp reads the ID 
+ * and knos what to do with the following message.
+ */
+enum MsgId : uint8_t {
+  MSG_PATH = 1,       // GloablPathMessage ESP1->ESP2
+  MSG_CORR = 2,       // LoopClosureCorrection ESP1->ESP2
+  MSG_POSE = 3,       // Pose2D ESP2->ESP1
+  MSG_TXT = 4
+  // maybe more to add
 };

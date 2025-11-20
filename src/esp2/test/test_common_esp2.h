@@ -31,8 +31,8 @@
 #include "MotorController.h"
 #include "AS5600.h"
 #include "motor_pid.h"
-#include "pure_pursuit.h"
-#include "odometry.h"
+#include "../../include/common/esp_link.h"
+
 // Pins used by the hardware components on the esp 2
 #define ESC_PIN 15          // pin used for the motor
 #define SERVO_DIR_PIN 6     // the servo that modifies the direction of the wheels
@@ -50,6 +50,9 @@ extern ImuSensor imu;
 //extern AS5600Encoder encoder;
 extern EncoderCarVelocity encoder;
 extern Connection connection;
+extern HardwareSerial ESPS;
+
+extern MotorPID pid;
 
 extern MotorPID pid;
 extern PurePursuit purePursuit;
@@ -68,3 +71,5 @@ void setup_pid_velocity();          void loop_pid_velocity();
 void setup_path_pid();              void loop_path_pid();
 void setup_test_freertos_path_follow();  void loop_test_freertos_path_follow();
 void setup_test_sensor();           void loop_test_sensor();
+void setup_esps_comm_esp2();        void loop_esps_comm_esp2();
+void setup_led_basic();             void loop_led_basic();

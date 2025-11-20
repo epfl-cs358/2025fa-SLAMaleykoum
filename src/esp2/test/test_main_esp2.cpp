@@ -23,7 +23,7 @@
 
 // Change the id depending on the test to run
 #ifndef TEST_ID
-#define TEST_ID 12
+#define TEST_ID 14
 #endif
 
 void setup() {
@@ -51,6 +51,10 @@ void setup() {
         setup_test_freertos_path_follow();       
     #elif TEST_ID == 12
         setup_test_sensor();   
+    #elif TEST_ID == 13
+        setup_esps_comm_esp2();
+    #elif TEST_ID == 14
+        setup_led_basic();
     #endif
 }
 
@@ -79,5 +83,9 @@ void loop() {
         loop_test_freertos_path_follow();
     #elif TEST_ID == 12
         loop_test_sensor();  
+    #elif TEST_ID == 13
+        loop_esps_comm_esp2();
+    #elif TEST_ID == 14
+        loop_led_basic();
     #endif
 }
