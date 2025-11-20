@@ -68,3 +68,4 @@ void setup_test_connection();       void loop_test_connection();
 void setup_pid_velocity();          void loop_pid_velocity();
 void setup_path_pid();              void loop_path_pid();
 void setup_esps_comm_esp2();        void loop_esps_comm_esp2();
+void setup_led_basic();             void loop_led_basic();
