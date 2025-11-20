@@ -32,6 +32,8 @@
 #include "AS5600.h"
 #include "motor_pid.h"
 #include "../../include/common/esp_link.h"
+#include <odometry.h>
+#include "esp2/control/pure_pursuit.h"
 
 // Pins used by the hardware components on the esp 2
 #define ESC_PIN 15          // pin used for the motor
