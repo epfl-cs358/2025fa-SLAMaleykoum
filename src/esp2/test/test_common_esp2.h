@@ -38,7 +38,7 @@
 #define SERVO_DIR_PIN 6     // the servo that modifies the direction of the wheels
 #define US_TRIG_PIN 5       // changé par rapport a avant sur conseil de chat
 #define US_ECHO_PIN 19      // changé par rapport a avant sur conseil de chat
-#define SDA_PIN 8           // pin used for SDA of IMU
+#define  SDA_PIN 8           // pin used for SDA of IMU
 #define SCL_PIN 9           // pin used for SCL of IMU
 
 // Harwdare objects
@@ -67,3 +67,4 @@ void setup_test_connection();       void loop_test_connection();
 void setup_pid_velocity();          void loop_pid_velocity();
 void setup_path_pid();              void loop_path_pid();
 void setup_test_freertos_path_follow();  void loop_test_freertos_path_follow();
+void setup_test_sensor();           void loop_test_sensor();

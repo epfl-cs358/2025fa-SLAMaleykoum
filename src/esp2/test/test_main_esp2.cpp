@@ -23,7 +23,7 @@
 
 // Change the id depending on the test to run
 #ifndef TEST_ID
-#define TEST_ID 11
+#define TEST_ID 12
 #endif
 
 void setup() {
@@ -49,6 +49,8 @@ void setup() {
         setup_path_pid(); 
     #elif TEST_ID == 11
         setup_test_freertos_path_follow();       
+    #elif TEST_ID == 12
+        setup_test_sensor();   
     #endif
 }
 
@@ -75,5 +77,7 @@ void loop() {
         loop_path_pid();
     #elif TEST_ID == 11
         loop_test_freertos_path_follow();
+    #elif TEST_ID == 12
+        loop_test_sensor();  
     #endif
 }
