@@ -23,7 +23,7 @@
 
 // Change the id depending on the test to run
 #ifndef TEST_ID
-#define TEST_ID 14
+#define TEST_ID 12
 #endif
 
 void setup() {

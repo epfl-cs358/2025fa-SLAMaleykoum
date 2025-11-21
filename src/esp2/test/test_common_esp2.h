@@ -40,7 +40,7 @@
 #define SERVO_DIR_PIN 6     // the servo that modifies the direction of the wheels
 #define US_TRIG_PIN 5       // changé par rapport a avant sur conseil de chat
 #define US_ECHO_PIN 19      // changé par rapport a avant sur conseil de chat
-#define  SDA_PIN 8           // pin used for SDA of IMU
+#define SDA_PIN 8           // pin used for SDA of IMU
 #define SCL_PIN 9           // pin used for SCL of IMU
 
 // Harwdare objects
