@@ -23,7 +23,7 @@
 
 // Change the id depending on the test to run
 #ifndef TEST_ID
-#define TEST_ID 7
+#define TEST_ID 11
 #endif
 
 void setup() {
@@ -51,6 +51,8 @@ void setup() {
         setup_esps_comm_esp2();
     #elif TEST_ID == 12
         setup_led_basic();
+    #elif TEST_ID == 13
+        setup_clock_esp2();
     #endif
 }
 
@@ -79,5 +81,7 @@ void loop() {
         loop_esps_comm_esp2();
     #elif TEST_ID == 12
         loop_led_basic();
+    #elif TEST_ID == 13
+        loop_clock_esp2();
     #endif
 }

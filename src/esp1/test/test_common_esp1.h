@@ -61,3 +61,4 @@ void setup_test_lidar_express_get_info();   void loop_test_lidar_express_get_inf
 void setup_test_lidar_standard();           void loop_test_lidar_standard();
 void setup_test_lidar_tcp();                void loop_test_lidar_tcp();
 void setup_esps_comm_esp1();                void loop_esps_comm_esp1();
+void setup_clock_esp1();                    void loop_clock_esp1();
