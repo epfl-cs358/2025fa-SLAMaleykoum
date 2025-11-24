@@ -32,6 +32,7 @@ bool Lidar::start()
 {
     // Reset the device
 	serial->write(req_message[rq_reset],2);
+	delay(1000);
     
     // Clear serial buffer
     while(serial->available()) //read as long the hardware buffer is not empty
@@ -96,8 +97,8 @@ uint16_t Lidar::awaitStandardScan()
 					pBuff=pBuff+5; //move pointer to next measure point in storage
 				}
 			}
-			else if(!frameStart)
-				serial->readBytes((uint8_t*)&point,1);
+			// else if(!frameStart)
+			// 	serial->readBytes((uint8_t*)&point,1);
 			
 		}
 	}

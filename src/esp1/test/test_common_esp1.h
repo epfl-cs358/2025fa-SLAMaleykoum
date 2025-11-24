@@ -21,9 +21,8 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <PubSubClient.h>
-#include "esp1/hardware/servo.h"
 #include "common/wifi_connection.h"
-#include "esp1/hardware/rpLidar.h"
+#include "esp1/hardware/lidar.h"
 #include "../../include/common/esp_link.h"
 
 // Pins used by the hardware components on the esp 1
@@ -31,7 +30,6 @@ constexpr int MAX_RANGE = 8000; // Maximum range for LIDAR in mm
 constexpr int LIDAR_TIMEOUT_MS = 5000; // Timeout for LIDAR read operations in milliseconds
 constexpr int LIDAR_ANGLE_OF_INTEREST_START = 0; // Start angle for LIDAR
 constexpr int LIDAR_ANGLE_OF_INTEREST_END = 360; // End angle for LIDAR
-constexpr int MAX_LIDAR_POINTS = 1024; 
 constexpr int HEIGHT = 200; // Height of the map in pixels
 constexpr int WIDTH = 200; // Width of the map in pixels
 #define LIDAR_BAUDRATE 460800 // Common for RPLIDAR S2/A3/M1 (460800). Adjust if using A1/A2 (115200) or other models.
@@ -45,8 +43,7 @@ constexpr int WIDTH = 200; // Width of the map in pixels
 extern Connection connection;
 extern HardwareSerial LIDAR_SERIAL;
 extern HardwareSerial ESPS;
-extern rpLidar* lidar;
-extern DMS15 servo_dir;
+extern Lidar* lidar;
 
 void initGlobals();
 
