@@ -53,7 +53,7 @@ void setup() {
     #elif TEST_ID == 12
         setup_led_basic();
     #elif TEST_ID == 13
-        setup_clock_esp1();
+        setup_clock_esp1_AP();
     #endif
 }
 
@@ -83,6 +83,6 @@ void loop() {
     #elif TEST_ID == 12
         loop_led_basic();
     #elif TEST_ID == 13
-        loop_clock_esp1();
+        loop_clock_esp1_AP();
     #endif
 }
