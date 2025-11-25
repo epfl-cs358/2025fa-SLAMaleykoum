@@ -19,7 +19,7 @@ struct Pose2D {
     float x;     // Global X position (m)
     float y;     // Global Y position (m)
     float theta; // Global Yaw angle (rad)
-    uint32_t timestamp_ms;
+    uint64_t timestamp_ms;
 };
 
 /**

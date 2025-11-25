@@ -1,34 +1,23 @@
 #include "test_common_esp1.h"
 
-void mqtt_print_clock_esp1(const char* str, const char* topic = "slamaleykoum77/esp1");
-int j = 0;
+int i = 0;
+uint64_t t0 = 0;
 
 void setup_clock_esp1() {
-    Serial.begin(115200);
-    delay(1000);
-    Serial.println("serial ok");
     connection.setupWifi();
     connection.check_connection();
     delay(1000);
 
-    char msg[100];
-    snprintf(msg, sizeof(msg), "setup,    millis_esp1 = %lu", (unsigned long)millis());
-    mqtt_print_clock_esp1(msg);
-
-    mqtt_print_clock_esp1("ESP1 ready");
+    connection.publish("slamaleykoum77/esp1", "ESP1 ready");
+    t0 = esp_wifi_get_tsf_time(WIFI_IF_STA);
 }
 
 void loop_clock_esp1() {
     connection.check_connection();
-    delay(2000);
+    delay(4000);
 
-    char msg[100];
-    snprintf(msg, sizeof(msg), "loop %d,    millis_esp1 = %lu ms", j++, (unsigned long)millis());
-    mqtt_print_clock_esp1(msg);
-}
-
-void mqtt_print_clock_esp1(const char* str, const char* topic) {
     char msg[200];
-    snprintf(msg, sizeof(msg), str);
-    connection.publish(topic, msg);
+    snprintf(msg, sizeof(msg), "loop %d,    millis = %10lu ms,   tsf = %.3f ms", 
+            i++, (unsigned long)millis(), ((double)esp_wifi_get_tsf_time(WIFI_IF_STA)-t0)/1000.0);
+    connection.publish("slamaleykoum77/esp1", msg);
 }

@@ -16,6 +16,7 @@
 
 HardwareSerial LIDAR_SERIAL(2);
 HardwareSerial ESPS(1);
+Esp_link esp_link(ESPS);
 rpLidar* lidar = nullptr;
 DMS15 servo_dir(SERVO_DIR_PIN);
 
