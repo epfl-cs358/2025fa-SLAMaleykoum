@@ -26,6 +26,13 @@ BayesianOccupancyGrid::BayesianOccupancyGrid(float resolution_m,
     // Initialise toute la grille à 0
     for (int i = 0; i < grid_size_x * grid_size_y; i++)
         log_odds[i] = 0.0f;
+
+    // Precompute sin/cos tables
+    for (int i = 0; i < 3600; i++) {
+        float a = i * 0.1f * M_PI / 180.0f;
+        sin_table[i] = sin(a);
+        cos_table[i] = cos(a);
+    }
 }
 
 // ------------------------------------------------------
@@ -35,22 +42,26 @@ void BayesianOccupancyGrid::update_map(const LiDARScan& scan,
                                        const Pose2D& pose,
                                        const float lidar_max_range)
 {
-    for (uint16_t i = 0; i < scan.count; i++)
+    for (uint16_t i = 0; i < scan.count; ++i)
     {
         float angle_lidar = scan.angles[i] * (M_PI / 180.0f);
+        
         float r = scan.distances[i] * 0.001f;  // mm to m
 
         bool is_hit = (r > 0);
         if (!is_hit) {
             r = lidar_max_range;
         }
-
+        
         // Convert to world angle
         float angle_world = pose.theta + angle_lidar;
+        int idx = (int)(angle_world * 10.0f);
+        float angle_lidar_sin = sin_table[idx];
+        float angle_lidar_cos = cos_table[idx];
 
         // Compute world hit pos
-        float hit_x = pose.x + r * std::cos(angle_world);
-        float hit_y = pose.y + r * std::sin(angle_world);
+        float hit_x = pose.x + r * angle_lidar_cos;
+        float hit_y = pose.y + r * angle_lidar_sin;
 
         int x0 = (int)(pose.x / grid_resolution) + grid_size_x / 2;
         int x1 = (int)(hit_x / grid_resolution) + grid_size_x / 2;
@@ -70,7 +81,7 @@ void BayesianOccupancyGrid::update_map(const LiDARScan& scan,
 
         int x = x0;
         int y = y0;
-
+        
         while (true)
         {
             if (x == x1 && y == y1)

@@ -124,6 +124,14 @@ typedef struct {
 } LiDARScan;
 
 /**
+ * @brief Synchronized LiDAR scan and robot pose.
+ */
+struct SyncedScan {
+    LiDARScan scan;
+    Pose2D pose;
+};
+
+/**
  * @brief Represents a single raw point from the LiDAR sensor in standard mode.
  */
 typedef struct rawScanDataPoint

@@ -60,4 +60,8 @@ public:
 private:
     // ✔️ tableau interne, contigu, sans allocation dynamique
     float* log_odds;
+
+    // Precomputed sin/cos tables for efficiency
+    float sin_table[3600];
+    float cos_table[3600];
 };
