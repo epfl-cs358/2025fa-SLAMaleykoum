@@ -52,13 +52,16 @@ public:
     // Returns a simplified map representation (e.g. pointer or some light compressed array).
     const float* get_map_data() const;
 
-
-private:
     // Internal 2D array or vector to hold log-odds values
     float grid_resolution;
     uint16_t grid_size_x;
     uint16_t grid_size_y;
 
+private:
     // ✔️ tableau interne, contigu, sans allocation dynamique
     float* log_odds;
+
+    // Precomputed sin/cos tables for efficiency
+    float sin_table[3600];
+    float cos_table[3600];
 };
