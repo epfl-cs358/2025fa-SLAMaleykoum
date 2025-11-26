@@ -17,8 +17,8 @@ const char* mqtt_server = "broker.hivemq.com";
 const int mqtt_port = 1883;
 const char* mqtt_topic_commands = "slamaleykoum77/commands";
 
-Connection::Connection() : 
-    client(_espClient) {}
+Connection::Connection(const char* clientId) : 
+    client(_espClient), clientId_(clientId) {}
 
 void Connection::setupWifi(){
     delay(100);
@@ -43,7 +43,7 @@ void Connection::reconnect() {
   while (!client.connected()) {
     Serial.print("Attempting MQTT connection...");
 
-    if (client.connect("ESP32_Client")) {
+    if (client.connect(clientId_)) {
         Serial.println("connected!");
         client.subscribe(mqtt_topic_commands); // inutile pour nous mais on garde au cas où (manque callback function)
     } else {

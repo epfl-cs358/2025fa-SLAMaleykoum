@@ -21,16 +21,17 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <PubSubClient.h>
-#include "esp1/hardware/servo.h"
 #include "common/wifi_connection.h"
-#include "esp1/hardware/rpLidar.h"
+#include "esp1/hardware/lidar.h"
+#include "../../include/common/esp_link.h"
+#include "esp1/mapping/occupancy/bayesian_grid.h"
+#include "esp_wifi.h"
 
 // Pins used by the hardware components on the esp 1
 constexpr int MAX_RANGE = 8000; // Maximum range for LIDAR in mm
 constexpr int LIDAR_TIMEOUT_MS = 5000; // Timeout for LIDAR read operations in milliseconds
 constexpr int LIDAR_ANGLE_OF_INTEREST_START = 0; // Start angle for LIDAR
 constexpr int LIDAR_ANGLE_OF_INTEREST_END = 360; // End angle for LIDAR
-constexpr int MAX_LIDAR_POINTS = 1024; 
 constexpr int HEIGHT = 200; // Height of the map in pixels
 constexpr int WIDTH = 200; // Width of the map in pixels
 #define LIDAR_BAUDRATE 460800 // Common for RPLIDAR S2/A3/M1 (460800). Adjust if using A1/A2 (115200) or other models.
@@ -39,14 +40,14 @@ constexpr int WIDTH = 200; // Width of the map in pixels
 #define SERVO_DIR_PIN 7     // the servo that modifies the direction of the wheels
 #define LIDAR_RX_PIN 5
 #define LIDAR_TX_PIN 4
+#define LED_PIN LED_BUILTIN
 
 // Harwdare objects
 extern Connection connection;
-extern HardwareSerial LIDAR_SERIAL;
-extern rpLidar* lidar;
-extern DMS15 servo_dir;
-
-void initGlobals();
+extern HardwareSerial& LIDAR_SERIAL;
+extern HardwareSerial ESPS;
+extern Lidar lidar;
+extern Esp_link esp_link;
 
 // Prototypes of the functions
 void setup_test_lidar_basic();              void loop_test_lidar_basic();
@@ -57,3 +58,9 @@ void setup_test_read_lidar();               void loop_test_read_lidar();
 void setup_servo_lidar();                   void loop_servo_lidar();
 void setup_test_lidar_express_get_info();   void loop_test_lidar_express_get_info();
 void setup_test_lidar_standard();           void loop_test_lidar_standard();
+void setup_test_lidar_tcp();                void loop_test_lidar_tcp();
+void setup_esps_comm_esp1();                void loop_esps_comm_esp1();
+void setup_bayesian_dynamic_tcp();          void loop_bayesian_dynamic_tcp();
+void setup_clock_esp1();                    void loop_clock_esp1();
+void setup_led_basic();                     void loop_led_basic();
+void setup_clock_esp1_AP();                 void loop_clock_esp1_AP();

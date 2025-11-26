@@ -92,6 +92,5 @@ void loop_all_together() {
     motor.update();
     delay(100);
     imu.readAndUpdate();
-    encoder.update();
     delay(100);
 }

@@ -23,7 +23,7 @@
 
 // Change the id depending on the test to run
 #ifndef TEST_ID
-#define TEST_ID 6
+#define TEST_ID 14
 #endif
 
 void setup() {
@@ -39,6 +39,22 @@ void setup() {
         setup_motor_runs();
     #elif TEST_ID == 6
         setup_test_connection();
+    #elif TEST_ID == 7
+        setup_imu_calibration();
+    #elif TEST_ID == 8
+        setup_encoder();
+    #elif TEST_ID == 9
+        setup_pid_velocity();   
+    #elif TEST_ID == 10
+        setup_path_pid();
+    #elif TEST_ID == 11
+        setup_esps_comm_esp2();
+    #elif TEST_ID == 12
+        setup_led_basic();
+    #elif TEST_ID == 13
+        setup_clock_esp2();
+    #elif TEST_ID == 14
+        setup_clock_esp2_STA();
     #endif
 }
 
@@ -55,5 +71,21 @@ void loop() {
         loop_motor_runs();
     #elif TEST_ID == 6
         loop_test_connection();
+    #elif TEST_ID == 7
+        loop_imu_calibration();
+    #elif TEST_ID == 8
+        loop_encoder();
+    #elif TEST_ID == 9
+        loop_pid_velocity();
+    #elif TEST_ID == 10
+        loop_path_pid();
+    #elif TEST_ID == 11
+        loop_esps_comm_esp2();
+    #elif TEST_ID == 12
+        loop_led_basic();
+    #elif TEST_ID == 13
+        loop_clock_esp2();
+    #elif TEST_ID == 14
+        loop_clock_esp2_STA();
     #endif
 }
