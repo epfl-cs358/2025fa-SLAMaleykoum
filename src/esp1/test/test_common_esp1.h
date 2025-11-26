@@ -25,6 +25,7 @@
 #include "esp1/hardware/lidar.h"
 #include "../../include/common/esp_link.h"
 #include "esp1/mapping/occupancy/bayesian_grid.h"
+#include "esp_wifi.h"
 
 // Pins used by the hardware components on the esp 1
 constexpr int MAX_RANGE = 8000; // Maximum range for LIDAR in mm
@@ -39,12 +40,14 @@ constexpr int WIDTH = 200; // Width of the map in pixels
 #define SERVO_DIR_PIN 7     // the servo that modifies the direction of the wheels
 #define LIDAR_RX_PIN 5
 #define LIDAR_TX_PIN 4
+#define LED_PIN LED_BUILTIN
 
 // Harwdare objects
 extern Connection connection;
 extern HardwareSerial& LIDAR_SERIAL;
 extern HardwareSerial ESPS;
 extern Lidar lidar;
+extern Esp_link esp_link;
 
 // Prototypes of the functions
 void setup_test_lidar_basic();              void loop_test_lidar_basic();
@@ -58,3 +61,6 @@ void setup_test_lidar_standard();           void loop_test_lidar_standard();
 void setup_test_lidar_tcp();                void loop_test_lidar_tcp();
 void setup_esps_comm_esp1();                void loop_esps_comm_esp1();
 void setup_bayesian_dynamic_tcp();          void loop_bayesian_dynamic_tcp();
+void setup_clock_esp1();                    void loop_clock_esp1();
+void setup_led_basic();                     void loop_led_basic();
+void setup_clock_esp1_AP();                 void loop_clock_esp1_AP();

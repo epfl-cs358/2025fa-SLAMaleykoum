@@ -49,6 +49,12 @@ void setup() {
         setup_esps_comm_esp1();
     #elif TEST_ID == 11
         setup_bayesian_dynamic_tcp();
+    #elif TEST_ID == 12
+        setup_clock_esp1();
+    #elif TEST_ID == 13
+        setup_led_basic();
+    #elif TEST_ID == 14
+        setup_clock_esp1_AP();
     #endif
 }
 
@@ -75,5 +81,11 @@ void loop() {
         loop_esps_comm_esp1();
     #elif TEST_ID == 11
         loop_bayesian_dynamic_tcp();
+    #elif TEST_ID == 12
+        loop_clock_esp1();
+    #elif TEST_ID == 13
+        loop_led_basic();
+    #elif TEST_ID == 14
+        loop_clock_esp1_AP();
     #endif
 }
