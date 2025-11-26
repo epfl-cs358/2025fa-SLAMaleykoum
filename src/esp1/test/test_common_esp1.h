@@ -25,7 +25,6 @@
 #include "esp1/hardware/lidar.h"
 #include "../../include/common/esp_link.h"
 #include "esp_wifi.h"
-#include "esp_wifi_types.h"
 
 // Pins used by the hardware components on the esp 1
 constexpr int MAX_RANGE = 8000; // Maximum range for LIDAR in mm

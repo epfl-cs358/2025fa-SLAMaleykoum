@@ -33,7 +33,6 @@
 #include "motor_pid.h"
 #include "../../include/common/esp_link.h"
 #include "esp_wifi.h"
-#include "esp_wifi_types.h"
 
 // Pins used by the hardware components on the esp 2
 #define ESC_PIN 15          // pin used for the motor
