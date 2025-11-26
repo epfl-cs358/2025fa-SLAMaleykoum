@@ -23,31 +23,29 @@ rq_message_t req_message[] = {{0xA5,0x25}, //Stop
                                 {0xA5,0x20}, //Scan
                                 {0xA5,0x82}}; //Express scan
 
-Lidar::Lidar(HardwareSerial *_mySerial)
-{
-	serial=_mySerial;
-}
-
 bool Lidar::start()
 {
+	serial.setRxBufferSize(LIDAR_SERIAL_BUFFER_SIZE);
+    serial.begin(LIDAR_BAUDRATE, SERIAL_8N1, LIDAR_RX_PIN, LIDAR_TX_PIN);
+
     // Reset the device
-	serial->write(req_message[rq_reset],2);
+	serial.write(req_message[rq_reset],2);
 	delay(1000);
     
     // Clear serial buffer
-    while(serial->available()) //read as long the hardware buffer is not empty
+    while(serial.available()) //read as long the hardware buffer is not empty
     {
-        serial->read();
+        serial.read();
     }
 
     // Start scan
-    serial->write((uint8_t*)&req_message[rq_scan],2); //standard scan request
+    serial.write((uint8_t*)&req_message[rq_scan],2); //standard scan request
 
 	rp_descriptor_t descr;
 
 	if(!checkForTimeout(5000,7)) //wait for response
 	{
-		serial->readBytes((uint8_t*)&descr,7);
+		serial.readBytes((uint8_t*)&descr,7);
         return compareDescriptor(descr,resp_descriptor[startScan]);
 	}
 	return false;
@@ -70,9 +68,9 @@ uint16_t Lidar::awaitStandardScan()
 	uint32_t startTime=millis();
 	while(millis()<(startTime+5000)) //timeout after 5 seconds
 	{
-		if(serial->available()>=5)
+		if(serial.available()>=5)
 		{
-			serial->readBytes((uint8_t*)&point,5);
+			serial.readBytes((uint8_t*)&point,5);
 			
 			//search for frameStart
 			if((point.quality&0x01)&&(!(point.quality&0x02))&&!frameStart)
@@ -123,7 +121,7 @@ float Lidar::calcDistance(uint8_t _lowByte,uint8_t _highByte)
 bool Lidar::checkForTimeout(uint32_t _time,size_t _size)
 {
 	float startTime=millis();
-	while(!(serial->available()>=_size))
+	while(!(serial.available()>=_size))
 	{
 		if(millis()>(startTime+_time)){
 			Serial.println("Lidar Timeout");

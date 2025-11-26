@@ -116,11 +116,11 @@ typedef float MotorOutputs; // PWM = pulse duration in microseconds
  * @brief Single LiDAR scan (360°).
  */
 typedef struct {
-    uint16_t count;                     // number of valid points
-    float angles[MAX_LIDAR_POINTS];     // angle in radians
-    float distances[MAX_LIDAR_POINTS];  // distance in meters
-    uint8_t qualities[MAX_LIDAR_POINTS]; // quality [0-255]
-    uint32_t timestamp_ms;              // end-of-scan timestamp
+    uint16_t count;                         // number of valid points
+    float angles[MAX_LIDAR_POINTS];         // angle in degrees
+    float distances[MAX_LIDAR_POINTS];      // distance in millimeters
+    uint8_t qualities[MAX_LIDAR_POINTS];    // quality [0-255]
+    uint32_t timestamp_ms;                  // end-of-scan timestamp
 } LiDARScan;
 
 /**

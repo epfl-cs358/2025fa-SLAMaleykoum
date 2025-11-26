@@ -32,28 +32,36 @@ BayesianOccupancyGrid::BayesianOccupancyGrid(float resolution_m,
 // Update log occupancy grid
 // ------------------------------------------------------
 void BayesianOccupancyGrid::update_map(const LiDARScan& scan,
-                                       const Pose2D& pose, const float lidar_max_range)
+                                       const Pose2D& pose,
+                                       const float lidar_max_range)
 {
-    for (const auto& landmark : scan.landmarks)
+    for (uint16_t i = 0; i < scan.count; i++)
     {
-        float angle_world = pose.theta + landmark.angle;
+        float angle_lidar = scan.angles[i] * (M_PI / 180.0f);
+        float r = scan.distances[i] * 0.001f;  // mm to m
 
-        float r = landmark.range; 
         bool is_hit = (r > 0);
-        if(!is_hit){
+        if (!is_hit) {
             r = lidar_max_range;
         }
 
+        // Convert to world angle
+        float angle_world = pose.theta + angle_lidar;
+
+        // Compute world hit pos
         float hit_x = pose.x + r * std::cos(angle_world);
         float hit_y = pose.y + r * std::sin(angle_world);
 
         int x0 = (int)(pose.x / grid_resolution) + grid_size_x / 2;
         int x1 = (int)(hit_x / grid_resolution) + grid_size_x / 2;
+
+        // NOTE: Y axis is inverted to match your map convention
         int y0 = (int)(-pose.y / grid_resolution) + grid_size_y / 2;
-        int y1 = (int)(-hit_y  / grid_resolution) + grid_size_y / 2;
+        int y1 = (int)(-hit_y / grid_resolution) + grid_size_y / 2;
 
-
-        // Bresenham algorithm
+        // ----------------------------------------------------------
+        // Bresenham free cells
+        // ----------------------------------------------------------
         int dx = std::abs(x1 - x0);
         int dy = std::abs(y1 - y0);
         int sx = (x0 < x1) ? 1 : -1;
@@ -71,8 +79,7 @@ void BayesianOccupancyGrid::update_map(const LiDARScan& scan,
             if (x >= 0 && x < grid_size_x && y >= 0 && y < grid_size_y)
             {
                 int idx = y * grid_size_x + x;
-                log_odds[idx] = std::max(LOG_ODDS_MIN,
-                                         log_odds[idx] + LOG_ODDS_FREE);
+                log_odds[idx] = std::max(LOG_ODDS_MIN, log_odds[idx] + LOG_ODDS_FREE);
             }
 
             int e2 = 2 * err;
@@ -80,9 +87,12 @@ void BayesianOccupancyGrid::update_map(const LiDARScan& scan,
             if (e2 < dx)  { err += dx; y += sy; }
         }
 
-        // Cellule finale occupée
-        if(is_hit){
-            if (x1 >= 0 && x1 < grid_size_x && y1 >= 0 && y1 < grid_size_y){
+        // ----------------------------------------------------------
+        // Occupied cell at the ray end
+        // ----------------------------------------------------------
+        if (is_hit) {
+            if (x1 >= 0 && x1 < grid_size_x && y1 >= 0 && y1 < grid_size_y)
+            {
                 int idx = y1 * grid_size_x + x1;
                 log_odds[idx] = std::min(LOG_ODDS_MAX, log_odds[idx] + LOG_ODDS_OCCUPIED);
             }

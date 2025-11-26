@@ -36,7 +36,7 @@ public:
 	 * @param pointer to used USART
 	 * @param Baudrate
 	 */
-	Lidar(HardwareSerial *_serial);
+	Lidar(HardwareSerial& ser) : serial(ser) {}
 
     /**
 	 * Starts the Lidar and its measurement system
@@ -87,6 +87,11 @@ public:
 	 float calcDistance(uint8_t _lowByte, uint8_t _highByte);
 
 private:
+	static constexpr uint32_t LIDAR_SERIAL_BUFFER_SIZE = 5000;
+    static constexpr uint8_t LIDAR_RX_PIN = 5;
+    static constexpr uint8_t LIDAR_TX_PIN = 4;
+    static constexpr uint32_t LIDAR_BAUDRATE = 460800;
+
     /**
 	 * Tries to read a new full cycle of Points
 	 * 
@@ -104,6 +109,8 @@ private:
     // RIEN A FAIRE DANS LA CLASS LIDAR NON??????????????????????????????????????????????????????????????????????
 
     // pointer to HardwareSerial USART 
-    HardwareSerial *serial;
+    HardwareSerial& serial;
+
+
 };
 

@@ -41,11 +41,9 @@ constexpr int WIDTH = 200; // Width of the map in pixels
 
 // Harwdare objects
 extern Connection connection;
-extern HardwareSerial LIDAR_SERIAL;
+extern HardwareSerial& LIDAR_SERIAL;
 extern HardwareSerial ESPS;
-extern Lidar* lidar;
-
-void initGlobals();
+extern Lidar lidar;
 
 // Prototypes of the functions
 void setup_test_lidar_basic();              void loop_test_lidar_basic();
