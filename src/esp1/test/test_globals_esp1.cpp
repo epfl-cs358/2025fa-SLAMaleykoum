@@ -17,8 +17,7 @@
 HardwareSerial LIDAR_SERIAL(2);
 HardwareSerial ESPS(1);
 Esp_link esp_link(ESPS);
-rpLidar* lidar = nullptr;
-DMS15 servo_dir(SERVO_DIR_PIN);
+Lidar* lidar = nullptr;
 
 Connection connection("esp1");
 
@@ -29,5 +28,5 @@ void initGlobals() {
     delay(100);
 
     // Create LIDAR object
-    lidar = new rpLidar(&LIDAR_SERIAL, LIDAR_BAUDRATE, LIDAR_RX_PIN, LIDAR_TX_PIN);
+    lidar = new Lidar(&LIDAR_SERIAL);
 }
