@@ -105,7 +105,7 @@ MotionCommand PurePursuit::compute_command(const Pose2D& current_pose, const Vel
     float steering_to_servo = (steering_command_rad * (180.0f / M_PI)) + 90.0f;
 
     // return {v_target, steering_command_rad};
-    return { /* Fixed Speed */ fixed_speed_, steering_command_rad};
+    return { /* Fixed Speed */ fixed_speed_, steering_to_servo};
 }
 
 
@@ -137,6 +137,8 @@ Waypoint PurePursuit::find_lookahead_point(const Pose2D& current_pose, float Ld)
         
         // We're looking for the first point just outside the lookahead distance.
         // If the current waypoint is *well* within the lookahead distance, we've passed it.
+
+
         if (dist_sq < Ld * Ld * 0.5f) { 
             // We have passed this waypoint (i+1), so start the next search from it.
             last_target_index_ = i + 1;

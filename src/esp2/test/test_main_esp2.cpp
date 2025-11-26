@@ -23,7 +23,7 @@
 
 // Change the id depending on the test to run
 #ifndef TEST_ID
-#define TEST_ID 12
+#define TEST_ID 11
 #endif
 
 void setup() {
@@ -51,6 +51,14 @@ void setup() {
         setup_test_freertos_path_follow();       
     #elif TEST_ID == 12
         setup_test_sensor();   
+    #elif TEST_ID == 13
+        setup_test_encoder(); 
+    #elif TEST_ID == 14
+        setup_servo_calibration();
+    #elif TEST_ID == 15
+        setup_test_odometry_freertos_path_follow();
+    #elif TEST_ID == 16
+        setup_test_odometry_position();
     #endif
 }
 
@@ -79,5 +87,13 @@ void loop() {
         loop_test_freertos_path_follow();
     #elif TEST_ID == 12
         loop_test_sensor();  
+    #elif TEST_ID == 13
+        loop_test_encoder(); 
+    #elif TEST_ID == 14
+        loop_servo_calibration();
+    #elif TEST_ID == 15
+        loop_test_odometry_freertos_path_follow();
+    #elif TEST_ID == 16
+        loop_test_odometry_position();
     #endif
 }

@@ -21,34 +21,55 @@ void setup_test_sensor() {
 
 
     // Wifi connection 
+    //connection.check_connection();
+
+    pinMode(LED_BUILTIN, OUTPUT);
+
+    //digitalWrite(LED_BUILTIN, HIGH);
+
+    delay(2000);
+
+    connection.setupWifi();
+
+  
+
+    // Wifi connection 
     connection.check_connection();
 
-     pinMode(LED_BUILTIN, OUTPUT);
-
-
+    digitalWrite(LED_BUILTIN, LOW);
 
     
     if (!ultrasonic.begin()) {
         char msgSonic[50];
         snprintf(msgSonic, sizeof(msgSonic), "UltraSonic Sensor init failed!");
         connection.publish(mqtt_topic_connection_sensor , msgSonic);
+        digitalWrite(LED_BUILTIN, LOW);
+            
+        
+
+        delay(2000);
         while (true);
     }
 
     snprintf(buff, sizeof(buff), "✅ Ultra Sonic initialized successfully");
     connection.publish(mqtt_topic_connection_sensor, buff);
 
+   
+
 
 }
 
 void loop_test_sensor() { 
 
+
     float dist = ultrasonic.readDistance();
     if (dist > 0 && dist <EMERGENCY_DISTANCE) {
-           digitalWrite(LED_BUILTIN, HIGH);
+        digitalWrite(LED_BUILTIN, HIGH);
             
-            snprintf(buff, sizeof(buff), "⚠️ Emergency stop! Distance=%.2f m", dist);
-            connection.publish(mqtt_topic_connection_sensor, buff);
+        snprintf(buff, sizeof(buff), "⚠️ Emergency stop! Distance=%.2f m", dist);
+
+        delay(2000);
+        connection.publish(mqtt_topic_connection_sensor, buff);
 
             
 
@@ -57,6 +78,6 @@ void loop_test_sensor() {
         digitalWrite(LED_BUILTIN, LOW);
     }
 
-
+   
     
 }

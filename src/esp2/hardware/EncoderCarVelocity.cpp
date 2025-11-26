@@ -69,7 +69,7 @@ float EncoderCarVelocity::getFilteredAngularVelocity() {
 
 
 float EncoderCarVelocity::getWheelAngularVelocity() {
-    return getFilteredAngularVelocity() / GEAR_RATIO;
+    return getMotorAngularVelocity()/GEAR_RATIO;// getFilteredAngularVelocity() / GEAR_RATIO;
 }
 
 

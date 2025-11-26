@@ -21,36 +21,494 @@
 #include <PubSubClient.h>
 #include "common/wifi_connection.h"
 
+#include  "FreeRTOSConfig.h"
+#include "common/data_types.h"
+#include <Arduino.h>
+#include <cmath>
+#include "I2C_wire.h"
+
+#include "MotorManager.h"
+#include "DMS15.h"
+#include "UltraSonicSensor.h"
+#include "ImuSensor.h"
+#include "I2C_mutex.h"
+#include <WiFi.h>
+#include <PubSubClient.h>
+#include "common/wifi_connection.h"
+#include "EncoderCarVelocity.h"
+#include "MotorController.h"
+#include "AS5600.h"
+#include "motor_pid.h"
+#include "pure_pursuit.h"
+#include "odometry.h"
+
+#define ESC_PIN 15          // pin used for the motor
+#define SERVO_DIR_PIN 6     // the servo that modifies the direction of the wheels
+#define US_TRIG_PIN 5       // changé par rapport a avant sur conseil de chat
+#define US_ECHO_PIN 19      // changé par rapport a avant sur conseil de chat
+#define  SDA_PIN 8           // pin used for SDA of IMU
+#define SCL_PIN 9           // pin used for SCL of IMU
+
+
+MotorManager motor(ESC_PIN);
+//MotorController motor(ESC_PIN);
+DMS15 servo_dir(SERVO_DIR_PIN);
+UltraSonicSensor ultrasonic(5,19);//US_TRIG_PIN, US_ECHO_PIN);
+ImuSensor imu(SDA_PIN, SCL_PIN);
+//AS5600Encoder encoder(SDA_PIN, SCL_PIN);
+EncoderCarVelocity encoder;
 Connection connection;
+MotorPID pid(0.9f, 0.1f, 0.0f);
+PurePursuit purePursuit;//(0.26f);
+Odometry odom;
 
-const char* mqtt_topic_esp2esp1 = "slamaleykoum77/esps";
 
-void mqtt_print(const char* str) {
-    char msg[80];
-    snprintf(msg, sizeof(msg), str);
-    connection.publish(mqtt_topic_esp2esp1, msg);
+#include "common/data_types.h"
+#include <Arduino.h>
+#include <cmath>
+#include "I2C_wire.h"
+
+
+const char* mqtt_topic_connection_pure_pursuit = "slamaleykoum77/print";
+const char* mqtt_topic_connection_location = "slamaleykoum77/purepursuit";
+
+
+// === Global instances ===
+
+
+bool emergencyStop = false;
+bool finishedPath = false;
+float motorPowerDrive = 0.18f;  // 18%
+
+
+char buf[100];
+
+
+// --- Pose estimation ---
+
+float velocity = 0.0f;
+float posX = 0.0f;
+float posY = 0.0f;
+float yaw = 0.0f;
+float newY = 0.0f;
+
+// --- Path definition ---
+float pathX[] = {
+    0.00, -0.07, -0.14, -0.21, -0.28, -0.35, -0.42, -0.49, -0.56, -0.64,
+    -0.71, -0.78, -0.85, -0.92, -1.00,
+    -1.00, -1.00, -1.00, -1.00, -1.00,
+    -1.00, -1.00, -1.00, -1.00, -1.00,
+    -1.00
+};
+
+float pathY[] = {1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00,1.00};
+
+/*{
+    0.00, 0.07, 0.14, 0.21, 0.28, 0.35, 0.42, 0.49, 0.56, 0.64,
+    0.71, 0.78, 0.85, 0.92, 1.00,
+    0.90, 0.80, 0.70, 0.60, 0.50,
+    0.40, 0.30, 0.20, 0.10, 0.00
+};*/
+
+
+
+//float pathX[] = {0,0};//{-1.00, -0.95, -0.90, -0.85, -0.80, -0.75, -0.70, -0.65, -0.60, -0.55, -0.50, -0.45, -0.40, -0.35, -0.30, -0.25, -0.20, -0.15, -0.10, -0.05, 0.00, 0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.95, 1.00} ;
+///{0.0, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00};//{0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0};//{0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.5};//{0.0, 0.5, 1.0, 1.5, 2.0};
+//float pathY[] ={0,-1.0};//{ 1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00};//{0.0, 0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.95, 1.00};//{0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0};//{0.0, 0.5, 1.0, 1.5, 2.0, 2.0, 2.0};//{0.0, 0.2, 0.4, 0.6, 0.6};
+const int pathSize = sizeof(pathX) / sizeof(pathX[0]);
+
+// --- Constants ---
+const float EMERGENCY_DISTANCE = 0.25f;
+const float GOAL_TOLERANCE = 0.05f;  // 5 cm
+
+// --- FreeRTOS handles ---
+TaskHandle_t motorTask, ultrasonicTask, imuTask, poseTask, pursuitTask;
+
+// ===============================================================
+// TASK: Motor Control
+// ===============================================================
+void TaskMotor(void *pvParameters) {
+    
+    for (;;) {
+        if (emergencyStop || finishedPath) {
+            motor.stop();
+            servo_dir.setAngle(90);
+        } else {
+            motor.forward(motorPowerDrive);  // already normalized [0,1]
+            
+        }
+        motor.update();
+        vTaskDelay(pdMS_TO_TICKS(20));
+    }
 }
 
-void setup() {
-    connection.setupWifi();
-    connection.check_connection();
+// ===============================================================
+// TASK: Ultrasonic Emergency Stop
+// ===============================================================
+void TaskUltrasonic(void *pvParameters) {
+    
+    for (;;) {
+        float dist = ultrasonic.readDistance();
+        if (dist > 0 && dist < EMERGENCY_DISTANCE) {
+            motor.stop();
+            motor.update();
 
-    mqtt_print("[ESP2] Setup ok");
+            emergencyStop = true;
+            
+            snprintf(buf, sizeof(buf), "⚠️ Emergency stop! Distance=%.2f m", dist);
+            connection.publish(mqtt_topic_connection_location, buf);
 
-    Serial1.begin(2000000, SERIAL_8N1, 13, 12); // RX=13, TX=12
-    delay(1000);
+             
 
-    mqtt_print("ESP2 ready");
+        } /*else if (dist > (EMERGENCY_DISTANCE + 0.05f)) {
+            emergencyStop = false; //this will make it restart so if you want it to stay stopped keeep commented out
+        }*/
+        vTaskDelay(pdMS_TO_TICKS(200));
+    }
 }
 
-void loop() {
-    if (Serial1.available()) {
-        String msg = Serial1.readStringUntil('\n');
-        mqtt_print("[ESP2] got: ");
-        mqtt_print(msg.c_str());
+// ===============================================================
+// TASK: IMU Orientation (yaw extraction)
+// ===============================================================
 
-        Serial1.println("PONG from ESP2");
+float getYawIMU(const IMUData& imu_data) {
+  // Extract quaternion components
+  float qw = imu_data.qw;
+  float qx = imu_data.qx;
+  float qy = imu_data.qy;
+  float qz = imu_data.qz;
+
+  // Yaw (z-axis rotation)
+  // This is the standard formula for quaternion-to-euler conversion
+  float siny_cosp = 2.0 * (qw * qz + qx * qy);
+  float cosy_cosp = 1.0 - 2.0 * (qy * qy + qz * qz);
+  float yaw = atan2(siny_cosp, cosy_cosp);
+
+  return yaw; // Yaw angle in radians
+}
+
+
+
+void TaskOdometryUnified_Stable(void *pvParameters) {
+    uint32_t prevTime = micros();
+    static uint32_t lastPublishTime = 0;
+    
+    for (;;) {
+        uint32_t now = micros();
+        float dt = (now - prevTime) / 1000000.0f;
+        prevTime = now;
+        
+        // Read sensors
+        i2c_lock();
+        imu.readAndUpdate();
+        IMUData imuData = imu.data();
+        float currentYaw = getYawIMU(imuData);
+        
+        float currentVel = encoder.getWheelLinearVelocity();
+        float currentDist = encoder.getDistance();
+        i2c_unlock();
+        
+        // Update globals
+        yaw = currentYaw;
+        velocity = currentVel;
+        newY = currentDist;
+        
+        // Update position
+        posX -= velocity * sinf(yaw) * dt;
+        posY += velocity * cosf(yaw) * dt;
+        
+        // Publish
+        uint32_t nowMillis = millis();
+        if (nowMillis - lastPublishTime >= 200) {
+            connection.check_connection();
+            snprintf(buf, sizeof(buf),
+                     "Pose: X=%.3f Y=%.3f Yaw=%.1f° V=%.3f dt=%.4f",
+                     posX, posY, yaw * 180.0f / M_PI, velocity, dt);
+            connection.publish(mqtt_topic_connection_location, buf);
+            lastPublishTime = nowMillis;
+        }
+        
+        // Run at 100 Hz (10ms interval) - more stable
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+}
+
+
+
+
+
+
+void TaskIMU(void *pvParameters) {
+   
+    for (;;) {
+        i2c_lock();
+        imu.readAndUpdate();
+        IMUData q = imu.data();
+        i2c_unlock();
+
+        // ✅ PRINT QUATERNIONS FIRST TO SEE IF THEY CHANGE
+        snprintf(buf, sizeof(buf), "RAW: qw=%.4f qx=%.4f qy=%.4f qz=%.4f", 
+                 q.qw, q.qx, q.qy, q.qz);
+        //connection.publish(mqtt_topic_connection_pure_pursuit, buf);
+        
+        // ✅ COMPUTE YAW
+        float yaw_radians = getYawIMU(q);//odom.computeYaw(q);
+        yaw = yaw_radians;
+
+
+        vTaskDelay(pdMS_TO_TICKS(5));  // Slow down for debugging
+    }
+}
+
+
+
+
+
+
+//Task for encodervelocity
+void TaskEncoder(void *pvParameters) {
+    
+    for (;;) {
+        i2c_lock();
+        float currVel = encoder.getWheelLinearVelocity();   // updates internal velocity state
+        newY = encoder.getDistance();
+        i2c_unlock();
+
+        velocity = currVel;
+        //connection.check_connection();
+        snprintf(buf, sizeof(buf), "Current Vel=%.3f",
+                     currVel);
+        //connection.publish(mqtt_topic_connection_pure_pursuit, buf);
+
+        vTaskDelay(pdMS_TO_TICKS(5));       // 200 Hz
+    }
+}/*
+
+void TaskOdometry(void *pvParameters)
+{
+    for(;;)
+    {
+        i2c_lock();
+        imu.readAndUpdate();
+        IMUData imuData = imu.data();
+        i2c_unlock();
+
+        i2c_lock();
+        float currVel = encoder.getWheelLinearVelocity();   // updates internal velocity state
+        newY = encoder.getDistance();
+        i2c_unlock();
+
+        velocity = currVel;
+
+        odom.update(imuData, currVel);
+
+        vTaskDelay(pdMS_TO_TICKS(20));       // 50 Hz
+    }
+}*/
+
+// ===============================================================
+// TASK: Pose Estimation (dead reckoning)
+// ===============================================================
+void TaskPose(void *pvParameters) {
+    float prevTime = millis();
+    static uint32_t lastPublishTime = 0;
+
+    for (;;) {
+        float now = millis();
+        float dt = (now - prevTime) / 1000.0f;
+        //float now = micros() / 1e6;
+        //float dt = now - prevTime;
+        prevTime = now;
+
+        // yaw and velocity are updated by TaskIMU and TaskEncoder
+
+        posX -= velocity * sinf(yaw) * dt;
+        posY += velocity * cosf(yaw) * dt;
+        /*
+        snprintf(buf, sizeof(buf),
+                     "Pose: X=%.2f Y=%.2f  newY=%.2f Yaw=%.2f Vel=%.3f",
+                     posX, posY, newY, yaw, velocity);
+        connection.publish(mqtt_topic_connection_pure_pursuit, buf);*/
+
+        if (now - lastPublishTime >= 200) {
+            connection.check_connection();
+            snprintf(buf, sizeof(buf),
+                     "Pose: X=%.2f Y=%.2f  newY=%.2f Yaw=%.2f Vel=%.3f",
+                     posX, posY, newY, yaw, velocity);
+            connection.publish(mqtt_topic_connection_location, buf);
+            lastPublishTime = now;
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(5));  // 50 Hz
+    }
+}
+
+// ===============================================================
+// TASK: Pure Pursuit Controller
+// ===============================================================
+void TaskPurePursuit(void *pvParameters) {
+    // Prepare path
+    GlobalPathMessage msg;
+    msg.current_length = pathSize;
+    msg.timestamp_ms = millis();
+    msg.path_id = 1;
+    for (int i = 0; i < pathSize; i++) {
+        msg.path[i].x = pathX[i];
+        msg.path[i].y = pathY[i];
     }
 
-    delay(1000);
+    purePursuit.set_path(msg);
+
+    for (;;) {
+        if (emergencyStop) {
+            vTaskDelay(pdMS_TO_TICKS(100));
+            continue;
+        }
+
+        Pose2D currentPose = {posX, posY, yaw};
+        //Pose2D currentPose = { odom.x(), odom.y(), odom.yaw() };
+        Velocity velStruct = {velocity, 0.0f};
+
+        MotionCommand cmd = purePursuit.compute_command(currentPose, velStruct);
+
+
+
+        // Steering 
+        //float steeringDeg = cmd.delta_target * 180.0f / M_PI;
+        servo_dir.setAngle(cmd.delta_target);
+
+        snprintf(buf, sizeof(buf),
+                "Pose: X=%.2f Y=%.2f Yaw=%.2f Vel=%.3f newY=%.2f",
+                posX, posY, yaw, velocity, newY);
+            //connection.publish(mqtt_topic_connection_location, buf);
+
+
+        if ((cmd.v_target == 0)){//(distToGoal < GOAL_TOLERANCE)) {
+            motor.stop();
+            motor.update();
+            motor.stop();
+            motor.update();
+            motor.stop();
+            motor.update();
+            
+            connection.check_connection();
+
+            snprintf(buf, sizeof(buf), "Purepursuit says v = 0 ");
+            connection.publish(mqtt_topic_connection_location, buf);
+            finishedPath = true;
+            delay(6000);
+            snprintf(buf, sizeof(buf), "✅ Reached goal at (%.2f, %.2f, %.2f), stopping.", posX, posY,newY);
+            connection.publish(mqtt_topic_connection_location, buf);
+
+
+
+            finishedPath = true;
+            
+            motor.stop();
+            motor.update();
+            
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(50));
+    }
 }
+
+// ===============================================================
+// SETUP & LOOP
+// ===============================================================
+void setup() {
+    Serial.begin(115200);
+    delay(2000);
+
+    connection.setupWifi();
+
+    I2C_wire.begin(8, 9);
+    // I2C setup for IMU and Encoder
+    i2cMutexInit();
+
+    // Wifi connection 
+    connection.check_connection();
+
+
+    if (!servo_dir.begin()) {
+        Serial.println("Servo init failed!");
+        while (true);
+    }
+    servo_dir.setAngle(90);
+
+    
+    if (!ultrasonic.begin()) {
+        char msgSonic[50];
+        snprintf(msgSonic, sizeof(msgSonic), "UltraSonic Sensor init failed!");
+        connection.publish(mqtt_topic_connection_pure_pursuit , msgSonic);
+        while (true);
+    }
+
+    snprintf(buf, sizeof(buf), "✅ Ultra Sonic initialized successfully");
+    connection.publish(mqtt_topic_connection_pure_pursuit, buf);
+
+
+
+    if (!imu.begin()) {
+        snprintf(buf, sizeof(buf), "❌ IMU failed to initialize!");
+        connection.publish(mqtt_topic_connection_pure_pursuit, buf);
+        vTaskDelete(NULL);
+        return;
+    }
+   
+
+    snprintf(buf, sizeof(buf), "✅ IMU initialized successfully");
+    connection.publish(mqtt_topic_connection_pure_pursuit, buf);
+    
+
+    if (!encoder.begin()) {
+        char msgEncoder[50];
+        snprintf(msgEncoder, sizeof(msgEncoder), "Encoder init failed!");
+        connection.publish(mqtt_topic_connection_pure_pursuit,msgEncoder);
+        while (true);
+    }
+    
+
+    char msgEncoder[50];
+        snprintf(msgEncoder, sizeof(msgEncoder), "Encoder setup successful!");
+    connection.publish(mqtt_topic_connection_pure_pursuit,msgEncoder);
+
+    
+
+    if (!motor.begin()) {
+        char msgMotor[50];
+        snprintf(msgMotor, sizeof(msgMotor), "Motor init failed!");
+        connection.publish(mqtt_topic_connection_pure_pursuit , msgMotor);
+        while (true);
+    }
+
+    snprintf(buf, sizeof(buf), "✅ Motor initialized successfully");
+    connection.publish(mqtt_topic_connection_pure_pursuit, buf);
+
+
+
+    snprintf(buf, sizeof(buf), "🚗 FreeRTOS Path-Follow Test Start");
+    //connection.publish(mqtt_topic_connection_pure_pursuit, buf);
+
+
+    
+    //Core 0 from high to low priority : I2C
+    //xTaskCreatePinnedToCore(TaskIMU,          "IMU",          4096, NULL, 3,  &imuTask,        0); //core 0
+    //xTaskCreatePinnedToCore(TaskEncoder,      "Encoder",      4096, NULL, 3,  NULL,            0); //core 0 
+    //encoder might not need high priority if we consider speed is constant most of the time
+    //xTaskCreatePinnedToCore(TaskPose,        "Pose",        4096, NULL, 3, &poseTask,    0); // core 1
+
+    xTaskCreatePinnedToCore(TaskOdometryUnified_Stable, "OdomStable", 8192, NULL, 3, NULL, 0);
+
+    //xTaskCreatePinnedToCore(TaskOdometry,    "Odometry",    4096, NULL, 3, NULL,         0); // core 0
+    xTaskCreatePinnedToCore(TaskMotor,       "Motor",       4096, NULL, 2, &motorTask,   1); // core 1
+    xTaskCreatePinnedToCore(TaskUltrasonic,  "Ultrasonic",  4096, NULL, 2, &ultrasonicTask,1); // core 1
+    
+    xTaskCreatePinnedToCore(TaskPurePursuit, "PurePursuit", 4096, NULL, 1, &pursuitTask, 1); // core 1
+
+
+}
+
+void loop() { 
+}
+

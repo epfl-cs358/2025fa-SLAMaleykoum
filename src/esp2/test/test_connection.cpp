@@ -43,15 +43,10 @@ void setup_test_connection() {
 void loop_test_connection() {
     connection.check_connection();
 
-<<<<<<< HEAD
-    char msg[50];
-    snprintf(msg, sizeof(msg), "I am connected!!!!");
-=======
-    char msg[60];
-    snprintf(msg, sizeof(msg), "{\"type\": \"print\", \"message\": \"I am connected!!!!\"}");
->>>>>>> origin/main
+    char msgC[60];
+    snprintf(msgC, sizeof(msgC), "{\"type\": \"print\", \"message\": \"I am connected!!!!\"}");
     // Publish data to MQTT
-    connection.publish(mqtt_topic_connection2, msg);
+    connection.publish(mqtt_topic_connection2, msgC);
 
     delay(1000);
 }

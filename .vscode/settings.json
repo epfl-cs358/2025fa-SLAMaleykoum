@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "*.ba": "cpp",
+        "cmath": "cpp"
+    }
+}

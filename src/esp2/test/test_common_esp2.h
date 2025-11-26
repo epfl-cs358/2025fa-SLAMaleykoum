@@ -68,3 +68,7 @@ void setup_pid_velocity();          void loop_pid_velocity();
 void setup_path_pid();              void loop_path_pid();
 void setup_test_freertos_path_follow();  void loop_test_freertos_path_follow();
 void setup_test_sensor();           void loop_test_sensor();
+void setup_test_encoder();           void loop_test_encoder(); 
+void setup_servo_calibration();     void loop_servo_calibration();
+void setup_test_odometry_freertos_path_follow(); void loop_test_odometry_freertos_path_follow();
+void setup_test_odometry_position(); void loop_test_odometry_position();

@@ -33,10 +33,7 @@ private:
     bool configureSensor(uint32_t period_us = 400); // 400 Hz by default
 
 public:
-<<<<<<< HEAD
-=======
     IMUData imu_data;
->>>>>>> origin/main
     /**
      * @brief Construct an ImuSensor object
      * Calls the constructor of bno086 and nitializes the sensorValue and all the data components to 0

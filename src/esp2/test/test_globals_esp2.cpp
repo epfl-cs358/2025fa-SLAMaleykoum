@@ -17,7 +17,7 @@
 MotorManager motor(ESC_PIN);
 //MotorController motor(ESC_PIN);
 DMS15 servo_dir(SERVO_DIR_PIN);
-UltraSonicSensor ultrasonic(US_TRIG_PIN, US_ECHO_PIN);
+UltraSonicSensor ultrasonic(5,19);//US_TRIG_PIN, US_ECHO_PIN);
 ImuSensor imu(SDA_PIN, SCL_PIN);
 //AS5600Encoder encoder(SDA_PIN, SCL_PIN);
 EncoderCarVelocity encoder;
