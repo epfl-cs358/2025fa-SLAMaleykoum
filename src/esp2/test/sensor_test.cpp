@@ -7,6 +7,7 @@
 
 char buff[100];
 const char* mqtt_topic_connection_sensor = "slamaleykoum77/print";
+#define LED_PIN LED_BUILTIN   // sinon remplace par 48 si ça ne marche pas
 
 
 // === Global instances ===
@@ -74,8 +75,7 @@ void loop_test_sensor() {
             
 
     }else{
-        
-        digitalWrite(LED_BUILTIN, LOW);
+        digitalWrite(LED_PIN, HIGH);
     }
 
    

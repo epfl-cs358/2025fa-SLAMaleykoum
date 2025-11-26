@@ -31,14 +31,16 @@
 #include "MotorController.h"
 #include "AS5600.h"
 #include "motor_pid.h"
-#include "pure_pursuit.h"
-#include "odometry.h"
+#include "../../include/common/esp_link.h"
+#include <odometry.h>
+#include "esp2/control/pure_pursuit.h"
+
 // Pins used by the hardware components on the esp 2
 #define ESC_PIN 15          // pin used for the motor
 #define SERVO_DIR_PIN 6     // the servo that modifies the direction of the wheels
 #define US_TRIG_PIN 5       // changé par rapport a avant sur conseil de chat
 #define US_ECHO_PIN 19      // changé par rapport a avant sur conseil de chat
-#define  SDA_PIN 8           // pin used for SDA of IMU
+#define SDA_PIN 8           // pin used for SDA of IMU
 #define SCL_PIN 9           // pin used for SCL of IMU
 
 // Harwdare objects
@@ -50,6 +52,9 @@ extern ImuSensor imu;
 //extern AS5600Encoder encoder;
 extern EncoderCarVelocity encoder;
 extern Connection connection;
+extern HardwareSerial ESPS;
+
+extern MotorPID pid;
 
 extern MotorPID pid;
 extern PurePursuit purePursuit;

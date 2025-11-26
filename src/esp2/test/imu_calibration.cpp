@@ -555,7 +555,7 @@ static void handle_command(const String& line) {
 // === Test entry points ===
 void setup_imu_calibration() {
   Serial.begin(115200);
-  delay(2000);
+  delay(10000);
 
   // connection.setupWifi();
 
@@ -565,7 +565,7 @@ void setup_imu_calibration() {
 
   i2cMutexInit();
 
-  delay(2000);
+  delay(1000);
   if (!imu.begin()) {
       Serial.println("IMU init failed!");
       while(true);
