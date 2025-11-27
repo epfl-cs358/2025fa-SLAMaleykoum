@@ -23,11 +23,10 @@
 
 // Change the id depending on the test to run
 #ifndef TEST_ID
-#define TEST_ID 1
+#define TEST_ID 11
 #endif
 
 void setup() {
-    initGlobals();
     #if TEST_ID == 1
         setup_test_lidar_basic();
     #elif TEST_ID == 2
@@ -48,6 +47,14 @@ void setup() {
         setup_test_lidar_tcp();
     #elif TEST_ID == 10
         setup_esps_comm_esp1();
+    #elif TEST_ID == 11
+        setup_bayesian_dynamic_tcp();
+    #elif TEST_ID == 12
+        setup_clock_esp1();
+    #elif TEST_ID == 13
+        setup_led_basic();
+    #elif TEST_ID == 14
+        setup_clock_esp1_AP();
     #endif
 }
 
@@ -72,5 +79,13 @@ void loop() {
         loop_test_lidar_tcp();
     #elif TEST_ID == 10
         loop_esps_comm_esp1();
+    #elif TEST_ID == 11
+        loop_bayesian_dynamic_tcp();
+    #elif TEST_ID == 12
+        loop_clock_esp1();
+    #elif TEST_ID == 13
+        loop_led_basic();
+    #elif TEST_ID == 14
+        loop_clock_esp1_AP();
     #endif
 }

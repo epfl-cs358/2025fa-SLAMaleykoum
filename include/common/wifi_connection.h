@@ -52,8 +52,10 @@ extern const char* mqtt_topic_commands;
  */
 class Connection {
     private:
-    const char* ssid = "CMAISONNIER 9694";
-    const char* pass = "8>73rR97"; 
+    const char* ssid = "PC-Alex";
+    const char* pass = "rienattergrabandedehaineux"; 
+    const char* clientId_;
+
 
     WiFiClient _espClient;  // Underlying TCP client used by the MQTT client.
 

@@ -6,10 +6,16 @@
 
 #include <vector>
 #include <cstdint>
-#include <Arduino.h>
+
+#ifdef ARDUINO
+    #include <Arduino.h>
+#endif
+  
+
 
 // Define the maximum number of waypoints the controller can handle.
 #define MAX_PATH_LENGTH 50
+#define MAX_LIDAR_POINTS 3000
 
 // --- Core Geometric Structures ---
 /**
@@ -19,7 +25,7 @@ struct Pose2D {
     float x;     // Global X position (m)
     float y;     // Global Y position (m)
     float theta; // Global Yaw angle (rad)
-    uint32_t timestamp_ms;
+    uint64_t timestamp_ms;
 };
 
 /**
@@ -54,6 +60,8 @@ struct OdometryData {
  * Updated to include full 3-axis gyroscope and accelerometer data
  * for robust EKF prediction and non-holonomic constraint enforcement.
  */
+
+#ifdef ARDUINO
 struct IMUData : public Printable {
     // Gyroscope data (Angular Velocity)
     // float omega_x;  // Angular velocity around X-axis (rad/s) - typically roll
@@ -98,14 +106,68 @@ struct IMUData : public Printable {
     }
 
 };
+#endif
 
 typedef float MotorOutputs; // PWM = pulse duration in microseconds 
 // (1000 µs = full reverse, 1500 µs = neutral, 2000 µs = full forward)
 
 // --- MAPPING AND PLANNING DATA ---
+/**
+ * @brief Single LiDAR scan (360°).
+ */
+typedef struct {
+    uint16_t count;                         // number of valid points
+    float angles[MAX_LIDAR_POINTS];         // angle in degrees
+    float distances[MAX_LIDAR_POINTS];      // distance in millimeters
+    uint8_t qualities[MAX_LIDAR_POINTS];    // quality [0-255]
+    uint32_t timestamp_ms;                  // end-of-scan timestamp
+} LiDARScan;
 
 /**
- * @brief Represents a distinctive feature/landmark extracted from LiDAR data.
+ * @brief Synchronized LiDAR scan and robot pose.
+ */
+struct SyncedScan {
+    LiDARScan scan;
+    Pose2D pose;
+};
+
+/**
+ * @brief Represents a single raw point from the LiDAR sensor in standard mode.
+ */
+typedef struct rawScanDataPoint
+{
+	uint8_t quality;
+	uint8_t angle_low;
+	uint8_t angle_high;
+	uint8_t distance_low;
+	uint8_t distance_high;
+} rawScanDataPoint_t;
+
+// Descriptor and packet types for LiDAR communication
+typedef uint8_t rp_descriptor_t[7];
+typedef uint8_t rq_Packet_t[9];
+typedef uint8_t rq_message_t[2];
+
+// --- LiDAR Communication Enums ---
+enum enDescriptor
+{
+		legacyVersion,  ///< Legacy scan version
+		extendedVersion, ///< Extendet scan version
+		denseVersion,	 ///< Dense scan version
+		startScan		 ///< start scan
+};
+
+// --- LiDAR Request Enums ---
+enum enRequest
+{
+	rq_stop,
+	rq_reset,
+	rq_scan,
+	rq_scanExpress
+};
+
+/**
+ * @brief Detected landmark from LiDAR scan processing.
  */
 struct LiDARLandmark {
     float range;   // Distance to the landmark (m)
@@ -116,10 +178,10 @@ struct LiDARLandmark {
 /**
  * @brief Full LiDAR scan structure.
  */
-struct LiDARScan {
+/*struct LiDARScan {
     std::vector<LiDARLandmark> landmarks; // The processed list of features
     uint32_t timestamp_ms;
-};
+};*/ // c'est quoi ça -----------------------------------------------------------------------------------
 
 
 // --- Inter-Processor Communication (IPC) Structures ---

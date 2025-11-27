@@ -59,6 +59,16 @@ void setup() {
         setup_test_odometry_freertos_path_follow();
     #elif TEST_ID == 16
         setup_test_odometry_position();
+    #elif TEST_ID == 17
+        setup_path_pid();
+    #elif TEST_ID == 18
+        setup_esps_comm_esp2();
+    #elif TEST_ID == 19
+        setup_led_basic();
+    #elif TEST_ID == 20
+        setup_clock_esp2();
+    #elif TEST_ID == 21
+        setup_clock_esp2_STA();
     #endif
 }
 
@@ -95,5 +105,15 @@ void loop() {
         loop_test_odometry_freertos_path_follow();
     #elif TEST_ID == 16
         loop_test_odometry_position();
+    #elif TEST_ID == 17
+        setup_path_pid();
+    #elif TEST_ID == 18
+        loop_esps_comm_esp2();
+    #elif TEST_ID == 19
+        loop_led_basic();
+    #elif TEST_ID == 20
+        loop_clock_esp2();
+    #elif TEST_ID == 21
+        loop_clock_esp2_STA();
     #endif
 }

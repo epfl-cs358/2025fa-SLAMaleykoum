@@ -10,6 +10,7 @@
 #ifndef AS5600Encoder_H
 #define AS5600Encoder_H
 
+
 #include <Arduino.h>
 #include <Wire.h>
 

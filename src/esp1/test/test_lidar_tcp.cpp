@@ -18,8 +18,6 @@
 #include <WiFiServer.h>
 #include "test_common_esp1.h"
 
-#define MAX_BUFFER_POINTS 3000
-
 const char* ssid = "LIDAR_AP";
 const char* password = "l1darpass";
 const uint16_t TCP_PORT = 9000;
@@ -34,7 +32,7 @@ uint32_t bytesFromLidarToNet = 0;
 uint32_t bytesFromNetToLidar = 0;
 uint32_t tcpClientsAccepted = 0;
 
-point_t pointBuffer[MAX_BUFFER_POINTS];
+LiDARScan pointBuffer;
 uint16_t pointBufferCount = 0;
 
 float lastAngleESP = 0.0;
@@ -48,15 +46,13 @@ void setup_test_lidar_tcp() {
     Serial.println();
     Serial.println("=== ESP32 LIDAR Serial->TCP Bridge ===");
 
-    bool ret = lidar->start(standard);
+    bool ret = lidar.start();
     delay(1000);
     if (ret) {
         Serial.println("🟢 Rplidar C1 started correctly!\r\n");
     } else {
         Serial.println("🔴 Error starting Rplidar C1\r\n");
     }
-
-    lidar->setAngleOfInterest(LIDAR_ANGLE_OF_INTEREST_START, LIDAR_ANGLE_OF_INTEREST_END);
 
     Serial.println("[LiDAR] STANDARD mode started.");
     // Give the lidar some time
@@ -94,11 +90,11 @@ void loop_test_lidar_tcp() {
     }
 
     // read lidar data
-    uint16_t count = lidar->readMeasurePoints();   // fills DataBuffer[]
+    uint16_t count = lidar.readMeasurePoints();   // fills DataBuffer[]
 
     if (count > 0 && tcpClient && tcpClient.connected()) {
         for (uint16_t i = 0; i < count; i++) {
-            stScanDataPoint_t &p = lidar->DataBuffer[i];
+            rawScanDataPoint_t &p = lidar.DataBuffer[i];
 
             // Distance in mm
             uint16_t dist_mm = (((uint16_t)p.distance_high << 8) | p.distance_low) / 4;
@@ -109,9 +105,10 @@ void loop_test_lidar_tcp() {
             float angle_deg = angle_raw / 64.0f;
 
             // Store in buffer
-            if (pointBufferCount < MAX_BUFFER_POINTS) {
-                pointBuffer[pointBufferCount].angle = angle_deg;
-                pointBuffer[pointBufferCount].distance = dist_mm;
+            if (pointBufferCount < MAX_LIDAR_POINTS) {
+                pointBuffer.angles[pointBufferCount] = angle_deg;
+                pointBuffer.distances[pointBufferCount] = dist_mm;
+                pointBuffer.qualities[pointBufferCount] = p.quality >> 2;
                 pointBufferCount++;
             }
 
@@ -121,6 +118,8 @@ void loop_test_lidar_tcp() {
             }
             lastAngleESP = angle_deg;
         }
+
+        pointBuffer.timestamp_ms = millis();
     }
 
     // Send full scan only when scanComplete is true
@@ -134,8 +133,8 @@ void loop_test_lidar_tcp() {
             packet.reserve(pointBufferCount * 12); // approximate size per point
 
             for (int i = 0; i < pointBufferCount; i++) {
-                packet += String(pointBuffer[i].angle, 2) + "," +
-                        String(pointBuffer[i].distance) + "\n";
+                packet += String(pointBuffer.angles[i], 2) + "," +
+                        String(pointBuffer.distances[i]) + "\n";
             }
 
             tcpClient.write((uint8_t*)packet.c_str(), packet.length());

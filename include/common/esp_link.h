@@ -108,7 +108,7 @@ class Esp_link {
     bool get_path(GlobalPathMessage& out);
 
     private:
-    static constexpr size_t QUEUE_CAP = 4;
+    static constexpr size_t QUEUE_CAP = 1;
     static constexpr uint8_t RX_ESPS = 13;
     static constexpr uint8_t TX_ESPS = 12;
     static constexpr uint32_t ESPS_BAUDRATE = 2000000;
