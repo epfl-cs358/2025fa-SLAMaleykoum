@@ -47,6 +47,7 @@ private:
     // Fixed parameters (while we don't have precise speed control)
     float Ld_fixed_ = 0.3f;         // Fixed lookahead distance (m)
     float fixed_speed_ = 0.17f;      // Fixed target speed (m/s)
+    float k_p = 0.25f;               // Proportional gain for steering calculation
     // Parameters for adaptive lookahead and speed (currently unused)
     float K_dd_ = 0.5f;             // Gain for lookahead distance (Ld = K_dd_ * speed)
     float K_v_ = 0.5f;              // Speed gain. eg., K_v_ = 0.5 means at max steering angle, speed is halved. 

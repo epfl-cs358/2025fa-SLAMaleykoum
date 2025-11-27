@@ -25,6 +25,13 @@ T clamp(T value, T minVal, T maxVal) {
   return value;
 }
 
+// Calculates the squared Euclidean distance between the current pose and a waypoint.
+float PurePursuit::get_dist_sq(const Pose2D& pose, const Waypoint& wp) const {
+    float dx = wp.x - pose.x;
+    float dy = wp.y - pose.y;
+    return dx * dx + dy * dy;
+}
+
 // Note: Since we're constanly re-computing the path from the current pose to the goal,
 //      we can just overwrite the current path even if we're in the middle of following one.
 //      It's assumed that the new path is always better than the old one. (e.g. discovered a "cul de sac",
@@ -77,16 +84,16 @@ MotionCommand PurePursuit::compute_command(const Pose2D& current_pose, const Vel
     
     // Create a copy to hold the robot-frame coordinates
     Waypoint target_point_robot = target_point_global;
+    // Transform to Robot Frame
     Transforms::to_robot_frame(current_pose, target_point_robot);
 
-    // Compute the Steering Angle (Pure Pursuit Formula using Bicycle Model)
-    // The bicycle model formula is: delta = atan2(2 * L * x_lateral, Ld^2)
-    //
-    // delta_target: Steering angle to reach the target point with respect to the car's heading.
-    // -> (radians from the "straight ahead" direction)
-    // 
+    // Calculate curvature / Steering
+    // Pure Pursuit logic: curvature = 2 * x / Ld^2 (Standard frame)
     // L_ is the car's wheelbase. NOTE: the LATERAL component is target_point_robot.x
-    float delta_target = std::atan2(2.0f * L_ * target_point_robot.x, Ld_fixed_ * Ld_fixed_);
+    float curvature = k_p * (2.0f * target_point_robot.x) / (Ld_fixed_ * Ld_fixed_);
+    
+    // delta = atan(curvature * wheelbase)
+    float delta_target = std::atan(curvature * L_);
 
     // ---
     // This part is commented out since we don't have a useful PID for the car speed yet.
@@ -163,12 +170,6 @@ Waypoint PurePursuit::find_lookahead_point(const Pose2D& current_pose, float Ld)
 }
 
 
-// Calculates the squared Euclidean distance between the current pose and a waypoint.
-float PurePursuit::get_dist_sq(const Pose2D& pose, const Waypoint& wp) const {
-    float dx = wp.x - pose.x;
-    float dy = wp.y - pose.y;
-    return dx * dx + dy * dy;
-}
 
 // These functions are currently unused since we're using fixed lookahead distance and speed due to our ESC limitations.
 float PurePursuit::calculate_lookahead_distance(float current_speed) const {
