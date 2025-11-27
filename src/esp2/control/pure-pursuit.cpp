@@ -117,13 +117,11 @@ MotionCommand PurePursuit::compute_command(const Pose2D& current_pose, const Vel
 
 
 /**
- * @brief Finds the waypoint on the path that is closest to the intersection 
- * of the lookahead distance circle and the path segment.
- * @param current_pose The robot's current position.
- * @param Ld The calculated lookahead radius.
- * @return The Waypoint structure of the lookahead target point.
+ * @brief Finds the exact point on the path segment that intersects the Lookahead Circle.
+ * This creates a "Sliding Target" that moves smoothly as the car moves.
  */
 Waypoint PurePursuit::find_lookahead_point(const Pose2D& current_pose, float Ld) {
+<<<<<<< HEAD
     // If the path is empty, return the current pose
     if (path_length_ == 0) {
         return {current_pose.x, current_pose.y};
@@ -161,11 +159,63 @@ Waypoint PurePursuit::find_lookahead_point(const Pose2D& current_pose, float Ld)
             return w2; 
         }
     }
+=======
+>>>>>>> 5887487 (pure_pursuit.cpp: find_lookahead_point (#43))
     
-    // Edge Case:
-    // If we reach the end of the path array and haven't found an intersection (meaning all remaining points
-    // are *inside* Ld), the target point is simply the last point on the path.
-    last_target_index_ = path_length_ > 0 ? path_length_ - 1 : 0;
+    // Default to the last point in case we don't find an intersection
+    Waypoint target_point = current_path_[path_length_ - 1];
+    
+    // We iterate from the last known target index to find the active segment
+    for (uint16_t i = last_target_index_; i < path_length_ - 1; ++i) {
+        Waypoint start = current_path_[i];
+        Waypoint end = current_path_[i + 1];
+
+        // --- Shift coordinate system to robot position ---
+        // (Math is easier if robot is at 0,0)
+        float dx = end.x - start.x;
+        float dy = end.y - start.y;
+        float fx = start.x - current_pose.x;
+        float fy = start.y - current_pose.y;
+
+        // --- Solve Intersection of Line and Circle ---
+        // Line: P = start + t * (end - start)
+        // Circle: x^2 + y^2 = Ld^2
+        // Result is a quadratic equation: a*t^2 + b*t + c = 0
+        
+        float a = dx*dx + dy*dy;
+        float b = 2 * (fx*dx + fy*dy);
+        float c = (fx*fx + fy*fy) - (Ld*Ld);
+
+        float discriminant = b*b - 4*a*c;
+
+        if (discriminant >= 0) {
+            // We have an intersection!
+            discriminant = std::sqrt(discriminant);
+            
+            // Two possible solutions (entering the circle and exiting it)
+            // We usually want t2 (exiting) as it pulls us forward
+            float t1 = (-b - discriminant) / (2*a);
+            float t2 = (-b + discriminant) / (2*a);
+
+            // Check if the intersection is actually ON this segment (0 <= t <= 1)
+            if (t2 >= 0.0f && t2 <= 1.0f) {
+                last_target_index_ = i;
+                target_point.x = start.x + t2 * dx;
+                target_point.y = start.y + t2 * dy;
+                return target_point;
+            }
+            // Fallback: check t1 if t2 wasn't valid (rare, but possible)
+            if (t1 >= 0.0f && t1 <= 1.0f) {
+                last_target_index_ = i;
+                target_point.x = start.x + t1 * dx;
+                target_point.y = start.y + t1 * dy;
+                return target_point;
+            }
+        }
+    }
+
+    // If no intersection found (e.g., end of path is inside the circle),
+    // return the final goal.
     return current_path_[path_length_ - 1];
 }
 
