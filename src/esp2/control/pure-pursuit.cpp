@@ -120,48 +120,7 @@ MotionCommand PurePursuit::compute_command(const Pose2D& current_pose, const Vel
  * @brief Finds the exact point on the path segment that intersects the Lookahead Circle.
  * This creates a "Sliding Target" that moves smoothly as the car moves.
  */
-Waypoint PurePursuit::find_lookahead_point(const Pose2D& current_pose, float Ld) {
-<<<<<<< HEAD
-    // If the path is empty, return the current pose
-    if (path_length_ == 0) {
-        return {current_pose.x, current_pose.y};
-    }
-
-    // Start Search from the Last Target Index to avoid re-searching waypoints that have already been passed.
-    for (uint16_t i = last_target_index_; i < path_length_ - 1; ++i) {
-                
-        // const Waypoint& w1 = current_path_[i];
-        const Waypoint& w2 = current_path_[i + 1];
-
-        // TODO: Last index used
-        // Find the *last* waypoint that is within the lookahead distance.
-        // Then, find the *first* waypoint beyond the lookahead distance. 
-
-        // Distance from current pose to w2
-        float dist_sq = get_dist_sq(current_pose, w2);
-        
-        // We're looking for the first point just outside the lookahead distance.
-        // If the current waypoint is *well* within the lookahead distance, we've passed it.
-
-
-        if (dist_sq < Ld * Ld * 0.5f) { 
-            // We have passed this waypoint (i+1), so start the next search from it.
-            last_target_index_ = i + 1;
-        }
-
-        // Look for a point *just outside* the lookahead distance.
-        if (dist_sq >= Ld * Ld) {
-            // Waypoint w2 is now outside Ld. Interpolate on the segment (w1, w2) to find the intersection.
-            // This is the ideal target point calculation.
-            
-            last_target_index_ = i; // Update for next search
-            // Simplified return: Just use w2 as the target point.            
-            return w2; 
-        }
-    }
-=======
->>>>>>> 5887487 (pure_pursuit.cpp: find_lookahead_point (#43))
-    
+Waypoint PurePursuit::find_lookahead_point(const Pose2D& current_pose, float Ld) {    
     // Default to the last point in case we don't find an intersection
     Waypoint target_point = current_path_[path_length_ - 1];
     
