@@ -15,24 +15,14 @@ MAX_RETRIES = 5
 RECONNECT_DELAY = 5 # seconds
 
 def parse_telemetry_line(line):
-    """
-    Parses a single line of telemetry data from the car.
-    Expected format: "CMD: v_target=0.180 delta_target=90.000 | POSE: X=0.00 Y=0.00 Yaw=0.00 Vel=0.000\n"
+    # Format: 
+    # CMD: v=0.180 d=90.000 | P: Kp=0.90 Ld=0.25 | T: LX=0.500 LY=1.000 | POSE: X=0.00 Y=0.00 Yaw=0.00 Vel=0.000
     
-    Returns a dictionary of parsed values or None if parsing fails.
-    """
-    
-    # Define a robust regular expression to capture all float values
-    # Group 1: v_target, Group 2: delta_target
-    # Group 3: X, Group 4: Y, Group 5: Yaw, Group 6: Vel
-    # Note: We look for a pattern that captures floating point numbers (e.g., -1.23, 4.00, .5)
     pattern = re.compile(
-        r"CMD: v_target=([-\d.]+)\s+"
-        r"delta_target=([-\d.]+)\s+\|\s+"
-        r"POSE: X=([-\d.]+)\s+"
-        r"Y=([-\d.]+)\s+"
-        r"Yaw=([-\d.]+)\s+"
-        r"Vel=([-\d.]+)"
+        r"CMD: v=([-\d.]+)\s+d=([-\d.]+)\s+\|\s+"
+        r"P: Kp=([-\d.]+)\s+Ld=([-\d.]+)\s+\|\s+"
+        r"T: LX=([-\d.]+)\s+LY=([-\d.]+)\s+\|\s+"
+        r"POSE: X=([-\d.]+)\s+Y=([-\d.]+)\s+Yaw=([-\d.]+)\s+Vel=([-\d.]+)"
     )
     
     match = pattern.search(line)
@@ -42,85 +32,62 @@ def parse_telemetry_line(line):
             return {
                 'v_target': float(match.group(1)),
                 'delta_target': float(match.group(2)),
-                'X': float(match.group(3)),
-                'Y': float(match.group(4)),
-                'Yaw': float(match.group(5)),
-                'Vel': float(match.group(6)),
+                'Kp': float(match.group(3)),
+                'Ld': float(match.group(4)),
+                'Lookahead_X': float(match.group(5)),
+                'Lookahead_Y': float(match.group(6)),
+                'X': float(match.group(7)),
+                'Y': float(match.group(8)),
+                'Yaw': float(match.group(9)),
+                'Vel': float(match.group(10)),
             }
         except ValueError as e:
-            print(f"Error converting data to float: {e} in line: {line.strip()}")
+            print(f"Error converting data: {e} in line: {line.strip()}")
             return None
-    else:
-        # This often happens with incomplete or corrupt lines, especially at startup
-        # print(f"Warning: Line did not match expected pattern: {line.strip()}")
-        return None
-
+    return None
 
 def connect_and_log(host, port, filename):
-    """
-    Connects to the car's TCP server and continuously logs data.
-    """
-    # Open the CSV file and write the header
     try:
         with open(filename, 'w', newline='') as csvfile:
             fieldnames = [
-                'timestamp_utc', 
-                'time_s', 
+                'timestamp_utc', 'time_s', 
                 'X_Current', 'Y_Current', 'Yaw_Current', 'Velocity_Current',
-                'v_target_CMD', 'delta_target_CMD'
+                'v_target_CMD', 'delta_target_CMD',
+                'Lookahead_X', 'Lookahead_Y', 'Kp', 'Ld'
             ]
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()
             print(f"✅ CSV file created: {filename}")
 
     except IOError as e:
-        print(f"FATAL: Could not open or write to file {filename}: {e}")
+        print(f"FATAL: {e}")
         return
 
-    # Start main logging loop
     retries = 0
     while retries < MAX_RETRIES:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(5) # Set a timeout for connection and receiving
+        sock.settimeout(5)
 
         try:
-            print(f"Attempting to connect to {host}:{port} (Attempt {retries + 1}/{MAX_RETRIES})...")
+            print(f"Connecting to {host}:{port}...")
             sock.connect((host, port))
-            print("🟢 Connection successful!")
-            
-            # --- NEW: Send Start Command ---
-            print("🚀 Sending 'start' command to car...")
+            print("🟢 Connected! Sending 'start'...")
             sock.sendall(b'start\n')
-            # -------------------------------
-
-            print("📷 Starting data capture...")
             
-            # Reset buffer and initial time on successful connection
             buffer = ""
             start_time = time.time()
             
             while True:
-                # Receive data in chunks
                 data = sock.recv(1024).decode('utf-8')
-                
-                if not data:
-                    print("Connection closed by the remote host.")
-                    break
-                
-                # Append the new data to the buffer
+                if not data: break
                 buffer += data
                 
-                # Process the buffer line by line
                 while '\n' in buffer:
                     line, buffer = buffer.split('\n', 1)
-                    
-                    # Parse the line
                     parsed_data = parse_telemetry_line(line)
                     
                     if parsed_data:
                         current_time = time.time()
-                        
-                        # Prepare row for CSV
                         row = {
                             'timestamp_utc': datetime.utcfromtimestamp(current_time).isoformat(),
                             'time_s': round(current_time - start_time, 3),
@@ -130,37 +97,24 @@ def connect_and_log(host, port, filename):
                             'Velocity_Current': parsed_data['Vel'],
                             'v_target_CMD': parsed_data['v_target'],
                             'delta_target_CMD': parsed_data['delta_target'],
+                            'Lookahead_X': parsed_data['Lookahead_X'],
+                            'Lookahead_Y': parsed_data['Lookahead_Y'],
+                            'Kp': parsed_data['Kp'],
+                            'Ld': parsed_data['Ld'],
                         }
                         
-                        # Write to file (we re-open the file in 'a'ppend mode for each write block)
                         with open(filename, 'a', newline='') as csvfile_append:
                             writer_append = csv.DictWriter(csvfile_append, fieldnames=fieldnames)
                             writer_append.writerow(row)
-                            
-                        # Print status to console
-                        print(f"[{row['time_s']}s] X={row['X_Current']:.2f}, Y={row['Y_Current']:.2f}, V_cmd={row['v_target_CMD']:.3f}")
                         
+                        print(f"[{row['time_s']}s] Pose({row['X_Current']:.2f}, {row['Y_Current']:.2f}) -> LX: {row['Lookahead_X']:.2f}, LY: {row['Lookahead_Y']:.2f}")
         
-        except socket.timeout:
-            print("Connection timeout.")
-        except socket.error as e:
-            print(f"Socket error: {e}")
-        except KeyboardInterrupt:
-            print("\n👋 Logging stopped by user.")
-            sock.close()
-            return
         except Exception as e:
-            print(f"An unexpected error occurred: {e}")
+            print(f"Error: {e}")
         finally:
-            # Clean up the socket connection before retrying or exiting
             sock.close()
             retries += 1
-            if retries < MAX_RETRIES:
-                print(f"Retrying connection in {RECONNECT_DELAY} seconds...")
-                time.sleep(RECONNECT_DELAY)
-
-    print(f"❌ Failed to connect after {MAX_RETRIES} attempts. Exiting.")
-
+            time.sleep(RECONNECT_DELAY)
 
 if __name__ == "__main__":
     connect_and_log(HOST, PORT, OUTPUT_FILE)

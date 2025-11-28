@@ -82,6 +82,11 @@ MotionCommand PurePursuit::compute_command(const Pose2D& current_pose, const Vel
     // Find the Lookahead Target Point (in GLOBAL frame)
     Waypoint target_point_global = find_lookahead_point(current_pose, Ld_fixed_);
     
+    // ==== FIXME: TODO: For debugging purposes only!!! ====
+    last_lookahead_point_ = target_point_global;
+    // =====================================================
+
+    
     // Create a copy to hold the robot-frame coordinates
     Waypoint target_point_robot = target_point_global;
     // Transform to Robot Frame
@@ -120,9 +125,36 @@ MotionCommand PurePursuit::compute_command(const Pose2D& current_pose, const Vel
  * @brief Finds the exact point on the path segment that intersects the Lookahead Circle.
  * This creates a "Sliding Target" that moves smoothly as the car moves.
  */
-Waypoint PurePursuit::find_lookahead_point(const Pose2D& current_pose, float Ld) {    
-    // Default to the last point in case we don't find an intersection
-    Waypoint target_point = current_path_[path_length_ - 1];
+Waypoint PurePursuit::find_lookahead_point(const Pose2D& current_pose, float Ld) {
+    
+    // --- STEP 1: Find Closest Point to enforce Forward Motion ---
+    float min_dist_sq = 1e9f;
+    Waypoint closest_point = current_path_[last_target_index_];
+    uint16_t search_limit = std::min((uint16_t)(path_length_ - 1), (uint16_t)(last_target_index_ + 50));
+
+    for (uint16_t i = last_target_index_; i < search_limit; ++i) {
+        Waypoint start = current_path_[i];
+        Waypoint end = current_path_[i + 1];
+        
+        float dx = end.x - start.x; float dy = end.y - start.y;
+        float len_sq = dx*dx + dy*dy;
+        float t = 0.0f;
+        if (len_sq > 0) t = ((current_pose.x - start.x) * dx + (current_pose.y - start.y) * dy) / len_sq;
+        t = clamp(t, 0.0f, 1.0f);
+        
+        float px = start.x + t * dx; float py = start.y + t * dy;
+        float d_sq = (current_pose.x - px)*(current_pose.x - px) + (current_pose.y - py)*(current_pose.y - py);
+        
+        if (d_sq < min_dist_sq) {
+            min_dist_sq = d_sq;
+            closest_point = {px, py};
+            last_target_index_ = i; // Enforce forward progress
+        }
+    }
+
+    // --- STEP 2: Standard Lookahead Search (using new index) ---
+    // Default to the closest point found above (Fallback for "Corner Cutting")
+    Waypoint target_point = closest_point; 
     
     // We iterate from the last known target index to find the active segment
     for (uint16_t i = last_target_index_; i < path_length_ - 1; ++i) {
@@ -139,8 +171,6 @@ Waypoint PurePursuit::find_lookahead_point(const Pose2D& current_pose, float Ld)
         // --- Solve Intersection of Line and Circle ---
         // Line: P = start + t * (end - start)
         // Circle: x^2 + y^2 = Ld^2
-        // Result is a quadratic equation: a*t^2 + b*t + c = 0
-        
         float a = dx*dx + dy*dy;
         float b = 2 * (fx*dx + fy*dy);
         float c = (fx*fx + fy*fy) - (Ld*Ld);
@@ -151,31 +181,31 @@ Waypoint PurePursuit::find_lookahead_point(const Pose2D& current_pose, float Ld)
             // We have an intersection!
             discriminant = std::sqrt(discriminant);
             
-            // Two possible solutions (entering the circle and exiting it)
-            // We usually want t2 (exiting) as it pulls us forward
             float t1 = (-b - discriminant) / (2*a);
             float t2 = (-b + discriminant) / (2*a);
 
-            // Check if the intersection is actually ON this segment (0 <= t <= 1)
+            // FIX: Instead of returning immediately, we update the target point
+            // and CONTINUE the loop. This ensures we pick the valid intersection
+            // with the HIGHEST index (furthest along the path).
+            
+            // Check t2 first (usually forward exit of the circle relative to segment)
             if (t2 >= 0.0f && t2 <= 1.0f) {
-                last_target_index_ = i;
                 target_point.x = start.x + t2 * dx;
                 target_point.y = start.y + t2 * dy;
-                return target_point;
+                // DO NOT return here!
             }
-            // Fallback: check t1 if t2 wasn't valid (rare, but possible)
-            if (t1 >= 0.0f && t1 <= 1.0f) {
-                last_target_index_ = i;
+            // Fallback to t1
+            else if (t1 >= 0.0f && t1 <= 1.0f) {
                 target_point.x = start.x + t1 * dx;
                 target_point.y = start.y + t1 * dy;
-                return target_point;
+                // DO NOT return here!
             }
         }
     }
 
-    // If no intersection found (e.g., end of path is inside the circle),
-    // return the final goal.
-    return current_path_[path_length_ - 1];
+    // If no intersection found, this returns 'closest_point' (Step 1).
+    // If intersection(s) found, this returns the one with the highest index (Step 2).
+    return target_point;
 }
 
 

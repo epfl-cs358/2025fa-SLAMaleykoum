@@ -35,6 +35,11 @@ public:
      */
     bool is_path_complete() const;
 
+    // === FOR DEBUGGING PURPOSES ONLY ===
+    Waypoint get_lookahead_point() const { return last_lookahead_point_; }
+    float get_kp() const { return k_p; }
+    float get_ld() const { return Ld_fixed_; }
+
 private:
     // Internal path storage (fixed size, same as in GlobalPathMessage)
     Waypoint current_path_[MAX_PATH_LENGTH];
@@ -45,9 +50,9 @@ private:
 
     // Configuration parameters
     // Fixed parameters (while we don't have precise speed control)
-    float Ld_fixed_ = 0.3f;         // Fixed lookahead distance (m)
-    float fixed_speed_ = 0.17f;      // Fixed target speed (m/s)
-    float k_p = 0.25f;               // Proportional gain for steering calculation
+    float Ld_fixed_ = 1.0f;         // Fixed lookahead distance (m)
+    float fixed_speed_ = 0.25f;      // Fixed target speed (m/s)
+    float k_p = 1.0f;               // Proportional gain for steering calculation
     // Parameters for adaptive lookahead and speed (currently unused)
     float K_dd_ = 0.5f;             // Gain for lookahead distance (Ld = K_dd_ * speed)
     float K_v_ = 0.5f;              // Speed gain. eg., K_v_ = 0.5 means at max steering angle, speed is halved. 
@@ -55,7 +60,7 @@ private:
     float min_lookahead_dist_ = 0.3f;
     // TODO: Check these speeds with @cléa
     float max_speed_ = 0.30f;
-    float min_speed_ = 0.17f;
+    float min_speed_ = 0.21f;
 
     // ±45 degrees in radians
     float MIN_STEERING_ANGLE_RAD_ = -0.785398; // ~ -45 degrees
@@ -70,4 +75,7 @@ private:
     float calculate_lookahead_distance(float current_speed) const;
     float calculate_target_speed(float steering_angle) const;
     Waypoint find_lookahead_point(const Pose2D& current_pose, float lookahead_dist); 
+
+    // ==== For debugging purposes only ===
+    Waypoint last_lookahead_point_;
 };
