@@ -50,6 +50,21 @@
 #define SCL_PIN 9           // pin used for SCL of IMU
 
 
+// ---- ALEX TCP STUFFFF ----
+#include <WiFi.h>
+#include <WiFiClient.h>
+#include <WiFiServer.h>
+
+const char* ssid = "LIDAR_AP";
+const char* password = "l1darpass";
+const uint16_t TCP_PORT = 9000;
+
+// TCP server and client
+WiFiServer tcpServer(TCP_PORT);
+WiFiClient tcpClient;
+// ---- END ALEX TCP STUFFFF ----
+
+
 MotorManager motor(ESC_PIN);
 //MotorController motor(ESC_PIN);
 DMS15 servo_dir(SERVO_DIR_PIN);
@@ -57,7 +72,7 @@ UltraSonicSensor ultrasonic(5,19);//US_TRIG_PIN, US_ECHO_PIN);
 ImuSensor imu(SDA_PIN, SCL_PIN);
 //AS5600Encoder encoder(SDA_PIN, SCL_PIN);
 EncoderCarVelocity encoder;
-Connection connection;
+// Connection connection;
 MotorPID pid(0.9f, 0.1f, 0.0f);
 PurePursuit purePursuit;//(0.26f);
 Odometry odom;
@@ -69,8 +84,8 @@ Odometry odom;
 #include "I2C_wire.h"
 
 
-const char* mqtt_topic_connection_pure_pursuit = "slamaleykoum77/print";
-const char* mqtt_topic_connection_location = "slamaleykoum77/purepursuit";
+// const char* mqtt_topic_connection_pure_pursuit = "slamaleykoum77/print";
+// const char* mqtt_topic_connection_location = "slamaleykoum77/purepursuit";
 
 
 // === Global instances ===
@@ -78,6 +93,7 @@ const char* mqtt_topic_connection_location = "slamaleykoum77/purepursuit";
 
 bool emergencyStop = false;
 bool finishedPath = false;
+bool startSignalReceived = false; 
 float motorPowerDrive = 0.18f;  // 18%
 
 
@@ -93,28 +109,21 @@ float yaw = 0.0f;
 float newY = 0.0f;
 
 // --- Path definition ---
+
+// float pathX[] = {0, 1};
+// float pathY[] = {0, 1};
+
+// Sample path: a straight line for 1m from (0, 0) to (0, 1) followed by a sharp right
+// turn and another 1m straight line from (0, 1) to (1, 1) with waypoints every 10cm.
+// Sample path: 
 float pathX[] = {
-    0.00, -0.07, -0.14, -0.21, -0.28, -0.35, -0.42, -0.49, -0.56, -0.64,
-    -0.71, -0.78, -0.85, -0.92, -1.00,
-    -1.00, -1.00, -1.00, -1.00, -1.00,
-    -1.00, -1.00, -1.00, -1.00, -1.00,
-    -1.00
+    0.00, 0.00, 0.00, 0.00, 0.50, 1.50, 2.00, 2.50, 2.80, 2.80, 2.80, 2.80, 2.80
+};
+float pathY[] = {
+    0.00, 0.50, 1.00, 1.50, 1.50, 1.50, 1.50, 1.50, 1.50, 2.00, 2.50, 2.00, 3.40
 };
 
-float pathY[] = {1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00,1.00};
 
-/*{
-    0.00, 0.07, 0.14, 0.21, 0.28, 0.35, 0.42, 0.49, 0.56, 0.64,
-    0.71, 0.78, 0.85, 0.92, 1.00,
-    0.90, 0.80, 0.70, 0.60, 0.50,
-    0.40, 0.30, 0.20, 0.10, 0.00
-};*/
-
-
-
-//float pathX[] = {0,0};//{-1.00, -0.95, -0.90, -0.85, -0.80, -0.75, -0.70, -0.65, -0.60, -0.55, -0.50, -0.45, -0.40, -0.35, -0.30, -0.25, -0.20, -0.15, -0.10, -0.05, 0.00, 0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.95, 1.00} ;
-///{0.0, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00};//{0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0};//{0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.5};//{0.0, 0.5, 1.0, 1.5, 2.0};
-//float pathY[] ={0,-1.0};//{ 1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00};//{0.0, 0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.95, 1.00};//{0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0};//{0.0, 0.5, 1.0, 1.5, 2.0, 2.0, 2.0};//{0.0, 0.2, 0.4, 0.6, 0.6};
 const int pathSize = sizeof(pathX) / sizeof(pathX[0]);
 
 // --- Constants ---
@@ -130,7 +139,12 @@ TaskHandle_t motorTask, ultrasonicTask, imuTask, poseTask, pursuitTask;
 void TaskMotor(void *pvParameters) {
     
     for (;;) {
-        if (emergencyStop || finishedPath) {
+        // If we haven't started, keep motor stopped and servo straight
+        if (!startSignalReceived) {
+            motor.stop();
+            servo_dir.setAngle(90);
+        } 
+        else if (emergencyStop || finishedPath) {
             motor.stop();
             servo_dir.setAngle(90);
         } else {
@@ -148,6 +162,14 @@ void TaskMotor(void *pvParameters) {
 void TaskUltrasonic(void *pvParameters) {
     
     for (;;) {
+        // --- NEW: Wait for start signal ---
+        // We do NOT want to read distance or trigger emergency stop
+        // before the computer says "start".
+        if (!startSignalReceived) {
+            vTaskDelay(pdMS_TO_TICKS(100)); // Sleep 100ms and check again
+            continue;
+        }
+
         float dist = ultrasonic.readDistance();
         if (dist > 0 && dist < EMERGENCY_DISTANCE) {
             motor.stop();
@@ -156,7 +178,7 @@ void TaskUltrasonic(void *pvParameters) {
             emergencyStop = true;
             
             snprintf(buf, sizeof(buf), "⚠️ Emergency stop! Distance=%.2f m", dist);
-            connection.publish(mqtt_topic_connection_location, buf);
+            // connection.publish(mqtt_topic_connection_location, buf);
 
              
 
@@ -220,11 +242,11 @@ void TaskOdometryUnified_Stable(void *pvParameters) {
         // Publish
         uint32_t nowMillis = millis();
         if (nowMillis - lastPublishTime >= 200) {
-            connection.check_connection();
-            snprintf(buf, sizeof(buf),
-                     "Pose: X=%.3f Y=%.3f Yaw=%.1f° V=%.3f dt=%.4f",
-                     posX, posY, yaw * 180.0f / M_PI, velocity, dt);
-            connection.publish(mqtt_topic_connection_location, buf);
+            // connection.check_connection();
+            // snprintf(buf, sizeof(buf),
+            //          "Pose: X=%.3f Y=%.3f Yaw=%.1f° V=%.3f dt=%.4f",
+            //          posX, posY, yaw * 180.0f / M_PI, velocity, dt);
+            // connection.publish(mqtt_topic_connection_location, buf);
             lastPublishTime = nowMillis;
         }
         
@@ -330,14 +352,14 @@ void TaskPose(void *pvParameters) {
                      posX, posY, newY, yaw, velocity);
         connection.publish(mqtt_topic_connection_pure_pursuit, buf);*/
 
-        if (now - lastPublishTime >= 200) {
-            connection.check_connection();
-            snprintf(buf, sizeof(buf),
-                     "Pose: X=%.2f Y=%.2f  newY=%.2f Yaw=%.2f Vel=%.3f",
-                     posX, posY, newY, yaw, velocity);
-            connection.publish(mqtt_topic_connection_location, buf);
-            lastPublishTime = now;
-        }
+        // if (now - lastPublishTime >= 200) {
+        //     connection.check_connection();
+        //     snprintf(buf, sizeof(buf),
+        //              "Pose: X=%.2f Y=%.2f  newY=%.2f Yaw=%.2f Vel=%.3f",
+        //              posX, posY, newY, yaw, velocity);
+        //     connection.publish(mqtt_topic_connection_location, buf);
+        //     lastPublishTime = now;
+        // }
 
         vTaskDelay(pdMS_TO_TICKS(5));  // 50 Hz
     }
@@ -360,6 +382,39 @@ void TaskPurePursuit(void *pvParameters) {
     purePursuit.set_path(msg);
 
     for (;;) {
+        // ---- ALEX TCP RECEIVE STUFF ----
+        // 1. Accept new clients if needed
+        if (!tcpClient || !tcpClient.connected()) {
+            WiFiClient newClient = tcpServer.available();
+            if (newClient) {
+                tcpClient = newClient;
+                tcpClient.setNoDelay(true);
+                Serial.printf("Client connected from %s\n",
+                                tcpClient.remoteIP().toString().c_str());
+            }
+        }
+
+        // 2. Read incoming commands (Look for "start")
+        if (tcpClient && tcpClient.connected()) {
+            while (tcpClient.available()) {
+                String line = tcpClient.readStringUntil('\n');
+                line.trim();
+                if (line == "start") {
+                    startSignalReceived = true;
+                    Serial.println("✅ Start command received from Logger!");
+                }
+            }
+        }
+        // ---- END ALEX TCP RECEIVE STUFF ----
+
+        // If we haven't received the start command, wait.
+        if (!startSignalReceived) {
+            motor.stop();
+            motor.update();
+            vTaskDelay(pdMS_TO_TICKS(100));
+            continue;
+        }
+
         if (emergencyStop) {
             vTaskDelay(pdMS_TO_TICKS(100));
             continue;
@@ -371,7 +426,17 @@ void TaskPurePursuit(void *pvParameters) {
 
         MotionCommand cmd = purePursuit.compute_command(currentPose, velStruct);
 
-
+        // ---- ALEX TCP SEND STUFF ----
+        if (tcpClient && tcpClient.connected()) {
+            char tcpBuf[100];
+            // Send command and current pose information over TCP
+            int len = snprintf(tcpBuf, sizeof(tcpBuf),
+                               "CMD: v_target=%.3f delta_target=%.3f | POSE: X=%.2f Y=%.2f Yaw=%.2f Vel=%.3f\n",
+                               cmd.v_target, cmd.delta_target,
+                               posX, posY, yaw, velocity);
+            tcpClient.write((const uint8_t*)tcpBuf, len);
+        }
+        // ---- END ALEX TCP SEND STUFF ----
 
         // Steering 
         //float steeringDeg = cmd.delta_target * 180.0f / M_PI;
@@ -391,14 +456,14 @@ void TaskPurePursuit(void *pvParameters) {
             motor.stop();
             motor.update();
             
-            connection.check_connection();
+            // connection.check_connection();
 
-            snprintf(buf, sizeof(buf), "Purepursuit says v = 0 ");
-            connection.publish(mqtt_topic_connection_location, buf);
+            // snprintf(buf, sizeof(buf), "Purepursuit says v = 0 ");
+            // connection.publish(mqtt_topic_connection_location, buf);
             finishedPath = true;
-            delay(6000);
-            snprintf(buf, sizeof(buf), "✅ Reached goal at (%.2f, %.2f, %.2f), stopping.", posX, posY,newY);
-            connection.publish(mqtt_topic_connection_location, buf);
+            // delay(6000);
+            // snprintf(buf, sizeof(buf), "✅ Reached goal at (%.2f, %.2f, %.2f), stopping.", posX, posY,newY);
+            // connection.publish(mqtt_topic_connection_location, buf);
 
 
 
@@ -420,14 +485,34 @@ void setup() {
     Serial.begin(115200);
     delay(2000);
 
-    connection.setupWifi();
+    // ---- ALEX TCP STUFFFF ----
+    Serial.printf("Starting WiFi AP '%s' ...\n", ssid);
+    WiFi.mode(WIFI_AP);
+    bool ok = WiFi.softAP(ssid, password);
+    if (!ok) {
+        Serial.println("Failed to start AP!");
+    } else {
+        IPAddress ip = WiFi.softAPIP();
+        Serial.print("AP started. IP: ");
+        Serial.println(ip);
+        Serial.printf("Connect your PC to %s (password: %s)\n", ssid, password);
+    }
+
+    // Start TCP server
+    tcpServer.begin();
+    tcpServer.setNoDelay(true);
+    Serial.printf("TCP server started on port %u\n", TCP_PORT);
+    // ---- END ALEX TCP STUFFFF ----
+
+
+    // connection.setupWifi();
 
     I2C_wire.begin(8, 9);
     // I2C setup for IMU and Encoder
     i2cMutexInit();
 
     // Wifi connection 
-    connection.check_connection();
+    // connection.check_connection();
 
 
     if (!servo_dir.begin()) {
@@ -439,51 +524,54 @@ void setup() {
     
     if (!ultrasonic.begin()) {
         char msgSonic[50];
-        snprintf(msgSonic, sizeof(msgSonic), "UltraSonic Sensor init failed!");
-        connection.publish(mqtt_topic_connection_pure_pursuit , msgSonic);
-        while (true);
+        // FIX: Replaced "while(true)" with a simple print. 
+        // If the sensor fails (no echo), we continue anyway so TCP can start.
+        snprintf(msgSonic, sizeof(msgSonic), "WARNING: UltraSonic init failed (check wiring or obstacle distance). Continuing...");
+        Serial.println(msgSonic);
+        // while (true); <--- THIS WAS THE BLOCKER
+    } else {
+        snprintf(buf, sizeof(buf), "✅ Ultra Sonic initialized successfully");
+        Serial.println(buf);
     }
-
-    snprintf(buf, sizeof(buf), "✅ Ultra Sonic initialized successfully");
-    connection.publish(mqtt_topic_connection_pure_pursuit, buf);
+    
 
 
 
     if (!imu.begin()) {
         snprintf(buf, sizeof(buf), "❌ IMU failed to initialize!");
-        connection.publish(mqtt_topic_connection_pure_pursuit, buf);
+        // connection.publish(mqtt_topic_connection_pure_pursuit, buf);
         vTaskDelete(NULL);
         return;
     }
    
 
     snprintf(buf, sizeof(buf), "✅ IMU initialized successfully");
-    connection.publish(mqtt_topic_connection_pure_pursuit, buf);
+    // connection.publish(mqtt_topic_connection_pure_pursuit, buf);
     
 
     if (!encoder.begin()) {
         char msgEncoder[50];
         snprintf(msgEncoder, sizeof(msgEncoder), "Encoder init failed!");
-        connection.publish(mqtt_topic_connection_pure_pursuit,msgEncoder);
+        // connection.publish(mqtt_topic_connection_pure_pursuit,msgEncoder);
         while (true);
     }
     
 
     char msgEncoder[50];
         snprintf(msgEncoder, sizeof(msgEncoder), "Encoder setup successful!");
-    connection.publish(mqtt_topic_connection_pure_pursuit,msgEncoder);
+    // connection.publish(mqtt_topic_connection_pure_pursuit,msgEncoder);
 
     
 
     if (!motor.begin()) {
         char msgMotor[50];
         snprintf(msgMotor, sizeof(msgMotor), "Motor init failed!");
-        connection.publish(mqtt_topic_connection_pure_pursuit , msgMotor);
+        // connection.publish(mqtt_topic_connection_pure_pursuit , msgMotor);
         while (true);
     }
 
     snprintf(buf, sizeof(buf), "✅ Motor initialized successfully");
-    connection.publish(mqtt_topic_connection_pure_pursuit, buf);
+    // connection.publish(mqtt_topic_connection_pure_pursuit, buf);
 
 
 
@@ -511,4 +599,3 @@ void setup() {
 
 void loop() { 
 }
-
