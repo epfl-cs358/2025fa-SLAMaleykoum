@@ -27,7 +27,7 @@ EncoderCarVelocity::EncoderCarVelocity() {}
 bool EncoderCarVelocity::begin() {
      
 
-    I2C_wire.begin(); 
+    //I2C_wire.begin(); 
 
 
     if (!as5600.begin()) {

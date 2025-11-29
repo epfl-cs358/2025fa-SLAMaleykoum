@@ -563,6 +563,7 @@ void setup_imu_calibration() {
   
   mqtt_printf("IMU", "Calibration and accuracy test started");  
 
+  I2C_wire.begin(SDA_PIN, SCL_PIN);
   i2cMutexInit();
 
   delay(1000);

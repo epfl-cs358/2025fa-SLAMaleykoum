@@ -17,7 +17,7 @@ void setup_imu_stop_z() {
         Serial.println("Motor init failed!");
         while (true);
     }
-
+    I2C_wire.begin(SDA_PIN, SCL_PIN);
     i2cMutexInit();
 
     // Initialize imu

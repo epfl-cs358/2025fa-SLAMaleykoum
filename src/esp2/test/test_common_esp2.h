@@ -77,3 +77,4 @@ void setup_test_encoder();           void loop_test_encoder();
 void setup_servo_calibration();     void loop_servo_calibration();
 void setup_test_odometry_freertos_path_follow(); void loop_test_odometry_freertos_path_follow();
 void setup_test_odometry_position(); void loop_test_odometry_position();
+void setup_test_comm();             void loop_test_comm();
