@@ -49,7 +49,7 @@ void PurePursuit::set_path(const GlobalPathMessage& path_msg) {
     
     // IMPORTANT: Reset the lookahead index. When a new path is received, 
     // we must start tracking from the beginning of this new path.
-    last_target_index_ = 0;
+    last_target_index_ = 0; 
 }
 
 

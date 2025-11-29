@@ -1,6 +1,6 @@
 /**
  * @file main_esp2.cpp
- * @brief Updated Main with Lookahead and Parameter Transmission
+ * @brief Updated Main: Sends dynamic path data over TCP
  */
 #include <Arduino.h>
 #include <WiFi.h>
@@ -21,15 +21,13 @@
 #include "motor_pid.h"
 #include "pure_pursuit.h"
 #include "odometry.h"
-
-
 #include "common/esp_link.h"
 
 Esp_link esp_link(Serial1);
 
 // Storage for last received global path
 GlobalPathMessage receivedPath;
-bool pathAvailable = false;
+volatile bool newPathArrived = false; // Flag to trigger update in control loop
 
 // ---- ALEX TCP STUFFFF ----
 #include <WiFi.h>
@@ -63,7 +61,7 @@ bool emergencyStop = false;
 bool finishedPath = false;
 bool startSignalReceived = false; 
 float motorPowerDrive = 0.20f;
-char buf[256]; // Increased buffer size
+char buf[256]; 
 
 // --- Pose estimation ---
 float velocity = 0.0f;
@@ -71,17 +69,6 @@ float posX = 0.0f;
 float posY = 0.0f;
 float yaw = 0.0f;
 float newY = 0.0f;
-
-// --- Path definition ---
-//0.40m y, 3.40m x, 1.80m y, -3.6m x
-
-float pathX[] = {
-    0.00, 0.00, 0.50, 1.00, 1.50, 2.00, 2.50, 3.00, 3.50, 4.00, 4.00, 4.00, 4.00, 4.00, 4.00, 3.50, 3.00, 2.50, 2.00, 1.50, 1.00, 0.50, 0.00, -0.20
-};
-float pathY[] = {
-    0.00, 0.20, 0.20, 0.20, 0.20, 0.20, 0.20, 0.20, 0.20, 0.20, 0.50, 1.00, 1.50, 2.00, 2.40, 2.40, 2.40, 2.40, 2.40, 2.40, 2.40, 2.40, 2.40, 2.40
-};
-const int pathSize = sizeof(pathX) / sizeof(pathX[0]);
 
 const float EMERGENCY_DISTANCE = 0.25f;
 TaskHandle_t motorTask, ultrasonicTask, imuTask, poseTask, pursuitTask;
@@ -115,7 +102,6 @@ void TaskUltrasonic(void *pvParameters) {
             vTaskDelay(pdMS_TO_TICKS(100));
             continue;
         }
-
         float dist = ultrasonic.readDistance();
         if (dist > 0 && dist < EMERGENCY_DISTANCE) {
             motor.stop();
@@ -142,7 +128,6 @@ float getYawIMU(const IMUData& imu_data) {
 
 void TaskOdometryUnified_Stable(void *pvParameters) {
     uint32_t prevTime = micros();
-    
     for (;;) {
         uint32_t now = micros();
         float dt = (now - prevTime) / 1000000.0f;
@@ -171,18 +156,34 @@ void TaskOdometryUnified_Stable(void *pvParameters) {
 // TASK: Pure Pursuit Controller
 // ===============================================================
 void TaskPurePursuit(void *pvParameters) {
-    // Wait until ESP1 sends the path
-    while (!pathAvailable) {
-        
-        vTaskDelay(pdMS_TO_TICKS(500));
+    
+    // Initial wait for at least one path
+    while (!newPathArrived) {
+        vTaskDelay(pdMS_TO_TICKS(100));
     }
 
-    purePursuit.set_path(receivedPath);
-
-    
-
     for (;;) {
-        // 1. Accept new clients
+        // --- 1. Path Update Logic ---
+        if (newPathArrived) {
+            // Update the controller
+            purePursuit.set_path(receivedPath);
+            finishedPath = false; // Reset finish state for new path
+            
+            // Send Path to Python Logger
+            if (tcpClient && tcpClient.connected()) {
+                // Send Header
+                tcpClient.printf("PATH_START: ID=%d LEN=%d\n", receivedPath.path_id, receivedPath.current_length);
+                // Send Waypoints
+                for(int i=0; i<receivedPath.current_length; i++) {
+                    tcpClient.printf("WP: %d %.3f %.3f\n", i, receivedPath.path[i].x, receivedPath.path[i].y);
+                    vTaskDelay(2); // Small delay to prevent TCP buffer overflow
+                }
+                tcpClient.println("PATH_END");
+            }
+            newPathArrived = false;
+        }
+
+        // --- 2. TCP Connection ---
         if (!tcpClient || !tcpClient.connected()) {
             WiFiClient newClient = tcpServer.available();
             if (newClient) {
@@ -192,7 +193,7 @@ void TaskPurePursuit(void *pvParameters) {
             }
         }
 
-        // 2. Read incoming commands
+        // --- 3. Read Commands ---
         if (tcpClient && tcpClient.connected()) {
             while (tcpClient.available()) {
                 String line = tcpClient.readStringUntil('\n');
@@ -221,15 +222,13 @@ void TaskPurePursuit(void *pvParameters) {
 
         MotionCommand cmd = purePursuit.compute_command(currentPose, velStruct);
         
-        // Retrieve internal state from PurePursuit
         Waypoint lh = purePursuit.get_lookahead_point();
         float Kp_val = purePursuit.get_kp();
         float Ld_val = purePursuit.get_ld();
 
-        // 3. Send Telemetry
+        // --- 4. Send Telemetry ---
         if (tcpClient && tcpClient.connected()) {
             char tcpBuf[256];
-            // FORMAT: CMD | PARAMS | TARGET | POSE
             int len = snprintf(tcpBuf, sizeof(tcpBuf),
                                "CMD: v=%.3f d=%.3f | P: Kp=%.2f Ld=%.2f | T: LX=%.3f LY=%.3f | POSE: X=%.2f Y=%.2f Yaw=%.2f Vel=%.3f\n",
                                cmd.v_target, cmd.delta_target,
@@ -240,7 +239,6 @@ void TaskPurePursuit(void *pvParameters) {
         }
 
         servo_dir.setAngle(cmd.delta_target);
-        // motorPowerDrive = speed_to_power_drive(cmd.v_target);
 
         if ((cmd.v_target == 0)){
             motor.stop();
@@ -255,26 +253,15 @@ void TaskPurePursuit(void *pvParameters) {
 void TaskReceivePath(void *pvParameters) {
     for (;;) {
         esp_link.poll();
-
         GlobalPathMessage gpm;
         if (esp_link.get_path(gpm)) {
-
-            // Store the received path
             receivedPath = gpm;
-
-            purePursuit.set_path(receivedPath);
-
-            pathAvailable = true;
-
-
-
+            // Set flag so Pure Pursuit task picks it up and sends it to TCP
+            newPathArrived = true; 
         }
-
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
-
-
 
 // ===============================================================
 // SETUP
@@ -294,17 +281,13 @@ void setup() {
 
     I2C_wire.begin(8, 9);
     i2cMutexInit();
-
     esp_link.begin();
 
     if (!servo_dir.begin()) { Serial.println("Servo init failed!"); while (true); }
     servo_dir.setAngle(90);
 
-    if (!ultrasonic.begin()) {
-        Serial.println("WARNING: UltraSonic init failed. Continuing...");
-    } else {
-        Serial.println("✅ Ultra Sonic initialized");
-    }
+    if (!ultrasonic.begin()) { Serial.println("WARNING: UltraSonic init failed. Continuing..."); } 
+    else { Serial.println("✅ Ultra Sonic initialized"); }
 
     if (!imu.begin()) { Serial.println("IMU init failed!"); vTaskDelete(NULL); return; }
     if (!encoder.begin()) { Serial.println("Encoder init failed!"); while (true); }
@@ -317,5 +300,4 @@ void setup() {
     xTaskCreatePinnedToCore(TaskPurePursuit, "PurePursuit", 4096, NULL, 1, &pursuitTask, 1); 
 }
 
-void loop() { 
-}
+void loop() { }

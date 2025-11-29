@@ -2,24 +2,24 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 import math
+import matplotlib.cm as cm
 
-CSV_FILE = 'rc_car_telemetry.csv'
-
-# --- 1. Define the Expected Path ---
-pathX = [
-    0.00, 0.00, 0.50, 1.00, 1.50, 2.00, 2.50, 3.00, 3.50, 4.00, 4.00, 4.00, 4.00, 4.00, 4.00, 3.50, 3.00, 2.50, 2.00, 1.50, 1.00, 0.50, 0.00, -0.20
-]
-
-pathY = [
-    0.00, 0.20, 0.20, 0.20, 0.20, 0.20, 0.20, 0.20, 0.20, 0.20, 0.50, 1.00, 1.50, 2.00, 2.40, 2.40, 2.40, 2.40, 2.40, 2.40, 2.40, 2.40, 2.40, 2.40
-]
+TELEMETRY_FILE = 'rc_car_telemetry.csv'
+PATHS_FILE = 'rc_car_paths.csv'
 
 def plot_data():
     try:
-        df = pd.read_csv(CSV_FILE)
+        df_telem = pd.read_csv(TELEMETRY_FILE)
     except FileNotFoundError:
-        print(f"Could not find {CSV_FILE}. Run the logger script first.")
+        print(f"Could not find {TELEMETRY_FILE}. Run logger.")
         return
+
+    # Try to read paths file (might not exist if no path sent yet)
+    df_paths = pd.DataFrame()
+    try:
+        df_paths = pd.read_csv(PATHS_FILE)
+    except FileNotFoundError:
+        print(f"No paths file found yet. Plotting only car position.")
 
     fig = plt.figure(figsize=(10, 8))
     gs = fig.add_gridspec(3, 1)
@@ -27,35 +27,41 @@ def plot_data():
     # --- PLOT 1: Top-Down Map ---
     ax_map = fig.add_subplot(gs[0:2, 0])
     
-    # 1. Expected Path
-    ax_map.plot(pathX, pathY, 'g--', linewidth=2, label='Waypoints')
-    ax_map.scatter(pathX, pathY, color='green', s=30, alpha=0.5)
-
+    # 1. Plot All Received Paths
+    if not df_paths.empty and 'path_id' in df_paths.columns:
+        path_ids = df_paths['path_id'].unique()
+        # Create a color map of Greens. 
+        # We skip the very light greens (0.0-0.3) so they are visible against white background
+        colors = cm.Greens(np.linspace(0.4, 1.0, len(path_ids)))
+        
+        for i, pid in enumerate(path_ids):
+            path_data = df_paths[df_paths['path_id'] == pid].sort_values('index')
+            color = colors[i]
+            label = f'Path ID {pid}' if i == len(path_ids)-1 else None # Only label last one to avoid clutter
+            
+            # Plot line
+            ax_map.plot(path_data['x'], path_data['y'], color=color, linestyle='--', linewidth=2, label=label)
+            # Plot dots
+            ax_map.scatter(path_data['x'], path_data['y'], color=color, s=20, alpha=0.6)
+            
     # 2. Real Path
-    ax_map.plot(df['X_Current'], df['Y_Current'], 'b-', linewidth=1, alpha=0.6, label='Real Car Path')
+    ax_map.plot(df_telem['X_Current'], df_telem['Y_Current'], 'b-', linewidth=1, alpha=0.6, label='Real Car Path')
     
-    # 3. Lookahead Points (Target)
-    # REMOVED: Red cross markers as requested to reduce overcrowding
-    # ax_map.scatter(df['Lookahead_X'], df['Lookahead_Y'], color='red', s=15, marker='x', label='Lookahead Target', alpha=0.5)
-
-    # Define density of visualization (Higher divisor = More cars/lines)
-    # Changed from 30 to 100 to show significantly more car positions
-    step = max(1, len(df) // 32) 
-
-    # 4. Connect Car to Lookahead (Visualizes the "String" pulling the car)
-    for i in range(0, len(df), step):
-        ax_map.plot([df['X_Current'][i], df['Lookahead_X'][i]], 
-                    [df['Y_Current'][i], df['Lookahead_Y'][i]], 
+    # 3. Lookahead Lines
+    step = max(1, len(df_telem) // 35)  # Limit to ~35 lines for clarity
+    for i in range(0, len(df_telem), step):
+        ax_map.plot([df_telem['X_Current'][i], df_telem['Lookahead_X'][i]], 
+                    [df_telem['Y_Current'][i], df_telem['Lookahead_Y'][i]], 
                     color='gray', linestyle=':', alpha=0.3)
 
-    # 5. Draw Car Box
-    CAR_L = 0.15  # 15cm length
-    CAR_W = 0.10  # 10cm width
+    # 4. Draw Car Box
+    CAR_L = 0.15 
+    CAR_W = 0.10 
     
-    for i in range(0, len(df), step):
-        x = df['X_Current'][i]
-        y = df['Y_Current'][i]
-        yaw = df['Yaw_Current'][i]
+    for i in range(0, len(df_telem), step):
+        x = df_telem['X_Current'][i]
+        y = df_telem['Y_Current'][i]
+        yaw = df_telem['Yaw_Current'][i]
         
         dir_x = -math.sin(yaw)
         dir_y = math.cos(yaw)
@@ -75,21 +81,20 @@ def plot_data():
                            closed=True, color='blue', alpha=0.3, edgecolor='black', zorder=10)
         ax_map.add_patch(poly)
         
-        # Front dot
         head_x = x + (dir_x * CAR_L * 0.4)
         head_y = y + (dir_y * CAR_L * 0.4)
         ax_map.plot(head_x, head_y, 'w.', markersize=3, zorder=11)
 
-    # 6. Display Kp and Ld Settings
-    if 'Kp' in df.columns and 'Ld' in df.columns:
-        last_kp = df['Kp'].iloc[-1]
-        last_ld = df['Ld'].iloc[-1]
+    # 5. Settings Box
+    if 'Kp' in df_telem.columns:
+        last_kp = df_telem['Kp'].iloc[-1]
+        last_ld = df_telem['Ld'].iloc[-1]
         text_str = f'Settings:\nKp = {last_kp}\nLd = {last_ld} m'
         props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
         ax_map.text(0.02, 0.95, text_str, transform=ax_map.transAxes, fontsize=10,
                     verticalalignment='top', bbox=props)
 
-    ax_map.set_title("Autonomous Car Trajectory & Lookahead")
+    ax_map.set_title("Dynamic Path Following")
     ax_map.set_xlabel("X (m)")
     ax_map.set_ylabel("Y (m)")
     ax_map.legend()
@@ -98,12 +103,11 @@ def plot_data():
 
     # --- PLOT 2: Steering ---
     ax_steer = fig.add_subplot(gs[2, 0])
-    ax_steer.plot(df['time_s'], df['delta_target_CMD'], 'r-', label='Steering Angle')
+    ax_steer.plot(df_telem['time_s'], df_telem['delta_target_CMD'], 'r-', label='Steering Angle')
     ax_steer.axhline(y=90, color='k', linestyle='--', alpha=0.5)
     ax_steer.set_title("Steering Command")
     ax_steer.set_xlabel("Time (s)")
     ax_steer.set_ylabel("Degrees")
-    ax_steer.legend()
     ax_steer.grid(True)
 
     plt.tight_layout()
@@ -111,3 +115,4 @@ def plot_data():
 
 if __name__ == "__main__":
     plot_data()
+
