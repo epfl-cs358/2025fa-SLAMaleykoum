@@ -50,8 +50,8 @@ private:
 
     // Configuration parameters
     // Fixed parameters (while we don't have precise speed control)
-    float Ld_fixed_ = 1.0f;         // Fixed lookahead distance (m)
-    float fixed_speed_ = 0.25f;      // Fixed target speed (m/s)
+    float Ld_fixed_ = 0.7f;         // Fixed lookahead distance (m)
+    float fixed_speed_ = 0.20f;      // Fixed target speed (m/s)
     float k_p = 1.0f;               // Proportional gain for steering calculation
     // Parameters for adaptive lookahead and speed (currently unused)
     float K_dd_ = 0.5f;             // Gain for lookahead distance (Ld = K_dd_ * speed)
