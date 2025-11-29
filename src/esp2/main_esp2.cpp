@@ -71,7 +71,7 @@ float yaw = 0.0f;
 float newY = 0.0f;
 
 const float EMERGENCY_DISTANCE = 0.25f;
-TaskHandle_t motorTask, ultrasonicTask, imuTask, poseTask, pursuitTask;
+TaskHandle_t motorTask, ultrasonicTask, pursuitTask,odomTask,receiveTask;
 
 // ===============================================================
 // TASK: Motor Control
@@ -128,6 +128,7 @@ float getYawIMU(const IMUData& imu_data) {
 
 void TaskOdometryUnified_Stable(void *pvParameters) {
     uint32_t prevTime = micros();
+    uint32_t lastPrintTime = 0;
     for (;;) {
         uint32_t now = micros();
         float dt = (now - prevTime) / 1000000.0f;
@@ -147,6 +148,22 @@ void TaskOdometryUnified_Stable(void *pvParameters) {
         
         posX -= velocity * sinf(yaw) * dt;
         posY += velocity * cosf(yaw) * dt;
+
+
+        //Send pose to the esp1 after each computation of the position
+        Pose2D pose;
+        pose.x = posX;
+        pose.y = posY;
+        pose.theta = yaw;
+        pose.timestamp_ms = millis();
+        
+        esp_link.sendPos(pose);
+        
+        //print -? mqtt or other method?
+        if (millis() - lastPrintTime > 1000) {
+            Serial.printf("Pose TX: X=%.3f Y=%.3f θ=%.3f | 100Hz\n", posX, posY, yaw);
+            lastPrintTime = millis();
+        }
         
         vTaskDelay(pdMS_TO_TICKS(10));
     }
@@ -293,8 +310,8 @@ void setup() {
     if (!encoder.begin()) { Serial.println("Encoder init failed!"); while (true); }
     if (!motor.begin()) { Serial.println("Motor init failed!"); while (true); }
 
-    xTaskCreatePinnedToCore(TaskReceivePath,"RX_Path",4096,NULL,3,NULL,0);
-    xTaskCreatePinnedToCore(TaskOdometryUnified_Stable, "OdomStable", 8192, NULL, 3, NULL, 0);
+    xTaskCreatePinnedToCore(TaskReceivePath,"RX_Path",4096,NULL,3,&receiveTask,0);
+    xTaskCreatePinnedToCore(TaskOdometryUnified_Stable, "OdomStable", 8192, NULL, 3, &odomTask, 0);
     xTaskCreatePinnedToCore(TaskMotor,       "Motor",       4096, NULL, 2, &motorTask,   1); 
     xTaskCreatePinnedToCore(TaskUltrasonic,  "Ultrasonic",  4096, NULL, 2, &ultrasonicTask,1); 
     xTaskCreatePinnedToCore(TaskPurePursuit, "PurePursuit", 4096, NULL, 1, &pursuitTask, 1); 
