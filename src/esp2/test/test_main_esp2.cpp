@@ -69,6 +69,8 @@ void setup() {
         setup_clock_esp2();
     #elif TEST_ID == 21
         setup_clock_esp2_STA();
+    #elif TEST_ID == 22
+        setup_test_comm();
     #endif
 }
 
@@ -115,5 +117,7 @@ void loop() {
         loop_clock_esp2();
     #elif TEST_ID == 21
         loop_clock_esp2_STA();
+    #elif TEST_ID == 22
+        loop_test_comm();
     #endif
 }

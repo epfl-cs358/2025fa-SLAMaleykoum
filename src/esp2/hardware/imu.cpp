@@ -3,14 +3,14 @@
 #include "I2C_wire.h"
 #include <Arduino.h>
 
-ImuSensor::ImuSensor(int sdaPin, int sclPin) : 
-    bno086(), sensorValue{}, imu_data{}, _sdaPin(sdaPin), _sclPin(sclPin) {}
+ImuSensor::ImuSensor()
+    : bno086(), sensorValue{}, imu_data{} {}
 
 bool ImuSensor::begin() {
-    I2C_wire.begin(_sdaPin, _sclPin);
-
+    
     // Initialize the BNO086
-    if (!bno086.begin_I2C(IMU_ADDR, &I2C_wire, 4)) { 
+    //if (!bno086.begin_I2C(IMU_ADDR, &I2C_wire, 4)) { 
+    if (!bno086.begin_I2C(IMU_ADDR, &I2C_wire)) {
         Serial.println("Failed to initialize BNO08x!");
         return false;
     }

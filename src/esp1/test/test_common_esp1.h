@@ -66,4 +66,5 @@ void setup_bayesian_dynamic_tcp();          void loop_bayesian_dynamic_tcp();
 void setup_clock_esp1();                    void loop_clock_esp1();
 void setup_led_basic();                     void loop_led_basic();
 void setup_clock_esp1_AP();                 void loop_clock_esp1_AP();
-
+void setup_send_simple_path();              void loop_send_simple_path();
+void setup_send_dynamic_path();             void loop_send_dynamic_path();

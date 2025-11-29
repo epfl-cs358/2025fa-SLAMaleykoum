@@ -24,7 +24,7 @@ char bufreceive[100];
 // ------------------------------------------------------------
 // UART link (must match ESP1)
 // ------------------------------------------------------------
-Esp_link esp_link(Serial1);
+Esp_link esp__link(Serial1);
 
 // Storage for received path
 GlobalPathMessage receivedPath;
@@ -45,7 +45,7 @@ void setup_test_comm() {
 
 
     
-    esp_link.begin();   // 2 Mbaud, correct pins, etc.
+    esp__link.begin();   // 2 Mbaud, correct pins, etc.
 
 
     snprintf(bufreceive, sizeof(bufreceive), "UART initialized.");
@@ -58,10 +58,10 @@ void setup_test_comm() {
 
 void loop_test_comm() {
     // Poll UART for incoming messages
-    esp_link.poll();
+    esp__link.poll();
 
     // Check if a new path was received
-    if (esp_link.get_path(receivedPath)) {
+    if (esp__link.get_path(receivedPath)) {
 
         snprintf(bufreceive, sizeof(bufreceive), "\n>>> RECEIVED PATH FROM ESP1!");
         connection.publish(mqtt_topic_connection_esp2_comm_receivewaypoints, bufreceive);

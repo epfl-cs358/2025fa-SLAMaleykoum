@@ -84,3 +84,4 @@ void setup_esps_comm_esp2();        void loop_esps_comm_esp2();
 void setup_led_basic();             void loop_led_basic();
 void setup_clock_esp2();            void loop_clock_esp2();
 void setup_clock_esp2_STA();        void loop_clock_esp2_STA();
+void setup_test_comm();             void loop_test_comm();

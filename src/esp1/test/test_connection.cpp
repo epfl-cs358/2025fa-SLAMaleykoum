@@ -31,11 +31,7 @@
  */
 #include "test_common_esp1.h"
 
-<<<<<<< HEAD
-const char* mqtt_topic_connection = "slamaleykoum77/print";
-=======
 const char* MQTT_TOPIC_CONNECTION = "slamaleykoum77/print";
->>>>>>> origin/main
 
 void setup_test_connection() {
     Serial.begin(115200);
@@ -50,11 +46,7 @@ void loop_test_connection() {
     char msg[60];
     snprintf(msg, sizeof(msg), "{\"type\": \"print\", \"message\": \"I am connected!!!!\"}");
     // Publish data to MQTT
-<<<<<<< HEAD
-    connection.publish(mqtt_topic_connection, msg);
-=======
     connection.publish(MQTT_TOPIC_CONNECTION, msg);
->>>>>>> origin/main
 
     delay(1000);
 }

@@ -22,6 +22,15 @@
 #include "pure_pursuit.h"
 #include "odometry.h"
 
+
+#include "common/esp_link.h"
+
+Esp_link esp_link(Serial1);
+
+// Storage for last received global path
+GlobalPathMessage receivedPath;
+bool pathAvailable = false;
+
 // ---- ALEX TCP STUFFFF ----
 #include <WiFi.h>
 #include <WiFiClient.h>
@@ -45,7 +54,7 @@ WiFiClient tcpClient;
 MotorManager motor(ESC_PIN);
 DMS15 servo_dir(SERVO_DIR_PIN);
 UltraSonicSensor ultrasonic(5,19);
-ImuSensor imu(SDA_PIN, SCL_PIN);
+ImuSensor imu;
 EncoderCarVelocity encoder;
 PurePursuit purePursuit;
 Odometry odom;
@@ -64,6 +73,8 @@ float yaw = 0.0f;
 float newY = 0.0f;
 
 // --- Path definition ---
+//0.40m y, 3.40m x, 1.80m y, -3.6m x
+
 float pathX[] = {
     0.00, 0.00, 0.50, 1.00, 1.50, 2.00, 2.50, 3.00, 3.50, 4.00, 4.00, 4.00, 4.00, 4.00, 4.00, 3.50, 3.00, 2.50, 2.00, 1.50, 1.00, 0.50, 0.00, -0.20
 };
@@ -160,16 +171,15 @@ void TaskOdometryUnified_Stable(void *pvParameters) {
 // TASK: Pure Pursuit Controller
 // ===============================================================
 void TaskPurePursuit(void *pvParameters) {
-    GlobalPathMessage msg;
-    msg.current_length = pathSize;
-    msg.timestamp_ms = millis();
-    msg.path_id = 1;
-    for (int i = 0; i < pathSize; i++) {
-        msg.path[i].x = pathX[i];
-        msg.path[i].y = pathY[i];
+    // Wait until ESP1 sends the path
+    while (!pathAvailable) {
+        
+        vTaskDelay(pdMS_TO_TICKS(500));
     }
 
-    purePursuit.set_path(msg);
+    purePursuit.set_path(receivedPath);
+
+    
 
     for (;;) {
         // 1. Accept new clients
@@ -242,6 +252,30 @@ void TaskPurePursuit(void *pvParameters) {
     }
 }
 
+void TaskReceivePath(void *pvParameters) {
+    for (;;) {
+        esp_link.poll();
+
+        GlobalPathMessage gpm;
+        if (esp_link.get_path(gpm)) {
+
+            // Store the received path
+            receivedPath = gpm;
+
+            purePursuit.set_path(receivedPath);
+
+            pathAvailable = true;
+
+
+
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+}
+
+
+
 // ===============================================================
 // SETUP
 // ===============================================================
@@ -261,6 +295,8 @@ void setup() {
     I2C_wire.begin(8, 9);
     i2cMutexInit();
 
+    esp_link.begin();
+
     if (!servo_dir.begin()) { Serial.println("Servo init failed!"); while (true); }
     servo_dir.setAngle(90);
 
@@ -274,6 +310,7 @@ void setup() {
     if (!encoder.begin()) { Serial.println("Encoder init failed!"); while (true); }
     if (!motor.begin()) { Serial.println("Motor init failed!"); while (true); }
 
+    xTaskCreatePinnedToCore(TaskReceivePath,"RX_Path",4096,NULL,3,NULL,0);
     xTaskCreatePinnedToCore(TaskOdometryUnified_Stable, "OdomStable", 8192, NULL, 3, NULL, 0);
     xTaskCreatePinnedToCore(TaskMotor,       "Motor",       4096, NULL, 2, &motorTask,   1); 
     xTaskCreatePinnedToCore(TaskUltrasonic,  "Ultrasonic",  4096, NULL, 2, &ultrasonicTask,1); 

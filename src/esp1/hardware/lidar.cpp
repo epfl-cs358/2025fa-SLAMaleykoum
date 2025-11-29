@@ -12,7 +12,7 @@
 
 #include "esp1/hardware/lidar.h"
 #include "Arduino.h"
-
+/*
 rp_descriptor_t resp_descriptor[] = {{0xA5,0x5A,0x54,0x00,0x00,0x40,0x82},//Legacy Version
 								{0xA5,0x5A,0x84,0x00,0x00,0x40,0x84},//Extended Version
 								{0xA5,0x5A,0x54,0x00,0x00,0x40,0x85},//Dense Version
@@ -22,7 +22,7 @@ rq_message_t req_message[] = {{0xA5,0x25}, //Stop
                                 {0xA5,0x40}, //Reset
                                 {0xA5,0x20}, //Scan
                                 {0xA5,0x82}}; //Express scan
-
+*/
 bool Lidar::start()
 {
 	serial.setRxBufferSize(LIDAR_SERIAL_BUFFER_SIZE);
