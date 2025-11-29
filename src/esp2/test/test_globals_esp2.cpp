@@ -18,7 +18,7 @@ MotorManager motor(ESC_PIN);
 //MotorController motor(ESC_PIN);
 DMS15 servo_dir(SERVO_DIR_PIN);
 UltraSonicSensor ultrasonic(5,19);//US_TRIG_PIN, US_ECHO_PIN);
-ImuSensor imu;//(SDA_PIN, SCL_PIN);
+ImuSensor imu(SDA_PIN, SCL_PIN);
 //AS5600Encoder encoder(SDA_PIN, SCL_PIN);
 EncoderCarVelocity encoder;
 Connection connection("esp2");
@@ -26,3 +26,5 @@ MotorPID pid(0.9f, 0.1f, 0.0f);
 PurePursuit purePursuit;//(0.26f);
 Odometry odom;
 HardwareSerial ESPS(1);
+Esp_link esp_link(ESPS);
+

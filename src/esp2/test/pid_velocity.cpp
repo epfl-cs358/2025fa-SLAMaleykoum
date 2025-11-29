@@ -37,7 +37,6 @@ void setup_pid_velocity() {
     pinMode(LED_BUILTIN, OUTPUT);
 
     // I2C setup for IMU and Encoder
-    I2C_wire.begin(SDA_PIN, SCL_PIN);
     i2cMutexInit();
 
     // Wifi connection 

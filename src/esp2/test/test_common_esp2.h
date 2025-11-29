@@ -34,6 +34,8 @@
 #include "../../include/common/esp_link.h"
 #include <odometry.h>
 #include "esp2/control/pure_pursuit.h"
+#include "esp_wifi.h"
+
 
 // Pins used by the hardware components on the esp 2
 #define ESC_PIN 15          // pin used for the motor
@@ -42,6 +44,7 @@
 #define US_ECHO_PIN 19      // changé par rapport a avant sur conseil de chat
 #define SDA_PIN 8           // pin used for SDA of IMU
 #define SCL_PIN 9           // pin used for SCL of IMU
+#define LED_PIN LED_BUILTIN
 
 // Harwdare objects
 extern MotorManager motor;
@@ -53,8 +56,8 @@ extern ImuSensor imu;
 extern EncoderCarVelocity encoder;
 extern Connection connection;
 extern HardwareSerial ESPS;
-
 extern MotorPID pid;
+extern Esp_link esp_link;
 
 extern MotorPID pid;
 extern PurePursuit purePursuit;
@@ -77,4 +80,7 @@ void setup_test_encoder();           void loop_test_encoder();
 void setup_servo_calibration();     void loop_servo_calibration();
 void setup_test_odometry_freertos_path_follow(); void loop_test_odometry_freertos_path_follow();
 void setup_test_odometry_position(); void loop_test_odometry_position();
-void setup_test_comm();             void loop_test_comm();
+void setup_esps_comm_esp2();        void loop_esps_comm_esp2();
+void setup_led_basic();             void loop_led_basic();
+void setup_clock_esp2();            void loop_clock_esp2();
+void setup_clock_esp2_STA();        void loop_clock_esp2_STA();

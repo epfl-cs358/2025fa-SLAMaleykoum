@@ -24,8 +24,6 @@
  */
 #include "test_common_esp1.h"
 
-Esp_link esp_link(ESPS);
-
 const Pose2D pos_eps1 = {5, 5, 5, 0};
 const Pose2D pos_eps2 = {2, 2, 2, 2};
 

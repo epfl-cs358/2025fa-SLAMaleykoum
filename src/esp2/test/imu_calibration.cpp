@@ -555,15 +555,13 @@ static void handle_command(const String& line) {
 // === Test entry points ===
 void setup_imu_calibration() {
   Serial.begin(115200);
-  delay(10000);
-
+  delay(1000);
   // connection.setupWifi();
 
   // connection.check_connection();
   
   mqtt_printf("IMU", "Calibration and accuracy test started");  
 
-  I2C_wire.begin(SDA_PIN, SCL_PIN);
   i2cMutexInit();
 
   delay(1000);
