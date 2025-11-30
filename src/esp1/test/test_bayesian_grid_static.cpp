@@ -59,7 +59,9 @@ int main() {
         for (int i = 0; i < scan.count; ++i) {
 
             // Angle in degrees
-            float angle_deg = i * 0.1f;///
+            int angle10 = (int)(i * 1) % 3600;  // 3600 = 360° en dixièmes
+            float angle_deg = angle10 * 0.1f;
+
             float angle_rad = angle_deg * (M_PI / 180.0f);///
 
             float range = 0; 
