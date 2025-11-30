@@ -53,6 +53,15 @@ int main() {
             float angle = (i / (float)lidar_points) * 2 * M_PI;
             float range = 0;
 
+            // Angle in degrees
+            int angle10 = (int)(i * 1) % 3600;  // 3600 = 360° en dixièmes
+            float angle_deg = angle10 * 0.1f;
+
+            float angle_rad = angle_deg * (M_PI / 180.0f);///
+
+            float range = 0; 
+
+            // Check all obstacles
             for (auto &obs : obstacles) {
                 float dx = obs.first - robot_pose.x;
                 float dy = obs.second - robot_pose.y;

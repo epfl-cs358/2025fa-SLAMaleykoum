@@ -44,7 +44,7 @@ void BayesianOccupancyGrid::update_map(const LiDARScan& scan,
 {
     for (uint16_t i = 0; i < scan.count; ++i)
     {
-        float angle_lidar = scan.angles[i] * (M_PI / 180.0f);
+        float angle_lidar = scan.angles[i]; 
         
         float r = scan.distances[i] * 0.001f;  // mm to m
 
@@ -54,14 +54,24 @@ void BayesianOccupancyGrid::update_map(const LiDARScan& scan,
         }
         
         // Convert to world angle
-        float angle_world = pose.theta + angle_lidar;
-        int idx = (int)(angle_world * 10.0f);
+        float angle_world = pose.theta * (180.0f/M_PI) + angle_lidar;
+        angle_world = fmod(angle_world, 360.0f);
+        if (angle_world < 0) angle_world += 360.0f;
+
+        int idx = (int) (angle_world * 10.0f); 
+        idx = (idx % 3600 + 3600) % 3600; 
+
+         // met dans [0, 3600]    
+
         float angle_lidar_sin = sin_table[idx];
         float angle_lidar_cos = cos_table[idx];
+
+        
 
         // Compute world hit pos
         float hit_x = pose.x + r * angle_lidar_cos;
         float hit_y = pose.y + r * angle_lidar_sin;
+
 
         int x0 = (int)(pose.x / grid_resolution) + grid_size_x / 2;
         int x1 = (int)(hit_x / grid_resolution) + grid_size_x / 2;
