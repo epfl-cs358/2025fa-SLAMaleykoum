@@ -38,10 +38,12 @@ BayesianOccupancyGrid::BayesianOccupancyGrid(float resolution_m,
 // ------------------------------------------------------
 // Update log occupancy grid
 // ------------------------------------------------------
-void BayesianOccupancyGrid::update_map(const LiDARScan& scan,
-                                       const Pose2D& pose,
+void BayesianOccupancyGrid::update_map(const SyncedScan& lidar_scan,
                                        const float lidar_max_range)
 {
+    LiDARScan scan = lidar_scan.scan; 
+    Pose2D pose = lidar_scan.pose; 
+
     for (uint16_t i = 0; i < scan.count; ++i)
     {
         float angle_lidar = scan.angles[i] * (M_PI / 180.0f);
@@ -55,7 +57,9 @@ void BayesianOccupancyGrid::update_map(const LiDARScan& scan,
         
         // Convert to world angle
         float angle_world = pose.theta + angle_lidar;
+
         int idx = (int)(angle_world * 10.0f);
+        idx = (idx % 3600 + 3600) % 3600;
         float angle_lidar_sin = sin_table[idx];
         float angle_lidar_cos = cos_table[idx];
 
