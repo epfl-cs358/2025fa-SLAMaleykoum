@@ -37,10 +37,8 @@ int main() {
     };
 
     const float lidar_max_range = 3.0f; // meters
-    const int lidar_points = 3600;     // 0.1° resolution
+    const int lidar_points = 20000;     // 0.1° resolution
 
-    LiDARScan scan;
-    scan.count = lidar_points;
 
     int iteration = 0;
 
@@ -53,15 +51,18 @@ int main() {
             }
         }
 
+        LiDARScan scan;
+        scan.timestamp_ms = iteration * 100;
+        scan.count = lidar_points;
+
         // ---------------- SIMULATE LIDAR ----------------
         for (int i = 0; i < scan.count; ++i) {
 
             // Angle in degrees
-            float angle_deg = i * 0.1f;
-            float angle_rad = angle_deg * (M_PI / 180.0f);
+            float angle_deg = i * 0.1f;///
+            float angle_rad = angle_deg * (M_PI / 180.0f);///
 
-            float range = lidar_max_range;
-            bool hit = false;
+            float range = 0; 
 
             // Check all obstacles
             for (auto &obs : obstacles) {
@@ -77,22 +78,18 @@ int main() {
                     std::cos(angle_rad - obs_angle)
                 ));
 
-                // Window based on angular resolution
-                float ang_step = 2 * M_PI / lidar_points;
-                float ang_window = ang_step * 60.0f; // ≈ ±6°
+        
 
-                if (diff < ang_window && dist < lidar_max_range) {
-                    if (!hit || dist < range) {
-                        hit = true;
+                if (diff < 0.1 && dist < lidar_max_range) {
+                    if (range == 0 || dist < range) {
                         range = dist;
                     }
                 }
             }
 
             // Fill scan (format expected by SLAM Code 1)
-            scan.angles[i]    = angle_deg;              // ° degrees
-            scan.distances[i] = hit ? (range * 1000.0f) // mm
-                                     : 0.0f;            // free
+            scan.angles[i]    = angle_deg;       // ° degrees
+            scan.distances[i] = range * 1000.0f; // mm                             
             scan.qualities[i] = 255;
         }
 
@@ -110,42 +107,37 @@ int main() {
         const uint8_t* data = grid.get_map_data_color();
 
         // SFML 3.0 constructor for Image
-        sf::Image img({grid_size_x, grid_size_y}, sf::Color::Black);
+        sf::Image img;
+        img.resize(sf::Vector2u(grid_size_x, grid_size_y));
 
-        for (unsigned int y = 0; y < grid_size_y; ++y) {
-            for (unsigned int x = 0; x < grid_size_x; ++x) {
-                uint8_t v = data[y * grid_size_x + x];
-                img.setPixel({x, y}, sf::Color(v, v, v));  // SFML 3
+        // IMPORTANT: CORRECT DISPLAY (Y NOT FLIPPED)
+        for (int y = 0; y < grid_size_y; ++y) {
+            for (int x = 0; x < grid_size_x; ++x) {
+                uint8_t value = data[y * grid_size_x + x];
+                img.setPixel(sf::Vector2u(x, y), sf::Color(value, value, value));
             }
         }
 
         sf::Texture tex;
-        if (!tex.loadFromImage(img)) {
-            std::cerr << "ERROR: loadFromImage failed.\n";
-        }
+        tex.loadFromImage(img);
 
         sf::Sprite sprite(tex);
-        sprite.setScale({
-            (float)cell_size,
-            (float)cell_size
-        });
-
+        sprite.setScale(sf::Vector2f(cell_size, cell_size));
         window.draw(sprite);
 
-        // ---------------- DRAW ROBOT ----------------
+        // ----------- DRAW ROBOT -------------
         sf::CircleShape robot(3);
         robot.setFillColor(sf::Color::Red);
 
-        robot.setPosition({
+        robot.setPosition(sf::Vector2f(
             (grid_size_x * cell_size) / 2.0f,
             (grid_size_y * cell_size) / 2.0f
-        });
+        ));
 
         window.draw(robot);
 
         window.display();
-
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
         iteration++;
     }
 
