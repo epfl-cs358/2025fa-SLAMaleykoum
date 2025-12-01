@@ -4,10 +4,15 @@
 
 void setup_led_basic() {
     pinMode(LED_PIN, OUTPUT);
+    Serial.begin(115600);
     delay(1000);
 }
 
 void loop_led_basic() {
+    Serial.println("hi");
     digitalWrite(LED_PIN, HIGH);
-    delay(10000);
+    delay(2000);
+    digitalWrite(LED_PIN, LOW);
+
+    delay(1000);
 }

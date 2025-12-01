@@ -148,7 +148,9 @@ void loop_bayesian_dynamic_tcp() {
         // ----------------------------
         // Update Bayesian map
         // ----------------------------
-        TheMap_.update_map(synced_data.scan, synced_data.pose, 8);
+
+    
+        TheMap_.update_map(synced_data, 8.0f);
         
         // ----------------------------
         // TCP STREAM

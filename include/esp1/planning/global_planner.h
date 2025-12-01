@@ -33,5 +33,7 @@ public:
      * @brief Checks if the path needs re-planning (e.g., goal achieved, path too old).
      * @return true if the path needs re-planning.
      */
+
+     // TODO / FIXME ====== CHECK IF WE REALLY NEED THIS =====
     bool needs_replanning() const;
 };
