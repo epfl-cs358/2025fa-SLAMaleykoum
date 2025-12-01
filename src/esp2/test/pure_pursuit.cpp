@@ -1,9 +1,7 @@
 #include "test_common_esp2.h"
 
-#include "common/data_types.h"
 #include <Arduino.h>
 #include <cmath>
-#include "I2C_wire.h"
 
 
 const char* mqtt_topic_connection_pure_pursuit = "slamaleykoum77/print";
@@ -13,8 +11,8 @@ const char* mqtt_topic_connection_location = "slamaleykoum77/purepursuit";
 // === Global instances ===
 
 
-bool emergencyStop = false;
-bool finishedPath = false;
+bool emergency_Stop = false;
+bool finished_Path = false;
 float motorPowerDrive = 0.18f;  // 18%
 
 
@@ -23,17 +21,17 @@ char buf[100];
 
 // --- Pose estimation ---
 
-float velocity = 0.0f;
-float posX = 0.0f;
-float posY = 0.0f;
-float yaw = 0.0f;
+float velocityV  = 0.0f;
+float pos_X = 0.0f;
+float pos_Y = 0.0f;
+float yawAng = 0.0f;
 float newY = 0.0f;
 
 // --- Path definition ---
-float pathX[] = {0,0};//{0,0};//{-1.00, -0.95, -0.90, -0.85, -0.80, -0.75, -0.70, -0.65, -0.60, -0.55, -0.50, -0.45, -0.40, -0.35, -0.30, -0.25, -0.20, -0.15, -0.10, -0.05, 0.00, 0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.95, 1.00} ;
+float path_X[] = {0,0};//{0,0};//{-1.00, -0.95, -0.90, -0.85, -0.80, -0.75, -0.70, -0.65, -0.60, -0.55, -0.50, -0.45, -0.40, -0.35, -0.30, -0.25, -0.20, -0.15, -0.10, -0.05, 0.00, 0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.95, 1.00} ;
 ///{0.0, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00};//{0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0};//{0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.5};//{0.0, 0.5, 1.0, 1.5, 2.0};
-float pathY[] ={0,-1.0};//{0,0.30};//{ 1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00};//{0.0, 0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.95, 1.00};//{0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0};//{0.0, 0.5, 1.0, 1.5, 2.0, 2.0, 2.0};//{0.0, 0.2, 0.4, 0.6, 0.6};
-const int pathSize = sizeof(pathX) / sizeof(pathX[0]);
+float path_Y[] ={0,-1.0};//{0,0.30};//{ 1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00,  1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00};//{0.0, 0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.95, 1.00};//{0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0};//{0.0, 0.5, 1.0, 1.5, 2.0, 2.0, 2.0};//{0.0, 0.2, 0.4, 0.6, 0.6};
+const int path_Size = sizeof(path_X) / sizeof(path_X[0]);
 
 // --- Constants ---
 const float EMERGENCY_DISTANCE = 0.25f;
@@ -48,7 +46,7 @@ TaskHandle_t motorTask, ultrasonicTask, imuTask, poseTask, pursuitTask;
 void TaskMotor(void *pvParameters) {
     
     for (;;) {
-        if (emergencyStop || finishedPath) {
+        if (emergency_Stop || finished_Path) {
             motor.stop();
             servo_dir.setAngle(90);
         } else {
@@ -71,7 +69,7 @@ void TaskUltrasonic(void *pvParameters) {
             motor.stop();
             motor.update();
 
-            emergencyStop = true;
+            emergency_Stop = true;
             
             snprintf(buf, sizeof(buf), "⚠️ Emergency stop! Distance=%.2f m", dist);
             connection.publish(mqtt_topic_connection_location, buf);
@@ -79,7 +77,7 @@ void TaskUltrasonic(void *pvParameters) {
              
 
         } /*else if (dist > (EMERGENCY_DISTANCE + 0.05f)) {
-            emergencyStop = false; //this will make it restart so if you want it to stay stopped keeep commented out
+            emergency_Stop = false; //this will make it restart so if you want it to stay stopped keeep commented out
         }*/
         vTaskDelay(pdMS_TO_TICKS(200));
     }
@@ -123,7 +121,7 @@ void TaskIMU(void *pvParameters) {
         
         // ✅ COMPUTE YAW
         float yaw_radians = getYawIMU(q);
-        yaw = yaw_radians;
+        yawAng = yaw_radians;
         
         float yaw_degrees = yaw_radians * 180.0f / PI;
         
@@ -149,7 +147,7 @@ void TaskEncoder(void *pvParameters) {
         newY = encoder.getDistance();
         i2c_unlock();
 
-        velocity = currVel;
+        velocityV  = currVel;
         //connection.check_connection();
         snprintf(buf, sizeof(buf), "Current Vel=%.3f",
                      currVel);
@@ -194,21 +192,21 @@ void TaskPose(void *pvParameters) {
         prevTime = now;
 
         // yaw and velocity are updated by TaskIMU and TaskEncoder
-        //posX += velocity * sinf(yaw) * dt;  //to be changed depending if increases clockwise or not
-        posX -= velocity * sinf(yaw) * dt;
-        //posY += velocity * cosf(yaw) * dt;
-        posY += velocity * cosf(yaw) * dt;
+        //pos_X += velocity * sinf(yaw) * dt;  //to be changed depending if increases clockwise or not
+        pos_X -= velocityV  * sinf(yawAng) * dt;
+        //pos_Y += velocity * cosf(yaw) * dt;
+        pos_Y += velocityV  * cosf(yawAng) * dt;
         /*
         snprintf(buf, sizeof(buf),
                      "Pose: X=%.2f Y=%.2f  newY=%.2f Yaw=%.2f Vel=%.3f",
-                     posX, posY, newY, yaw, velocity);
+                     pos_X, pos_Y, newY, yaw, velocity);
         connection.publish(mqtt_topic_connection_pure_pursuit, buf);*/
 
         if (now - lastPublishTime >= 200) {
             connection.check_connection();
             snprintf(buf, sizeof(buf),
                      "Pose: X=%.2f Y=%.2f  newY=%.2f Yaw=%.2f Vel=%.3f",
-                     posX, posY, newY, yaw, velocity);
+                     pos_X, pos_Y, newY, yawAng, velocityV );
             connection.publish(mqtt_topic_connection_pure_pursuit, buf);
             lastPublishTime = now;
         }
@@ -237,25 +235,25 @@ void TaskPose(void *pvParameters) {
 void TaskPurePursuit(void *pvParameters) {
     // Prepare path
     GlobalPathMessage msg;
-    msg.current_length = pathSize;
+    msg.current_length = path_Size;
     msg.timestamp_ms = millis();
     msg.path_id = 1;
-    for (int i = 0; i < pathSize; i++) {
-        msg.path[i].x = pathX[i];
-        msg.path[i].y = pathY[i];
+    for (int i = 0; i < path_Size; i++) {
+        msg.path[i].x = path_X[i];
+        msg.path[i].y = path_Y[i];
     }
 
     purePursuit.set_path(msg);
 
     for (;;) {
-        if (emergencyStop) {
+        if (emergency_Stop) {
             vTaskDelay(pdMS_TO_TICKS(100));
             continue;
         }
 
-        Pose2D currentPose = {posX, posY, yaw};
+        Pose2D currentPose = {pos_X, pos_Y, yawAng};
         //Pose2D currentPose = { odom.x(), odom.y(), odom.yaw() };
-        Velocity velStruct = {velocity, 0.0f};
+        Velocity velStruct = {velocityV , 0.0f};
 
         MotionCommand cmd = purePursuit.compute_command(currentPose, velStruct);
 
@@ -270,24 +268,24 @@ void TaskPurePursuit(void *pvParameters) {
 
         snprintf(buf, sizeof(buf),
                 "Pose: X=%.2f Y=%.2f Yaw=%.2f Vel=%.3f",
-                posX, posY, yaw, velocity);
+                pos_X, pos_Y, yawAng, velocityV );
             connection.publish(mqtt_topic_connection_location, buf);
 
 
         // Goal check
-        float dx = pathX[pathSize - 1] - posX;
-        float dy = pathY[pathSize - 1] - posY;
+        float dx = path_X[path_Size - 1] - pos_X;
+        float dy = path_Y[path_Size - 1] - pos_Y;
         float distToGoal = sqrtf(dx * dx + dy * dy);
 
-        float targetX = pathX[pathSize - 1];
-        float targetY = pathY[pathSize - 1];
+        float targetX = path_X[path_Size - 1];
+        float targetY = path_Y[path_Size - 1];
 
-        bool reachedX = fabs(posX - targetX) <= GOAL_TOLERANCE;
-        bool reachedY = fabs(posY - targetY) <= GOAL_TOLERANCE;
+        bool reachedX = fabs(pos_X - targetX) <= GOAL_TOLERANCE;
+        bool reachedY = fabs(pos_Y - targetY) <= GOAL_TOLERANCE;
 
         // Check if bot is past the goal in both axes
-        bool passedX = (targetX >= 0 && posX > targetX) || (targetX < 0 && posX < targetX);
-        bool passedY = (targetY >= 0 && posY > targetY) || (targetY < 0 && posY < targetY);
+        bool passedX = (targetX >= 0 && pos_X > targetX) || (targetX < 0 && pos_X < targetX);
+        bool passedY = (targetY >= 0 && pos_Y > targetY) || (targetY < 0 && pos_Y < targetY);
         bool passedGoal = passedX && passedY;
 
         // Allow overshoot only if we've passed the goal
@@ -297,12 +295,12 @@ void TaskPurePursuit(void *pvParameters) {
         if ((reachedX && reachedY)||(reachedByOvershoot)|| (cmd.v_target == 0)){//(distToGoal < GOAL_TOLERANCE)) {
             
             connection.check_connection();
-            snprintf(buf, sizeof(buf), "✅ Reached goal at (%.2f, %.2f, %.2f), stopping.", posX, posY,newY);
+            snprintf(buf, sizeof(buf), "✅ Reached goal at (%.2f, %.2f, %.2f), stopping.", pos_X, pos_Y,newY);
             connection.publish(mqtt_topic_connection_location, buf);
 
 
 
-            finishedPath = true;
+            finished_Path = true;
             
             motor.stop();
             motor.update();

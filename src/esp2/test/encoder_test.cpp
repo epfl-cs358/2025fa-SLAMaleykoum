@@ -3,7 +3,6 @@
 #include "common/data_types.h"
 #include <Arduino.h>
 #include <cmath>
-#include "I2C_wire.h"
 
 char buffencoder[100];
 const char* mqtt_topic_connection_encoder= "slamaleykoum77/print";

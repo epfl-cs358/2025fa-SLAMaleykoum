@@ -1,4 +1,4 @@
-#include "I2C_mutex.h"
+#include "hardware/I2C_mutex.h"
 SemaphoreHandle_t i2c_mutex = nullptr;
 
 void i2cMutexInit() {

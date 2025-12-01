@@ -2,75 +2,35 @@
  * @file main_esp2.cpp
  * @brief Updated Main: Sends dynamic path data over TCP
  */
+
+//Basic
 #include <Arduino.h>
+
+
+//Wifi
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include "common/wifi_connection.h"
 #include  "FreeRTOSConfig.h"
 #include "common/data_types.h"
 #include <cmath>
-#include "I2C_wire.h"
-#include "MotorManager.h"
-#include "DMS15.h"
-#include "UltraSonicSensor.h"
-#include "ImuSensor.h"
-#include "I2C_mutex.h"
-#include "EncoderCarVelocity.h"
-#include "MotorController.h"
+#include "hardware/I2C_wire.h"
+#include "hardware/MotorManager.h"
+#include "hardware/DMS15.h"
+#include "hardware/UltraSonicSensor.h"
+#include "hardware/ImuSensor.h"
+#include "hardware/I2C_mutex.h"
+#include "hardware/EncoderCarVelocity.h"
+#include "hardware/MotorController.h"
 #include "AS5600.h"
-#include "motor_pid.h"
 #include "pure_pursuit.h"
-#include "odometry.h"
 #include "common/esp_link.h"
+#include "config.h"
+#include "global_state.h"
+#include "esp2/config.h"
+#include "esp2/global_state.h"
 
-Esp_link esp_link(Serial1);
 
-// Storage for last received global path
-GlobalPathMessage receivedPath;
-volatile bool newPathArrived = false; // Flag to trigger update in control loop
-
-// ---- ALEX TCP STUFFFF ----
-#include <WiFi.h>
-#include <WiFiClient.h>
-#include <WiFiServer.h>
-
-const char* ssid = "LIDAR_AP";
-const char* password = "l1darpass";
-const uint16_t TCP_PORT = 9000;
-
-WiFiServer tcpServer(TCP_PORT);
-WiFiClient tcpClient;
-// ---- END ALEX TCP STUFFFF ----
-
-#define ESC_PIN 15          
-#define SERVO_DIR_PIN 6     
-#define US_TRIG_PIN 5       
-#define US_ECHO_PIN 19      
-#define  SDA_PIN 8           
-#define SCL_PIN 9           
-
-MotorManager motor(ESC_PIN);
-DMS15 servo_dir(SERVO_DIR_PIN);
-UltraSonicSensor ultrasonic(5,19);
-ImuSensor imu;
-EncoderCarVelocity encoder;
-PurePursuit purePursuit;
-Odometry odom;
-
-bool emergencyStop = false;
-bool finishedPath = false;
-bool startSignalReceived = false; 
-float motorPowerDrive = 0.20f;
-char buf[256]; 
-
-// --- Pose estimation ---
-float velocity = 0.0f;
-float posX = 0.0f;
-float posY = 0.0f;
-float yaw = 0.0f;
-float newY = 0.0f;
-
-const float EMERGENCY_DISTANCE = 0.25f;
 TaskHandle_t motorTask, ultrasonicTask, pursuitTask,odomTask,receiveTask;
 
 // ===============================================================
@@ -86,7 +46,7 @@ void TaskMotor(void *pvParameters) {
             motor.stop();
             servo_dir.setAngle(90);
         } else {
-            motor.forward(motorPowerDrive);
+            motor.forward(Config::MOTOR_POWER_DRIVE);
         }
         motor.update();
         vTaskDelay(pdMS_TO_TICKS(20));
@@ -103,11 +63,11 @@ void TaskUltrasonic(void *pvParameters) {
             continue;
         }
         float dist = ultrasonic.readDistance();
-        if (dist > 0 && dist < EMERGENCY_DISTANCE) {
+        if (dist > 0 && dist < Config::EMERGENCY_DISTANCE) {
             motor.stop();
             motor.update();
             emergencyStop = true;
-            snprintf(buf, sizeof(buf), "⚠️ Emergency stop! Distance=%.2f m", dist);
+            
         } 
         vTaskDelay(pdMS_TO_TICKS(200));
     }
@@ -139,12 +99,10 @@ void TaskOdometryUnified_Stable(void *pvParameters) {
         IMUData imuData = imu.data();
         float currentYaw = getYawIMU(imuData);
         float currentVel = encoder.getWheelLinearVelocity();
-        float currentDist = encoder.getDistance();
         i2c_unlock();
         
         yaw = currentYaw;
         velocity = currentVel;
-        newY = currentDist;
         
         posX -= velocity * sinf(yaw) * dt;
         posY += velocity * cosf(yaw) * dt;
@@ -287,16 +245,16 @@ void setup() {
     Serial.begin(115200);
     delay(2000);
 
-    Serial.printf("Starting WiFi AP '%s' ...\n", ssid);
+    Serial.printf("Starting WiFi AP '%s' ...\n", Config::WIFI_SSID);
     WiFi.mode(WIFI_AP);
-    bool ok = WiFi.softAP(ssid, password);
+    bool ok = WiFi.softAP(Config::WIFI_SSID, Config::WIFI_PASSWORD);
     if (!ok) Serial.println("Failed to start AP!");
     else Serial.println(WiFi.softAPIP());
 
     tcpServer.begin();
     tcpServer.setNoDelay(true);
 
-    I2C_wire.begin(8, 9);
+    I2C_wire.begin(Config::SDA_PIN,Config::SCL_PIN);
     i2cMutexInit();
     esp_link.begin();
 

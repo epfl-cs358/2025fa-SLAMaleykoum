@@ -3,8 +3,6 @@
  * @brief Fixed PID velocity control test
  */
 #include "test_common_esp2.h"
-#include "EncoderCarVelocity.h"
-#include "motor_pid.h"
 
 const char* mqtt_topic_connection_path_pid = "slamaleykoum77/print";
 

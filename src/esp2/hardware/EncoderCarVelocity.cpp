@@ -8,9 +8,9 @@
  * @author SLAMaleykoum
  * @date Nov 2025
  */
-#include "EncoderCarVelocity.h"
+#include "hardware/EncoderCarVelocity.h"
 #include <Wire.h>
-#include "I2C_wire.h"
+#include "hardware/I2C_wire.h"
 
 EncoderCarVelocity::EncoderCarVelocity() {}
 

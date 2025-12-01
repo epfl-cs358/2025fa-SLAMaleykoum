@@ -1,6 +1,6 @@
-#include "ImuSensor.h"
+#include "hardware/ImuSensor.h"
 #include <Wire.h>
-#include "I2C_wire.h"
+#include "hardware/I2C_wire.h"
 #include <Arduino.h>
 
 ImuSensor::ImuSensor()

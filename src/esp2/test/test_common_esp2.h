@@ -19,23 +19,21 @@
  */
 #pragma once
 #include <Arduino.h>
-#include "MotorManager.h"
-#include "DMS15.h"
-#include "UltraSonicSensor.h"
-#include "ImuSensor.h"
-#include "I2C_mutex.h"
+#include "hardware/MotorManager.h"
+#include "hardware/DMS15.h"
+#include "hardware/UltraSonicSensor.h"
+#include "hardware/ImuSensor.h"
+#include "hardware/I2C_mutex.h"
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include "common/wifi_connection.h"
-#include "EncoderCarVelocity.h"
-#include "MotorController.h"
+#include "hardware/EncoderCarVelocity.h"
+#include "hardware/MotorController.h"
 #include "AS5600.h"
-#include "motor_pid.h"
 #include "../../include/common/esp_link.h"
-#include <odometry.h>
 #include "esp2/control/pure_pursuit.h"
 #include "esp_wifi.h"
-
+#include "motor_pid.h"
 
 // Pins used by the hardware components on the esp 2
 #define ESC_PIN 15          // pin used for the motor
@@ -56,12 +54,10 @@ extern ImuSensor imu;
 extern EncoderCarVelocity encoder;
 extern Connection connection;
 extern HardwareSerial ESPS;
-extern MotorPID pid;
 extern Esp_link esp_link;
 
 extern MotorPID pid;
 extern PurePursuit purePursuit;
-extern Odometry odom;
 
 // Prototypes of the functions
 void setup_all_together();          void loop_all_together();

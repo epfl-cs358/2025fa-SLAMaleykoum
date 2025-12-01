@@ -39,10 +39,10 @@ const int pathA_size = sizeof(pathA_X) / sizeof(pathA_X[0]);
 // ------------------------------------------
 // PATH B (a NEW path for dynamic update)
 // ------------------------------------------
-float pathB_X[] = {
+float pathB_X[] ={
     5.50, 5.50, 5.50, 5.50, 5.50, 5.50, 5.50, 5.50, 5.50, 5.50, 5.50, 5.50
 };
-float pathB_Y[] = {
+float pathB_Y[] ={
     -1.00, -0.50, 0.00, 0.50, 1.0, 1.50, 2.00, 2.50, 3.00, 3.50, 4.00, 4.50
 };
 const int pathB_size = sizeof(pathB_X) / sizeof(pathB_X[0]);

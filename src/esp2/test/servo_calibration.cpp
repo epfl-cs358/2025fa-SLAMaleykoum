@@ -1,6 +1,6 @@
 #include <Arduino.h>
 #include "test_common_esp2.h"   // provides servo_dir + connection
-#include "I2C_wire.h"
+
 
 const char* mqtt_topic_calib = "slamaleykoum77/calibration";
 

@@ -27,7 +27,7 @@ char bufreceive[100];
 Esp_link esp__link(Serial1);
 
 // Storage for received path
-GlobalPathMessage receivedPath;
+GlobalPathMessage received__Path;
 
 void setup_test_comm() {
     Serial.begin(115200);
@@ -61,29 +61,29 @@ void loop_test_comm() {
     esp__link.poll();
 
     // Check if a new path was received
-    if (esp__link.get_path(receivedPath)) {
+    if (esp__link.get_path(received__Path)) {
 
         snprintf(bufreceive, sizeof(bufreceive), "\n>>> RECEIVED PATH FROM ESP1!");
         connection.publish(mqtt_topic_connection_esp2_comm_receivewaypoints, bufreceive);
 
-        snprintf(bufreceive, sizeof(bufreceive), "Path ID: %lu\n", receivedPath.path_id);
+        snprintf(bufreceive, sizeof(bufreceive), "Path ID: %lu\n", received__Path.path_id);
         connection.publish(mqtt_topic_connection_esp2_comm_receivewaypoints, bufreceive);
 
-        snprintf(bufreceive, sizeof(bufreceive), "Timestamp: %lu ms\n", receivedPath.timestamp_ms);
+        snprintf(bufreceive, sizeof(bufreceive), "Timestamp: %lu ms\n", received__Path.timestamp_ms);
         connection.publish(mqtt_topic_connection_esp2_comm_receivewaypoints, bufreceive);
 
-        snprintf(bufreceive, sizeof(bufreceive), "Number of waypoints: %u\n\n", receivedPath.current_length);
+        snprintf(bufreceive, sizeof(bufreceive), "Number of waypoints: %u\n\n", received__Path.current_length);
         connection.publish(mqtt_topic_connection_esp2_comm_receivewaypoints, bufreceive);
 
 
         
 
-        for (int i = 0; i < receivedPath.current_length; i++) {
+        for (int i = 0; i < received__Path.current_length; i++) {
 
             snprintf(bufreceive, sizeof(bufreceive), "WP %02d: (%.2f, %.2f)\n",
                           i,
-                          receivedPath.path[i].x,
-                          receivedPath.path[i].y);
+                          received__Path.path[i].x,
+                          received__Path.path[i].y);
         connection.publish(mqtt_topic_connection_esp2_comm_receivewaypoints, bufreceive);
 
         }
