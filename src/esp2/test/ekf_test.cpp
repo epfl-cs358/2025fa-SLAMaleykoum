@@ -14,9 +14,10 @@ void publish_mqtt(const char* fmt, ...) {
     char buf[300];
     snprintf(buf, sizeof(buf), fmt);
     connection.publish(mqtt_topic_ekf_debug, buf);
+    delay(500);
 }
 
-void setup() {
+void setup_ekfTest() {
     Serial.begin(115200);
     delay(1500);
 
@@ -27,6 +28,8 @@ void setup() {
     delay(1000);
     connection.check_connection();
 
+    I2C_wire.begin(8,9);
+
     // Init IMU
     i2cMutexInit();
     if (!imu.begin()) {
@@ -34,13 +37,20 @@ void setup() {
         while (true) delay(1000);
     }
     imu.readAndUpdate();
+    if (!encoder.begin()) {
+        Serial.println("Encoder FAILED to init!");
+        while (true) delay(1000);
+    }
+    if (!motor.begin()) {
+        Serial.println("Motor FAILED to init!");
+        while (true) delay(1000);
+    }
 
     publish_mqtt("{\"type\":\"print\",\"msg\":\"EKF MQTT test initialized\"}");
 }
 
 // Main test loop
-void loop() {
-    MotorManager motor(ESC_PIN);
+void loop_ekfTest() {
     motor.forward(0.17);
     motor.update();
     // -----------------------------
@@ -112,7 +122,6 @@ void loop() {
     connection.check_connection();
 
     // Slow enough to be readable (20 Hz)
-    delay(50);
 }
 
 /** 
