@@ -17,6 +17,7 @@
 #define MAX_PATH_LENGTH 50
 #define MAX_LIDAR_POINTS 3000
 
+
 // --- Core Geometric Structures ---
 /**
  * @brief 2D pose structure (Position and Orientation).
