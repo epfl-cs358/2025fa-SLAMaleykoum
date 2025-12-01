@@ -32,7 +32,7 @@ public:
      * @param scan The new LiDAR observation.
      * @param pose The robot's estimated pose during the scan (from ESP2).
      */
-    void update_map(const SyncedScan& lidar_scan, float lidar_max_range);
+    void update_map(const SyncedScan& lidar_scan,  float lidar_max_range);
 
     /**
      * @brief Retrieves the occupancy probability of a specific cell.
