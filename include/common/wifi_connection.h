@@ -52,8 +52,8 @@ extern const char* mqtt_topic_commands;
  */
 class Connection {
     private:
-    const char* ssid = "PC-Alex";
-    const char* pass = "rienattergrabandedehaineux"; 
+    const char* ssid = "Wifi de am";
+    const char* pass = "chibani5"; 
     const char* clientId_;
 
 
