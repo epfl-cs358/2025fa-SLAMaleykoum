@@ -32,41 +32,100 @@ static void fill_test_map(BayesianOccupancyGrid& grid)
     for (int i = 0; i < W * H; i++)
         map[i] = 0.0f;
 
-    // --- Centre de la grille = (0,0) monde ---
+    // Centre
     int cx = W / 2;
     int cy = H / 2;
 
-    // Taille du carré free : 50 × 50
-    int half = 25;
+    // ------------------------------
+    // POLYGONE IRRÉGULIER (8 points)
+    // ------------------------------
 
-    int x0 = cx - half;
-    int x1 = cx + half;
-    int y0 = cy - half;
-    int y1 = cy + half;
+    struct P { int x,y; };
 
-    // --- 1. Intérieur FREE ---
-    for (int y = y0; y <= y1; y++)
-        for (int x = x0; x <= x1; x++)
-            map[y * W + x] = -2.0f;   // FREE
+    std::vector<P> poly = {
+        {cx + 50, cy},        // droite
+        {cx + 30, cy + 40},   // bas droite
+        {cx,      cy + 60},   // bas
+        {cx - 40, cy + 30},   // bas gauche
+        {cx - 60, cy},        // gauche
+        {cx - 30, cy - 40},   // haut gauche
+        {cx,      cy - 70},   // haut (loin du centre)
+        {cx + 40, cy - 20}    // haut droite
+    };
 
-    // --- 2. Bordures OCCUPIED ---
-    for (int x = x0; x <= x1; x++)
+    // ------------------------------
+    // REMPLIR L’INTÉRIEUR DU POLYGONE
+    // ------------------------------
+
+    auto point_in_poly = [&](int x, int y)
     {
-        map[y0 * W + x] = 3.0f; // haut
-        map[y1 * W + x] = 3.0f; // bas
-    }
+        bool c = false;
+        for (int i = 0, j = poly.size() - 1; i < poly.size(); j = i++)
+        {
+            int xi = poly[i].x, yi = poly[i].y;
+            int xj = poly[j].x, yj = poly[j].y;
 
-    for (int y = y0; y <= y1; y++)
+            bool intersect = ((yi > y) != (yj > y)) &&
+                             (x < (float)(xj - xi) * (y - yi) / (float)(yj - yi + 1e-6f) + xi);
+            if (intersect) c = !c;
+        }
+        return c;
+    };
+
+    for (int y = 0; y < H; y++)
+        for (int x = 0; x < W; x++)
+            if (point_in_poly(x, y))
+                map[y * W + x] = -2.0f;   // FREE
+
+    // ------------------------------
+    // DESSINER LES CONTOURS OCCUPÉS
+    // ------------------------------
+
+    auto draw_line = [&](P a, P b)
     {
-        map[y * W + x0] = 3.0f; // gauche
-        map[y * W + x1] = 3.0f; // droite
-    }
+        int x0 = a.x, y0 = a.y;
+        int x1 = b.x, y1 = b.y;
 
-    // --- 3. Passage dans l’angle supérieur droit ---
-    map[y0 * W + x1] = -2.0f;          // angle free
-    map[(y0 + 1) * W + x1] = -2.0f;    // en dessous
-    map[y0 * W + (x1 - 1)] = -2.0f;    // à gauche
+        int dx = std::abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
+        int dy = -std::abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
+        int err = dx + dy;
+
+        while (true)
+        {
+            if (x0 >= 0 && y0 >= 0 && x0 < W && y0 < H)
+                map[y0 * W + x0] = 3.0f; // OCCUPIED
+
+            if (x0 == x1 && y0 == y1) break;
+            int e2 = 2 * err;
+            if (e2 >= dy) { err += dy; x0 += sx; }
+            if (e2 <= dx) { err += dx; y0 += sy; }
+        }
+    };
+
+    // Créer les passages en sautant 3 segments
+
+    int N = poly.size();
+
+    // 1) Passage proche du centre (petit)
+    int skip1 = 0;     // segment entre poly[0] et poly[1]
+
+    // 2) Passage à distance moyenne
+    int skip2 = 3;     // segment poly[3]→poly[4]
+
+    // 3) Passage très loin du centre (au nord)
+    int skip3 = 6;     // segment poly[6]→poly[7]
+
+    for (int i = 0; i < N; i++)
+    {
+        int j = (i + 1) % N;
+
+        if (i == skip1 || i == skip2 || i == skip3)
+            continue; // passage → pas de bordure
+
+        draw_line(poly[i], poly[j]);
+    }
 }
+
 
 
 

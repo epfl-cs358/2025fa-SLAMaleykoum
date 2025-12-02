@@ -3,6 +3,8 @@
 #include <iostream>
 #include <cmath>
 #include <limits>
+#include <queue>
+
 
 // -----------------------------------------------------------
 //      HELPERS : conversions + grid access
@@ -104,6 +106,65 @@ bool GoalManager::is_current_goal_achieved(const Pose2D& current_pose) const
     return std::sqrt(dx*dx + dy*dy) < 0.20f;
 }
 
+
+// -----------------------------------------------------------
+//            CLUSTER FRONTIER CELLS
+// -----------------------------------------------------------
+static std::vector<std::vector<std::pair<int,int>>> 
+cluster_frontiers(const BayesianOccupancyGrid& grid,
+                  const std::vector<std::pair<int,int>>& frontiers)
+{
+    int W = grid.grid_size_x;
+    int H = grid.grid_size_y;
+
+    // Visité = tableau 2D
+    std::vector<std::vector<bool>> visited(H, std::vector<bool>(W, false));
+
+    // Directions 8-connectivity
+    int dx[8] = {1,-1,0,0,  1,1,-1,-1};
+    int dy[8] = {0,0,1,-1,  1,-1,1,-1};
+
+    std::vector<std::vector<std::pair<int,int>>> clusters;
+
+    for (auto& f : frontiers)
+    {
+        int fx = f.first;
+        int fy = f.second;
+
+        if (visited[fy][fx]) continue;
+
+        // BFS pour un cluster
+        std::vector<std::pair<int,int>> cluster;
+        std::queue<std::pair<int,int>> q;
+        q.push({fx, fy});
+        visited[fy][fx] = true;
+
+        while (!q.empty())
+        {
+            auto [x,y] = q.front(); q.pop();
+            cluster.push_back({x,y});
+
+            for (int i = 0; i < 8; i++)
+            {
+                int nx = x + dx[i];
+                int ny = y + dy[i];
+
+                if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+                if (visited[ny][nx]) continue;
+                if (!is_frontier_cell(grid, nx, ny)) continue;
+
+                visited[ny][nx] = true;
+                q.push({nx, ny});
+            }
+        }
+
+        clusters.push_back(cluster);
+    }
+
+    return clusters;
+}
+
+
 // -----------------------------------------------------------
 //                MAIN UPDATE FUNCTION
 // -----------------------------------------------------------
@@ -124,6 +185,7 @@ MissionGoal GoalManager::update_goal(const Pose2D& current_pose,
         // ------------------ EXPLORING ------------------
         case STATE_EXPLORING:
         {
+            // Si on a atteint le goal précédent → nouveau goal
             if (is_current_goal_achieved(current_pose))
             {
                 int robot_gx, robot_gy;
@@ -134,29 +196,21 @@ MissionGoal GoalManager::update_goal(const Pose2D& current_pose,
                     return current_target_;
                 }
 
-                float best_dist = std::numeric_limits<float>::max();
-                int best_x = -1, best_y = -1;
+                // ----------------------------------------------------
+                // 1. Collecter TOUTES les cellules frontières
+                // ----------------------------------------------------
+                std::vector<std::pair<int,int>> all_frontiers;
 
                 for (int y = 0; y < grid.grid_size_y; y++)
                 {
                     for (int x = 0; x < grid.grid_size_x; x++)
                     {
-                        if (!is_frontier_cell(grid, x, y)) continue;
-
-                        float dx = (x - robot_gx) * grid.grid_resolution;
-                        float dy = (y - robot_gy) * grid.grid_resolution;
-                        float d  = std::sqrt(dx*dx + dy*dy);
-
-                        if (d < best_dist)
-                        {
-                            best_dist = d;
-                            best_x = x;
-                            best_y = y;
-                        }
+                        if (is_frontier_cell(grid, x, y))
+                            all_frontiers.push_back({x, y});
                     }
                 }
 
-                if (best_x < 0)
+                if (all_frontiers.empty())
                 {
                     std::cout << "[GoalManager] No more frontiers → IDLE.\n";
                     current_state_ = STATE_IDLE;
@@ -164,12 +218,101 @@ MissionGoal GoalManager::update_goal(const Pose2D& current_pose,
                     return current_target_;
                 }
 
-                current_target_.target_pose.x = best_x * grid.grid_resolution;
-                current_target_.target_pose.y = best_y * grid.grid_resolution;
+                // ----------------------------------------------------
+                // 2. CLUSTERING des frontières (segments)
+                // ----------------------------------------------------
+                auto clusters = cluster_frontiers(grid, all_frontiers);
+
+                if (clusters.empty())
+                {
+                    std::cout << "[GoalManager] WARNING: clusters empty.\n";
+                    current_state_ = STATE_IDLE;
+                    return current_target_;
+                }
+
+                // ----------------------------------------------------
+                // 3. Sélection du segment le plus long
+                // ----------------------------------------------------
+                int best_idx = -1;
+                int best_len = -1;
+
+                for (int i = 0; i < clusters.size(); i++)
+                {
+                    if (clusters[i].size() > best_len)
+                    {
+                        best_len = clusters[i].size();
+                        best_idx = i;
+                    }
+                }
+
+                if (best_idx < 0 || best_idx >= clusters.size())
+                {
+                    std::cout << "[GoalManager] WARNING: best_idx invalid.\n";
+                    current_state_ = STATE_IDLE;
+                    return current_target_;
+                }
+
+                auto& best_cluster = clusters[best_idx];
+
+                if (best_cluster.empty())
+                {
+                    std::cout << "[GoalManager] WARNING: best cluster empty.\n";
+
+                    // fallback → chercher la frontière la plus proche
+                    float best_d = 1e9f;
+                    int bx = -1, by = -1;
+
+                    for (auto& f : all_frontiers)
+                    {
+                        float dx = (f.first - robot_gx) * grid.grid_resolution;
+                        float dy = (f.second - robot_gy) * grid.grid_resolution;
+                        float d2 = dx*dx + dy*dy;
+
+                        if (d2 < best_d)
+                        {
+                            best_d = d2;
+                            bx = f.first;
+                            by = f.second;
+                        }
+                    }
+
+                    if (bx >= 0)
+                    {
+                        current_target_.target_pose.x = bx * grid.grid_resolution;
+                        current_target_.target_pose.y = by * grid.grid_resolution;
+                        current_target_.target_pose.theta = 0;
+                        current_target_.type = MissionGoalType::EXPLORATION_NODE;
+                        return current_target_;
+                    }
+
+                    current_state_ = STATE_IDLE;
+                    return current_target_;
+                }
+
+                // ----------------------------------------------------
+                // 4. Calculer le CENTRE du segment
+                // ----------------------------------------------------
+                float sx = 0.f;
+                float sy = 0.f;
+
+                for (auto& c : best_cluster)
+                {
+                    sx += c.first;
+                    sy += c.second;
+                }
+
+                sx /= float(best_cluster.size());
+                sy /= float(best_cluster.size());
+
+                // ----------------------------------------------------
+                // 5. Conversion en coordonnées monde
+                // ----------------------------------------------------
+                current_target_.target_pose.x = sx * grid.grid_resolution;
+                current_target_.target_pose.y = sy * grid.grid_resolution;
                 current_target_.target_pose.theta = 0;
                 current_target_.type = MissionGoalType::EXPLORATION_NODE;
 
-                std::cout << "[GoalManager] New frontier chosen: ("
+                std::cout << "[GoalManager] New frontier segment center: ("
                           << current_target_.target_pose.x << ", "
                           << current_target_.target_pose.y << ")\n";
             }
@@ -200,3 +343,4 @@ MissionGoal GoalManager::update_goal(const Pose2D& current_pose,
         }
     }
 }
+
