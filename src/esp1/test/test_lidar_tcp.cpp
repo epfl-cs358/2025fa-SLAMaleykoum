@@ -13,68 +13,27 @@
      e.g. socat or netcat. See instructions below.
 */
 
-#include <WiFi.h>
 #include <WiFiClient.h>
 #include <WiFiServer.h>
 #include "test_common_esp1.h"
 
-const char* ssid = "LIDAR_AP";
-const char* password = "l1darpass";
-const uint16_t TCP_PORT = 9000;
-
-// TCP server and client
-WiFiServer tcpServer(TCP_PORT);
-WiFiClient tcpClient;
-
-// simple stats
-unsigned long lastPrint = 0;
-uint32_t bytesFromLidarToNet = 0;
-uint32_t bytesFromNetToLidar = 0;
-uint32_t tcpClientsAccepted = 0;
-
-LiDARScan pointBuffer;
-uint16_t pointBufferCount = 0;
-
 float lastAngleESP = 0.0;
 unsigned long lastSendTime = 0;
-
 bool scanComplete = false;
 
 void setup_test_lidar_tcp() {
-    Serial.begin(115200);
-    delay(500);
-    Serial.println();
-    Serial.println("=== ESP32 LIDAR Serial->TCP Bridge ===");
-
-    bool ret = lidar.start();
+    lidar.start();
     delay(1000);
-    if (ret) {
-        Serial.println("🟢 Rplidar C1 started correctly!\r\n");
-    } else {
-        Serial.println("🔴 Error starting Rplidar C1\r\n");
-    }
-
-    Serial.println("[LiDAR] STANDARD mode started.");
-    // Give the lidar some time
-    delay(100);
 
     // Start WiFi in AP mode
-    Serial.printf("Starting WiFi AP '%s' ...\n", ssid);
     WiFi.mode(WIFI_AP);
-    bool ok = WiFi.softAP(ssid, password);
-    if (!ok) {
-        Serial.println("Failed to start AP!");
-    } else {
-        IPAddress ip = WiFi.softAPIP();
-        Serial.print("AP started. IP: ");
-        Serial.println(ip);
-        Serial.printf("Connect your PC to %s (password: %s)\n", ssid, password);
-    }
-
+    WiFi.softAP(ssid, password);
+    delay(3000);
+    
     // Start TCP server
     tcpServer.begin();
     tcpServer.setNoDelay(true);
-    Serial.printf("TCP server started on port %u\n", TCP_PORT);
+    delay(1000);
 }
 
 void loop_test_lidar_tcp() {
@@ -84,66 +43,28 @@ void loop_test_lidar_tcp() {
         if (newClient) {
             tcpClient = newClient;
             tcpClient.setNoDelay(true);
-            Serial.printf("Client connected from %s\n",
-                            tcpClient.remoteIP().toString().c_str());
         }
     }
 
-    // read lidar data
-    uint16_t count = lidar.readMeasurePoints();   // fills DataBuffer[]
-
-    if (count > 0 && tcpClient && tcpClient.connected()) {
-        for (uint16_t i = 0; i < count; i++) {
-            rawScanDataPoint_t &p = lidar.DataBuffer[i];
-
-            // Distance in mm
-            uint16_t dist_mm = (((uint16_t)p.distance_high << 8) | p.distance_low) / 4;
-            if (dist_mm == 0) continue;
-
-            // Angle in degrees (Q6)
-            uint16_t angle_raw = ((uint16_t)p.angle_high << 7) | p.angle_low >> 1;
-            float angle_deg = angle_raw / 64.0f;
-
-            // Store in buffer
-            if (pointBufferCount < MAX_LIDAR_POINTS) {
-                pointBuffer.angles[pointBufferCount] = angle_deg;
-                pointBuffer.distances[pointBufferCount] = dist_mm;
-                pointBuffer.qualities[pointBufferCount] = p.quality >> 2;
-                pointBufferCount++;
-            }
-
-            // Detect full 360° sweep (angle wrapped)
-            if (angle_deg < lastAngleESP) {
-                scanComplete = true;
-            }
-            lastAngleESP = angle_deg;
-        }
-
-        pointBuffer.timestamp_ms = millis();
-    }
+    lidar.build_scan(&scan, scanComplete, lastAngleESP);
 
     // Send full scan only when scanComplete is true
-    if ((scanComplete || millis() - lastSendTime > 33) && pointBufferCount > 0) {
+    if ((scanComplete || millis() - lastSendTime > 50) && scan.count > 0) {
         scanComplete = false;
         lastSendTime = millis();
 
         if (tcpClient && tcpClient.connected()) {
             // Build packet once
             String packet;
-            packet.reserve(pointBufferCount * 12); // approximate size per point
+            packet.reserve(scan.count * 12); // approximate size per point
 
-            for (int i = 0; i < pointBufferCount; i++) {
-                packet += String(pointBuffer.angles[i], 2) + "," +
-                        String(pointBuffer.distances[i]) + "\n";
+            for (int i = 0; i < scan.count; i++) {
+                packet += String(scan.angles[i], 2) + "," +
+                        String(scan.distances[i]) + "\n";
             }
 
             tcpClient.write((uint8_t*)packet.c_str(), packet.length());
         }
-        pointBufferCount = 0;
-    }
-
-    // read but ignore incoming
-    if (tcpClient && tcpClient.connected() && tcpClient.available()) {
-        while (tcpClient.available()) tcpClient.read();
+        scan.count = 0;
     }
 }

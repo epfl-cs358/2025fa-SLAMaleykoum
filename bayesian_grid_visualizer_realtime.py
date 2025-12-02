@@ -8,7 +8,7 @@ import math
 # ============ Viewer Settings ============
 GRID_RESOLUTION = 0.05
 CELL_SIZE = 5
-WINDOW_W, WINDOW_H = 900, 900
+WINDOW_W, WINDOW_H = 800, 800
 
 zoom = 1.0
 offset_x = 0
@@ -142,12 +142,23 @@ while running:
 
     with lock:
         if grid_data is not None:
+            # scale map to fill full window while keeping aspect ratio
+            gx = grid_w * CELL_SIZE * zoom
+            gy = grid_h * CELL_SIZE * zoom
+
+            scale_factor = min(WINDOW_W / gx, WINDOW_H / gy)
+
+            new_w = int(gx * scale_factor)
+            new_h = int(gy * scale_factor)
+
             surf = grid_to_surface(grid_data)
-            surf = pygame.transform.scale(
-                surf,
-                (int(grid_w*CELL_SIZE*zoom), int(grid_h*CELL_SIZE*zoom))
-            )
-            window.blit(surf, (offset_x, offset_y))
+            surf = pygame.transform.scale(surf, (new_w, new_h))
+
+            # center on screen
+            pos_x = (WINDOW_W - new_w) // 2
+            pos_y = (WINDOW_H - new_h) // 2
+
+            window.blit(surf, (pos_x + offset_x, pos_y + offset_y))
             draw_robot(window, robot_pose)
 
     pygame.display.update()

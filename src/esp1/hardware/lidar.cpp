@@ -13,6 +13,8 @@
 #include "esp1/hardware/lidar.h"
 #include "Arduino.h"
 
+#define MIN(a,b) (((a)<(b))?(a):(b))
+
 rp_descriptor_t resp_descriptor[] = {{0xA5,0x5A,0x54,0x00,0x00,0x40,0x82},//Legacy Version
 								{0xA5,0x5A,0x84,0x00,0x00,0x40,0x84},//Extended Version
 								{0xA5,0x5A,0x54,0x00,0x00,0x40,0x85},//Dense Version
@@ -115,6 +117,34 @@ float Lidar::calcDistance(uint8_t _lowByte,uint8_t _highByte)
 	uint16_t distance=(_highByte)<<8;
 	distance|=_lowByte;
 	return distance/4.0;
+}
+
+void Lidar::build_scan(LiDARScan* scan, bool &scanComplete_, float& lastAngleESP_) {
+	scan->count = 0;
+
+    // read lidar data
+    uint16_t count = this->readMeasurePoints();
+
+    for (uint16_t i = 0; i < MIN(count, MAX_LIDAR_POINTS) && !scanComplete_; i++) {
+        rawScanDataPoint_t dataPoint = this->DataBuffer[i];
+
+        uint16_t dist_mm = this->calcDistance(dataPoint.distance_low, dataPoint.distance_high);
+        if (dist_mm <= 0) continue;
+        uint16_t angle_deg = this->calcAngle(dataPoint.angle_low, dataPoint.angle_high);
+        uint8_t quality = dataPoint.quality >> 2;
+
+        // Store in buffer
+        scan->angles[scan->count] = angle_deg;
+        scan->distances[scan->count] = dist_mm;
+        scan->qualities[scan->count] = quality;
+		scan->count++;
+
+        if (angle_deg < lastAngleESP_) {
+            scanComplete_ = true;
+        }
+        lastAngleESP_ = angle_deg;
+    }
+    scan->timestamp_ms = millis();
 }
 
 // DEBUG FUNCTIONS //

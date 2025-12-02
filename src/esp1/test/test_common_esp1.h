@@ -34,6 +34,9 @@ constexpr int LIDAR_ANGLE_OF_INTEREST_START = 0; // Start angle for LIDAR
 constexpr int LIDAR_ANGLE_OF_INTEREST_END = 360; // End angle for LIDAR
 constexpr int HEIGHT = 200; // Height of the map in pixels
 constexpr int WIDTH = 200; // Width of the map in pixels
+constexpr const char* ssid = "LIDAR_AP"; // WiFi SSID
+constexpr const char* password = "l1darpass"; // WiFi Password
+constexpr uint16_t TCP_PORT = 9000; // TCP Port for communication
 #define LIDAR_BAUDRATE 460800 // Common for RPLIDAR S2/A3/M1 (460800). Adjust if using A1/A2 (115200) or other models.
                                 // S1/S2/C1 (256000)
 #define LIDAR_SERIAL_BUFFER_SIZE 5000 // HardwareSerial TX buffer size for Lidar commands
@@ -48,6 +51,10 @@ extern HardwareSerial& LIDAR_SERIAL;
 extern HardwareSerial ESPS;
 extern Lidar lidar;
 extern Esp_link esp_link;
+extern WiFiServer tcpServer;
+extern WiFiClient tcpClient;
+extern LiDARScan scan;
+
 
 // Prototypes of the functions
 void setup_test_lidar_basic();              void loop_test_lidar_basic();

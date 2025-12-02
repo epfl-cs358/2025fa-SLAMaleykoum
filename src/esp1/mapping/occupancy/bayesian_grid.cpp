@@ -69,8 +69,8 @@ void BayesianOccupancyGrid::update_map(const LiDARScan& scan,
         
 
         // Compute world hit pos
-        float hit_x = pose.x + r * angle_lidar_cos;
-        float hit_y = pose.y + r * angle_lidar_sin;
+        float hit_x = pose.x + r * angle_lidar_sin;
+        float hit_y = pose.y + r * angle_lidar_cos;
 
 
         int x0 = (int)(pose.x / grid_resolution) + grid_size_x / 2;
