@@ -57,6 +57,7 @@ float posX = 0.0f;
 float posY = 0.0f;
 float yaw = 0.0f;
 float velocity = 0.0f;
+// Pose2D currentPose = {posX, posY, yaw, millis()};
 
 // Path data
 GlobalPathMessage receivedPath;

@@ -4,9 +4,6 @@
  * 
  * These variables are defined in src/esp2/global_state.cpp
  * and shared across all tasks.
- * 
- * Note: In production, access to shared state should be protected
- * with mutexes or atomic operations.
  */
 
 #pragma once
