@@ -152,7 +152,7 @@ int main()
     };
 
     const int   lidar_pts   = 20000;
-    const float lidar_range = 1.0f;
+    const float lidar_range = 4.0f;
 
     int iter = 0;
 
