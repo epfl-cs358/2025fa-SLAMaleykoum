@@ -27,6 +27,7 @@
 #include "esp1/mapping/occupancy/bayesian_grid.h"
 #include "esp_wifi.h"
 
+
 // Pins used by the hardware components on the esp 1
 constexpr int MAX_RANGE = 8000; // Maximum range for LIDAR in mm
 constexpr int LIDAR_TIMEOUT_MS = 5000; // Timeout for LIDAR read operations in milliseconds
@@ -56,6 +57,7 @@ extern WiFiClient tcpClient;
 extern LiDARScan scan;
 
 
+
 // Prototypes of the functions
 void setup_test_lidar_basic();              void loop_test_lidar_basic();
 void setup_test_connection();               void loop_test_connection();
@@ -71,3 +73,5 @@ void setup_bayesian_dynamic_tcp();          void loop_bayesian_dynamic_tcp();
 void setup_clock_esp1();                    void loop_clock_esp1();
 void setup_led_basic();                     void loop_led_basic();
 void setup_clock_esp1_AP();                 void loop_clock_esp1_AP();
+void setup_send_simple_path();              void loop_send_simple_path();
+void setup_send_dynamic_path();             void loop_send_dynamic_path();

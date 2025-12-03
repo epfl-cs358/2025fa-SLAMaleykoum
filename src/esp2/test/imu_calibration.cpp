@@ -556,7 +556,6 @@ static void handle_command(const String& line) {
 void setup_imu_calibration() {
   Serial.begin(115200);
   delay(1000);
-
   // connection.setupWifi();
 
   // connection.check_connection();

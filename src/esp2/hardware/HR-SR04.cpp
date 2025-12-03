@@ -6,7 +6,7 @@
  * @date Oct 2025
  */
 
-#include "UltraSonicSensor.h"
+#include "hardware/UltraSonicSensor.h"
 
 
 /**

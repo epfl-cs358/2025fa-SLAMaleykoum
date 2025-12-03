@@ -1,0 +1,21 @@
+#include "tasks/task_ultrasonic.h"
+#include "global_state.h"
+#include "config.h"
+#include "hardware/UltraSonicSensor.h"
+#include "hardware/MotorManager.h"
+
+void TaskUltrasonic(void *pvParameters) {
+    for (;;) {
+        if (!startSignalReceived) {
+            vTaskDelay(pdMS_TO_TICKS(100));
+            continue;
+        }
+        float dist = ultrasonic.readDistance();
+        if (dist > 0 && dist < Config::EMERGENCY_DISTANCE) {
+            motor.stop();
+            motor.update();
+            emergencyStop = true;
+        } 
+        vTaskDelay(pdMS_TO_TICKS(200));
+    }
+}

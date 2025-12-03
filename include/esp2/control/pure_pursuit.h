@@ -11,7 +11,7 @@
  */
 class PurePursuit {
 public:
-    PurePursuit(float wheelbase_m);
+    PurePursuit() = default;
 
     /**
      * @brief Updates the path to track.
@@ -44,22 +44,29 @@ private:
     const float L_ = 0.26;          // Vehicle wheelbase (m)
 
     // Configuration parameters
+    // Fixed parameters (while we don't have precise speed control)
+    float Ld_fixed_ = 0.7f;         // Fixed lookahead distance (m)
+    float fixed_speed_ = 0.20f;      // Fixed target speed (m/s)
+    float k_p = 1.0f;               // Proportional gain for steering calculation
+    // Parameters for adaptive lookahead and speed (currently unused)
     float K_dd_ = 0.5f;             // Gain for lookahead distance (Ld = K_dd_ * speed)
     float K_v_ = 0.5f;              // Speed gain. eg., K_v_ = 0.5 means at max steering angle, speed is halved. 
     float max_lookahead_dist_ = 3.0f;
-    float min_lookahead_dist_ = 0.5f;
-    // TODO: Check these speeds with @cléa
-    float max_speed_ = 0.5f;
-    float min_speed_ = 0.2f;
+    float min_lookahead_dist_ = 0.3f;
+    float max_speed_ = 0.30f;
+    float min_speed_ = 0.21f;
 
-    // TODO: change this ------------------------
-    float MIN_STEERING_ANGLE_RAD_ = 0.5;
-    float MAX_STEERING_ANGLE_RAD_ = 0.5;
+    // ±45 degrees in radians
+    float MIN_STEERING_ANGLE_RAD_ = -0.785398; // ~ -45 degrees
+    float MAX_STEERING_ANGLE_RAD_ = 0.785398;  // ~ +45 degrees
+
+    // Goal-reaching tolerance
+    float goal_tolerance_ = 0.1f; // 10 cm tolerance radius
 
     // Helper functions
+    bool is_path_complete(const Pose2D& current_pose) const;
+    float get_dist_sq(const Pose2D& pose, const Waypoint& wp) const;
     float calculate_lookahead_distance(float current_speed) const;
     float calculate_target_speed(float steering_angle) const;
-
-    // Returns the Waypoint struct of the chosen lookahead point
     Waypoint find_lookahead_point(const Pose2D& current_pose, float lookahead_dist); 
 };

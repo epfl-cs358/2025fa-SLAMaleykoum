@@ -3,7 +3,6 @@
  * @brief Test to make the motor run simply
  */
 #include "test_common_esp2.h"
-#include "EncoderCarVelocity.h"
 
 const char* mqtt_topic_connection_motor_runs = "slamaleykoum77/print";
 

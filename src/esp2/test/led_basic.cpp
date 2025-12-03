@@ -1,7 +1,6 @@
 #include "test_common_esp2.h"
- 
-// #define LED_PIN LED_BUILTIN
 
+// #define LED_PIN LED_BUILTIN
 void setup_led_basic() {
     pinMode(LED_PIN, OUTPUT);
     delay(1000);
