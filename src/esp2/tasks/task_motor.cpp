@@ -6,11 +6,7 @@
 
 void TaskMotor(void *pvParameters) {
     for (;;) {
-        if (!startSignalReceived) {
-            motor.stop();
-            servo_dir.setAngle(90);
-        } 
-        else if (emergencyStop || finishedPath) {
+        if (emergencyStop || finishedPath || !startSignalReceived) {
             motor.stop();
             servo_dir.setAngle(90);
         } else {

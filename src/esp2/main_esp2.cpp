@@ -2,25 +2,25 @@
 #include <WiFi.h>
 
 // 1. Configuration & Global State
-#include "esp2/config.h"
-#include "esp2/global_state.h"
+#include "config.h"
+#include "global_state.h"
 
 // 2. Hardware Interfaces (Required for .begin() calls)
 #include "hardware/I2C_wire.h"
 #include "hardware/I2C_mutex.h"
 #include "hardware/MotorManager.h"
-#include "hardware/DMS15.h"           // For servo_dir
+#include "hardware/DMS15.h"
 #include "hardware/UltraSonicSensor.h"
 #include "hardware/ImuSensor.h"
 #include "hardware/EncoderCarVelocity.h"
 #include "common/esp_link.h"
 
 // 3. Task Definitions (Required for xTaskCreate)
-#include "esp2/tasks/task_motor.h"
-#include "esp2/tasks/task_ultrasonic.h"
-#include "esp2/tasks/task_odometry.h"
-#include "esp2/tasks/task_pure_pursuit.h"
-#include "esp2/tasks/task_receive_path.h"
+#include "tasks/task_motor.h"
+#include "tasks/task_ultrasonic.h"
+#include "tasks/task_odometry.h"
+#include "tasks/task_pure_pursuit.h"
+#include "tasks/task_receive_path.h"
 
 // Task Handles
 TaskHandle_t motorTask, ultrasonicTask, pursuitTask, odomTask, receiveTask;
@@ -28,17 +28,6 @@ TaskHandle_t motorTask, ultrasonicTask, pursuitTask, odomTask, receiveTask;
 void setup() {
     Serial.begin(115200);
     delay(2000);
-
-    // --- WiFi Init ---
-    Serial.printf("Starting WiFi AP '%s' ...\n", Config::WIFI_SSID);
-    WiFi.mode(WIFI_AP);
-    if (!WiFi.softAP(Config::WIFI_SSID, Config::WIFI_PASSWORD)) {
-        Serial.println("Failed to start AP!");
-    } else {
-        Serial.println(WiFi.softAPIP());
-    }
-    tcpServer.begin();
-    tcpServer.setNoDelay(true);
 
     // --- Hardware Init ---
     I2C_wire.begin(Config::SDA_PIN, Config::SCL_PIN);
@@ -73,4 +62,5 @@ void setup() {
 
 void loop() { 
     // Main loop is empty because all operations are handled in FreeRTOS tasks
+    // Once the taks are created in setup(), they run independently
 }
