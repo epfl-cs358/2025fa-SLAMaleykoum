@@ -35,11 +35,6 @@ public:
      */
     bool is_path_complete() const;
 
-    // === FOR DEBUGGING PURPOSES ONLY ===
-    Waypoint get_lookahead_point() const { return last_lookahead_point_; }
-    float get_kp() const { return k_p; }
-    float get_ld() const { return Ld_fixed_; }
-
 private:
     // Internal path storage (fixed size, same as in GlobalPathMessage)
     Waypoint current_path_[MAX_PATH_LENGTH];
@@ -58,7 +53,6 @@ private:
     float K_v_ = 0.5f;              // Speed gain. eg., K_v_ = 0.5 means at max steering angle, speed is halved. 
     float max_lookahead_dist_ = 3.0f;
     float min_lookahead_dist_ = 0.3f;
-    // TODO: Check these speeds with @cléa
     float max_speed_ = 0.30f;
     float min_speed_ = 0.21f;
 
@@ -75,7 +69,4 @@ private:
     float calculate_lookahead_distance(float current_speed) const;
     float calculate_target_speed(float steering_angle) const;
     Waypoint find_lookahead_point(const Pose2D& current_pose, float lookahead_dist); 
-
-    // ==== For debugging purposes only ===
-    Waypoint last_lookahead_point_;
 };
