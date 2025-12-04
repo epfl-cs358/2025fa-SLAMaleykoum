@@ -13,25 +13,22 @@
      e.g. socat or netcat. See instructions below.
 */
 
-#include <WiFiClient.h>
-#include <WiFiServer.h>
 #include "test_common_esp1.h"
 
 float lastAngleESP_ = 0.0;
-unsigned long lastSendTime_ = 0;
-bool scanComplete_ = false;
 
 Pose2D last_known_pose_ = {0.0f, 0.0f, 0.0f, 0};
 
-BayesianOccupancyGrid TheMap_(0.05f, 150, 150);
+BayesianOccupancyGrid TheMap_(0.02f, 150, 150);
 
 void setup_bayesian_dynamic_tcp() {
     lidar.start();
     delay(1000);
 
-    // Start WiFi in AP mode
-    WiFi.mode(WIFI_AP);
-    WiFi.softAP(ssid, password);
+    // Connect to Wifi in STA mode
+    WiFi.mode(WIFI_STA);
+    WiFi.setHostname("esp32-lidar-slamaleykoum");
+    WiFi.begin(ssid, password);
     delay(3000);
     
     // Start TCP server
@@ -50,10 +47,10 @@ void loop_bayesian_dynamic_tcp() {
         }
     }
 
-    lidar.build_scan(&scan, scanComplete_, lastAngleESP_);
+    lidar.build_scan(&scan, scanComplete, lastAngleESP_);
 
-    if ((scanComplete_ || millis() - lastSendTime_ > 100) && scan.count > 0) {
-        scanComplete_ = false;
+    if ((scanComplete || millis() - lastSendTime > 100) && scan.count > 0) {
+        scanComplete = false;
 
         // Update Bayesian map
         TheMap_.update_map(scan,
@@ -92,6 +89,6 @@ void loop_bayesian_dynamic_tcp() {
             tcpClient.write(map, map_size);
         }
 
-        lastSendTime_ = millis();
+        lastSendTime = millis();
     }
 }

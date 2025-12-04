@@ -3,37 +3,52 @@
   - RX pin = 5
   - TX pin = 4
   - Baudrate = 460800
-  - WiFi AP mode
+  - WiFi STA mode
   - TCP port: 9000
 
   Usage:
    - Flash on ESP32
-   - Connect PC to WiFi SSID "LIDAR_AP" / password "l1darpass"
-   - On PC, connect a TCP client to ESP IP (default 192.168.4.1) port 9000
-     e.g. socat or netcat. See instructions below.
+   - Connect PC to SPOT-iot WiFi
+    - On PC, connect a TCP client to ESP IP port 9000
+      e.g. socat or netcat. See instructions below.
 */
 
-#include <WiFiClient.h>
-#include <WiFiServer.h>
 #include "test_common_esp1.h"
 
 float lastAngleESP = 0.0;
-unsigned long lastSendTime = 0;
-bool scanComplete = false;
 
 void setup_test_lidar_tcp() {
+    Serial.begin(115200);
+
     lidar.start();
     delay(1000);
 
-    // Start WiFi in AP mode
-    WiFi.mode(WIFI_AP);
-    WiFi.softAP(ssid, password);
-    delay(3000);
+    // Connect to Wifi in STA mode
+    WiFi.mode(WIFI_STA);
+    WiFi.setHostname("esp32-lidar-slamaleykoum");
+    WiFi.begin(ssid, password);
+    Serial.print("Connexion WiFi...");
+
+    unsigned long startAttempt = millis();
+    while (WiFi.status() != WL_CONNECTED && millis() - startAttempt < 8000) {
+        Serial.print(".");
+        delay(300);
+    }
+
+    if (WiFi.status() != WL_CONNECTED) {
+        Serial.println("\n❌ WiFi failed. Restarting...");
+        ESP.restart();
+    }
+
+    Serial.println("\n✔ WiFi connected!");
+    Serial.println(WiFi.localIP());
     
     // Start TCP server
     tcpServer.begin();
     tcpServer.setNoDelay(true);
     delay(1000);
+
+    Serial.println(WiFi.localIP());
 }
 
 void loop_test_lidar_tcp() {
@@ -49,7 +64,7 @@ void loop_test_lidar_tcp() {
     lidar.build_scan(&scan, scanComplete, lastAngleESP);
 
     // Send full scan only when scanComplete is true
-    if ((scanComplete || millis() - lastSendTime > 50) && scan.count > 0) {
+    if ((scanComplete || millis() - lastSendTime > 33) && scan.count > 0) {
         scanComplete = false;
         lastSendTime = millis();
 

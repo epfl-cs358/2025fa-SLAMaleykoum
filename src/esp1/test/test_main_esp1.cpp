@@ -55,6 +55,12 @@ void setup() {
         setup_led_basic();
     #elif TEST_ID == 14
         setup_clock_esp1_AP();
+    #elif TEST_ID == 15
+        setup_mission_planner_basic();
+    #elif TEST_ID == 16
+        setup_test_lidar_udp();
+    #elif TEST_ID == 17
+        setup_test_bayesian_udp();
     #endif
 }
 
@@ -87,5 +93,11 @@ void loop() {
         loop_led_basic();
     #elif TEST_ID == 14
         loop_clock_esp1_AP();
+    #elif TEST_ID == 15
+        loop_mission_planner_basic();
+    #elif TEST_ID == 16
+        loop_test_lidar_udp();
+    #elif TEST_ID == 17
+        loop_test_bayesian_udp();
     #endif
 }

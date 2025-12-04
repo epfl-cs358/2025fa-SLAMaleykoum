@@ -21,3 +21,5 @@ Connection connection("esp1");
 WiFiServer tcpServer(TCP_PORT);
 WiFiClient tcpClient;
 LiDARScan scan;
+bool scanComplete = false;
+uint16_t lastSendTime = 0;

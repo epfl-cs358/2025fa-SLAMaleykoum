@@ -1,21 +1,18 @@
 #!/usr/bin/env python3
 # INSTALL pygame
-# BEFORE RUNNING THIS FILE, CONNECT TO THE WIFI CREATED BY THE ESP:
-# NAME : LIDAR_AP
-# PASSWORD : l1darpass
+# BEFORE RUNNING THIS FILE, CONNECT TO THE WIFI (SPOT-iot)
+# The ESP32 will broadcast UDP packets on port 9000
 
 import socket
 import math
 import time
 import pygame
 
-HOST = "172.21.72.29"
-PORT = 9000      # must match your C++ HOST/PORT
-
+UDP_PORT = 9000
 SCREEN_SIZE = 700
 
 
-class TCPViewer:
+class UDPViewer:
     def __init__(self, screen_size=700, draw_rays_default=True):
         # viewer state
         self.screenSize = screen_size
@@ -52,15 +49,18 @@ class TCPViewer:
 
         # scan state
         self.new_points = []
+        self.current_scan = []  # Accumulate points for current scan
         self.zeroPts = 0
         self.rotationRate = 0.0
         self.scanCount = 0
         self.totalNumPts = 0
         self.startTime = 0
+        self.last_angle = None
+        self.last_scan_time = time.time()
 
     def init_pygame(self):
         pygame.init()
-        pygame.display.set_caption("TCP LIDAR Viewer")
+        pygame.display.set_caption("UDP LIDAR Viewer")
         self.myfont = pygame.font.SysFont("Arial", 13)
         self.screen = pygame.display.set_mode([self.screenSize, self.screenSize])
         self.screen.fill(self.bgColour)
@@ -80,10 +80,6 @@ class TCPViewer:
 
         # compute pixels per meter
         px_per_m = self.drawScale
-
-        # draw vertical and horizontal lines around center
-        for sign in (-1, 1):
-            pass  # no-op to remove unused-lambda warnings
 
         # Determine how many meters fit on screen
         max_m = int(self.screenSize / px_per_m) + 5
@@ -122,12 +118,7 @@ class TCPViewer:
             if self.drawRays:
                 pygame.draw.line(self.screen, self.rayColour, (X, Y), (self.centerX, self.centerY))
             pygame.draw.rect(self.screen, self.pointColour, rect, 0)
-        # update the screen
-        pygame.display.update()
 
-        # clear only the *new* points, not the accumulated map
-        self.new_points = []
-        self.zeroPts = 0
         # text overlay (rotation, counts, etc.)
         def put_text(label, value, row):
             ts = self.myfont.render(label, False, self.textColour)
@@ -208,7 +199,6 @@ class TCPViewer:
         pygame.display.update()
 
         # reset scan-specific counters
-        self.new_points = []
         self.zeroPts = 0
 
     def handle_input(self, stopper):
@@ -321,76 +311,95 @@ class TCPViewer:
 
         return funcStopper
 
-    def run_as_tcp_client(self, host, port):
+    def run_as_udp_receiver(self, port):
         self.init_pygame()
 
-        # TCP client
-        cli = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        print(f"Connecting to {host}:{port} ...")
-        cli.connect((host, port))
-        print("Connected!")
+        # UDP socket
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.bind(('', port))
+        sock.setblocking(False)  # Non-blocking mode for pygame event loop
+        
+        print(f"Listening for UDP packets on port {port}...")
 
-        f = cli.makefile("r")
         stopper = False
+        points_received = 0
 
-        last_angle = None
-        last_scan_time = time.time()
         try:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    stopper = self.handle_input(stopper)
-                    if stopper:
-                        break
-                    continue
-
-                # angle,distance_mm
-                try:
-                    angle_str, dist_str = line.split(",")
-                    angle_deg = float(angle_str)
-                    dist_mm = float(dist_str)
-                except ValueError:
-                    continue
-
-                # end-of-scan detection: angle wrapped around
-                if last_angle is not None and angle_deg < last_angle:
-                    now = time.time()
-                    dt = now - last_scan_time
-                    if dt > 0:
-                        self.rotationRate = 1.0 / dt
-                    if self.rotationRate > 500.0:
-                        continue
-                    last_scan_time = now
-                    self.scanCount += 1
-                    self.drawPoints()
-
-                last_angle = angle_deg
-
-                if dist_mm > 0:
-                    dist_m = dist_mm / 1000.0
-                    theta = math.radians(angle_deg)
-                    deg90 = math.pi / 2.0
-
-                    Xv = math.cos(theta - (self.aziCorr * math.pi / 180.0)) * dist_m
-                    Yv = math.sin(theta - (self.aziCorr * math.pi / 180.0)) * dist_m
-
-                    self.new_points.append([Xv, Yv])
-                    self.totalNumPts += 1
-                else:
-                    self.zeroPts += 1
-
+            while not stopper:
+                # Handle pygame events
                 stopper = self.handle_input(stopper)
-                if stopper:
-                    break
+                
+                # Try to receive UDP data
+                try:
+                    data, addr = sock.recvfrom(2048)  # Larger buffer for batched packets
+                    lines = data.decode().strip().split('\n')
+                    
+                    for line in lines:
+                        if not line:
+                            continue
+                        try:
+                            angle_str, dist_str = line.split(',')
+                            angle = float(angle_str)
+                            distance = float(dist_str)
+                            
+                            # Convert polar to Cartesian (distance in mm, convert to meters)
+                            distance_m = distance / 1000.0
+                            
+                            # Apply azimuth correction
+                            angle_rad = math.radians(angle + self.aziCorr)
+                            
+                            # Convert to x, y coordinates
+                            x = distance_m * math.sin(angle_rad)
+                            y = distance_m * math.cos(angle_rad)
+                            
+                            # Add to current scan
+                            self.current_scan.append((x, y))
+                            points_received += 1
+                            
+                            # Detect scan completion (angle wraps around)
+                            if self.last_angle is not None:
+                                if angle < self.last_angle - 180:  # Wrapped around 0°
+                                    # Complete scan received
+                                    current_time = time.time()
+                                    scan_duration = current_time - self.last_scan_time
+                                    
+                                    if scan_duration > 0:
+                                        self.rotationRate = 1.0 / scan_duration
+                                    
+                                    # Update display data
+                                    self.new_points = self.current_scan.copy()
+                                    self.totalNumPts += len(self.current_scan)
+                                    self.scanCount += 1
+                                    
+                                    # Draw the completed scan
+                                    self.drawPoints()
+                                    
+                                    # Reset for next scan
+                                    self.current_scan = []
+                                    self.last_scan_time = current_time
+                                    
+                                    print(f"Scan #{self.scanCount}: {len(self.new_points)} points, {self.rotationRate:.1f} Hz")
+                            
+                            self.last_angle = angle
+                            
+                        except ValueError as e:
+                            print(f"Parse error: {e} - Line: {line}")
+                            pass
+
+                except socket.error:
+                    # No data available, just continue
+                    pass
+
+                # Small delay to prevent busy waiting
+                pygame.time.wait(1)
 
         finally:
-            cli.close()
+            sock.close()
             pygame.quit()
+            print(f"\nTotal points received: {points_received}")
 
 
 if __name__ == "__main__":
-    viewer = TCPViewer(SCREEN_SIZE, draw_rays_default=True)
-    # Replace with ESP32 AP IP and port
-    ESP32_IP = "172.21.72.29"
-    ESP32_PORT = 9000
-    viewer.run_as_tcp_client(ESP32_IP, ESP32_PORT)
+    viewer = UDPViewer(SCREEN_SIZE, draw_rays_default=True)
+    viewer.run_as_udp_receiver(UDP_PORT)

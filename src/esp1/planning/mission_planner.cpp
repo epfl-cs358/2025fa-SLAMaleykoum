@@ -141,8 +141,12 @@ cluster_frontiers(const BayesianOccupancyGrid& grid,
 
         while (!q.empty())
         {
-            auto [x,y] = q.front(); q.pop();
-            cluster.push_back({x,y});
+            std::pair<int,int> p = q.front();
+            q.pop();
+
+            int x = p.first;
+            int y = p.second;
+            cluster.push_back(std::make_pair(x,y));
 
             for (int i = 0; i < 8; i++)
             {

@@ -20,12 +20,15 @@
 #pragma once
 #include <Arduino.h>
 #include <WiFi.h>
+#include <WiFiClient.h>
+#include <WiFiServer.h>
 #include <PubSubClient.h>
 #include "common/wifi_connection.h"
 #include "esp1/hardware/lidar.h"
 #include "../../include/common/esp_link.h"
 #include "esp1/mapping/occupancy/bayesian_grid.h"
 #include "esp_wifi.h"
+#include "../../include/esp1/planning/mission_planner.h"
 
 // Pins used by the hardware components on the esp 1
 constexpr int MAX_RANGE = 8000; // Maximum range for LIDAR in mm
@@ -34,8 +37,8 @@ constexpr int LIDAR_ANGLE_OF_INTEREST_START = 0; // Start angle for LIDAR
 constexpr int LIDAR_ANGLE_OF_INTEREST_END = 360; // End angle for LIDAR
 constexpr int HEIGHT = 200; // Height of the map in pixels
 constexpr int WIDTH = 200; // Width of the map in pixels
-constexpr const char* ssid = "LIDAR_AP"; // WiFi SSID
-constexpr const char* password = "l1darpass"; // WiFi Password
+constexpr const char* ssid = "SPOT-iot"; // WiFi SSID
+constexpr const char* password = "KyrielleCivetTicketNombreuse6695"; // WiFi Password
 constexpr uint16_t TCP_PORT = 9000; // TCP Port for communication
 #define LIDAR_BAUDRATE 460800 // Common for RPLIDAR S2/A3/M1 (460800). Adjust if using A1/A2 (115200) or other models.
                                 // S1/S2/C1 (256000)
@@ -54,6 +57,8 @@ extern Esp_link esp_link;
 extern WiFiServer tcpServer;
 extern WiFiClient tcpClient;
 extern LiDARScan scan;
+extern bool scanComplete;
+extern uint16_t lastSendTime;
 
 
 // Prototypes of the functions
@@ -71,3 +76,6 @@ void setup_bayesian_dynamic_tcp();          void loop_bayesian_dynamic_tcp();
 void setup_clock_esp1();                    void loop_clock_esp1();
 void setup_led_basic();                     void loop_led_basic();
 void setup_clock_esp1_AP();                 void loop_clock_esp1_AP();
+void setup_mission_planner_basic();         void loop_mission_planner_basic(); 
+void setup_test_lidar_udp();                void loop_test_lidar_udp();
+void setup_test_bayesian_udp();             void loop_test_bayesian_udp();
