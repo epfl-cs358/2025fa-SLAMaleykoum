@@ -22,8 +22,7 @@ private:
     Adafruit_BNO08x bno086; // handles all the communication with the sensor (I2C addr, SH2 protocol..)
     sh2_SensorValue_t sensorValue; // temp structure to keep the current mesure
     const uint8_t IMU_ADDR = 0x4B;
-    int _sdaPin;
-    int _sclPin;
+  
 
     /**
      * @brief Enable desired BNO08x reports at a given period.
@@ -38,7 +37,7 @@ public:
      * @brief Construct an ImuSensor object
      * Calls the constructor of bno086 and nitializes the sensorValue and all the data components to 0
      */
-    ImuSensor(int sdaPin, int sclPin);
+    ImuSensor();
 
     /**
      * @brief Initialize I2C and the BNO08x, then enable sensor reports.

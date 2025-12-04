@@ -23,7 +23,7 @@
 
 // Change the id depending on the test to run
 #ifndef TEST_ID
-#define TEST_ID 11
+#define TEST_ID 16
 #endif
 
 void setup() {
@@ -61,6 +61,10 @@ void setup() {
         setup_test_lidar_udp();
     #elif TEST_ID == 17
         setup_test_bayesian_udp();
+    #elif TEST_ID == 18
+        setup_send_simple_path();
+    #elif TEST_ID == 19
+        setup_send_dynamic_path();
     #endif
 }
 
@@ -99,5 +103,9 @@ void loop() {
         loop_test_lidar_udp();
     #elif TEST_ID == 17
         loop_test_bayesian_udp();
+    #elif TEST_ID == 18
+        loop_send_simple_path();
+    #elif TEST_ID == 19
+        loop_send_dynamic_path();
     #endif
 }

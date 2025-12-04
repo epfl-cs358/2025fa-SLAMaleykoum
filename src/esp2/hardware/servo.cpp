@@ -13,7 +13,7 @@
  */
 
 
-#include "DMS15.h"
+#include "hardware/DMS15.h"
 #include <Arduino.h>
 
 // Servo constructor => create an instance of the DMS15 servo class

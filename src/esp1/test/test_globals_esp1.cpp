@@ -15,6 +15,8 @@
 #include "test_common_esp1.h"
 
 HardwareSerial ESPS(1);
+Connection connection("esp1");
+
 HardwareSerial& LIDAR_SERIAL = Serial2;
 Lidar lidar(LIDAR_SERIAL);
 Connection connection("esp1");

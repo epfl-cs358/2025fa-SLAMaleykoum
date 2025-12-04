@@ -6,7 +6,7 @@
  * @date Oct 2025
  */
 
-#include "MotorController.h"
+#include "hardware/MotorController.h"
 
 /**
  * @brief Construct a new MotorController object

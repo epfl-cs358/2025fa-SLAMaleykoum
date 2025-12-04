@@ -1,56 +1,66 @@
-/**
- * @file main_esp2.cpp
- * @brief Main control program for the SLAMaleykoum autonomous car.
- *
- * This file contains the primary firmware logic executed on the ESP32-S3 board.  
- * It integrates all hardware modules — motor, servo, ultrasonic sensor, IMU, and encoder — 
- * as well as the Wi-Fi and MQTT connection system.  
- * The current implementation serves as a comprehensive integration test, 
- * which will later evolve into the final autonomous driving program.
- *
- * @note
- * This version is primarily designed for validation and debugging.  
- * The final release will include autonomous navigation logic, data fusion, 
- * and closed-loop control algorithms.
- *
- * @author SLAMaleykoum
- * @date October 2025
- */
 #include <Arduino.h>
 #include <WiFi.h>
-#include <PubSubClient.h>
-#include "common/wifi_connection.h"
 
-Connection connection;
+// 1. Configuration & Global State
+#include "config.h"
+#include "global_state.h"
 
-const char* mqtt_topic_esp2esp1 = "slamaleykoum77/esps";
+// 2. Hardware Interfaces (Required for .begin() calls)
+#include "hardware/I2C_wire.h"
+#include "hardware/I2C_mutex.h"
+#include "hardware/MotorManager.h"
+#include "hardware/DMS15.h"
+#include "hardware/UltraSonicSensor.h"
+#include "hardware/ImuSensor.h"
+#include "hardware/EncoderCarVelocity.h"
+#include "common/esp_link.h"
 
-void mqtt_print(const char* str) {
-    char msg[80];
-    snprintf(msg, sizeof(msg), str);
-    connection.publish(mqtt_topic_esp2esp1, msg);
-}
+// 3. Task Definitions (Required for xTaskCreate)
+#include "tasks/task_motor.h"
+#include "tasks/task_ultrasonic.h"
+#include "tasks/task_odometry.h"
+#include "tasks/task_pure_pursuit.h"
+#include "tasks/task_receive_path.h"
+
+// Task Handles
+TaskHandle_t motorTask, ultrasonicTask, pursuitTask, odomTask, receiveTask;
 
 void setup() {
-    connection.setupWifi();
-    connection.check_connection();
+    Serial.begin(115200);
+    delay(2000);
 
-    mqtt_print("[ESP2] Setup ok");
+    // --- Hardware Init ---
+    I2C_wire.begin(Config::SDA_PIN, Config::SCL_PIN);
+    i2cMutexInit();
+    esp_link.begin();
 
-    Serial1.begin(2000000, SERIAL_8N1, 13, 12); // RX=13, TX=12
-    delay(1000);
+    if (!servo_dir.begin()) { Serial.println("Servo init failed!"); while (true); }
+    else { Serial.println("Servo initialized"); }
+    servo_dir.setAngle(90);
+    
+    if (!ultrasonic.begin()) { Serial.println("WARNING: US init failed"); } 
+    else { Serial.println("Ultra Sonic initialized"); }
+    
+    if (!imu.begin()) { Serial.println("IMU init failed!"); vTaskDelete(NULL); return; }
+    else { Serial.println("IMU initialized"); }
+    
+    if (!encoder.begin()) { Serial.println("Encoder init failed!"); while (true); }
+    else { Serial.println("Encoder initialized"); }
+    
+    if (!motor.begin()) { Serial.println("Motor init failed!"); while (true); }
+    else { Serial.println("Motor initialized"); }
 
-    mqtt_print("ESP2 ready");
+    Serial.println("---- Initialization complete. ----");
+
+    // --- FreeRTOS Tasks Creation ---
+    xTaskCreatePinnedToCore(TaskReceivePath,            "RX_Path",      4096, NULL, 3, &receiveTask,    0);
+    xTaskCreatePinnedToCore(TaskOdometryUnified_Stable, "Odom",         8192, NULL, 3, &odomTask,       0);
+    xTaskCreatePinnedToCore(TaskMotor,                  "Motor",        4096, NULL, 2, &motorTask,      1); 
+    xTaskCreatePinnedToCore(TaskUltrasonic,             "Ultrasonic",   4096, NULL, 2, &ultrasonicTask, 1); 
+    xTaskCreatePinnedToCore(TaskPurePursuit,            "PurePursuit",  4096, NULL, 1, &pursuitTask,    1); 
 }
 
-void loop() {
-    if (Serial1.available()) {
-        String msg = Serial1.readStringUntil('\n');
-        mqtt_print("[ESP2] got: ");
-        mqtt_print(msg.c_str());
-
-        Serial1.println("PONG from ESP2");
-    }
-
-    delay(1000);
+void loop() { 
+    // Main loop is empty because all operations are handled in FreeRTOS tasks
+    // Once the taks are created in setup(), they run independently
 }
