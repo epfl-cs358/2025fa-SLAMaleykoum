@@ -34,8 +34,8 @@ SemaphoreHandle_t Bayesian_Grid_Mutex;
 SemaphoreHandle_t Pose_Mutex; // <--- NEW: Protects 'last_known_pose'
 
 // --- GLOBAL OBJECTS ---
-const int grid_size_x = 200;
-const int grid_size_y = 200;
+const int grid_size_x = 80;
+const int grid_size_y = 80;
 const float resolution = 0.05f;
 
 BayesianOccupancyGrid* TheMap = nullptr;
@@ -169,7 +169,7 @@ void Bayesian_Grid_Task(void* parameter) {
             if (xSemaphoreTake(Bayesian_Grid_Mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
                 
                 // Update map logic
-                TheMap->update_map(synced_data.scan, synced_data.pose, 8.0f); 
+                TheMap->update_map(synced_data, 8.0f); 
 
                 // Send to PC
                 if (tcpClient && tcpClient.connected()) {
