@@ -38,12 +38,12 @@ const float EMERGENCY_DISTANCE = 0.25f;
 const float GOAL_TOLERANCE = 0.05f;  // 5 cm
 
 // --- FreeRTOS handles ---
-TaskHandle_t motorTask, ultrasonicTask, imuTask, poseTask, pursuitTask;
+TaskHandle_t motorTestTask, ultrasonicTestTask, imuTestTask, poseTestTask, pursuitTestTask;
 
 // ===============================================================
 // TASK: Motor Control
 // ===============================================================
-void TaskMotor(void *pvParameters) {
+void TaskTestMotor(void *pvParameters) {
     
     for (;;) {
         if (emergency_Stop || finished_Path) {
@@ -61,7 +61,7 @@ void TaskMotor(void *pvParameters) {
 // ===============================================================
 // TASK: Ultrasonic Emergency Stop
 // ===============================================================
-void TaskUltrasonic(void *pvParameters) {
+void TaskTestUltrasonic(void *pvParameters) {
     
     for (;;) {
         float dist = ultrasonic.readDistance();
@@ -106,7 +106,7 @@ float getYawIMU(const IMUData& imu_data) {
 
 
 
-void TaskIMU(void *pvParameters) {
+void TaskTestIMU(void *pvParameters) {
    
     for (;;) {
         i2c_lock();
@@ -139,7 +139,7 @@ void TaskIMU(void *pvParameters) {
 
 
 //Task for encodervelocity
-void TaskEncoder(void *pvParameters) {
+void TaskTestEncoder(void *pvParameters) {
     
     for (;;) {
         i2c_lock();
@@ -182,7 +182,7 @@ void TaskOdometry(void *pvParameters)
 // ===============================================================
 // TASK: Pose Estimation (dead reckoning)
 // ===============================================================
-void TaskPose(void *pvParameters) {
+void TaskTestPose(void *pvParameters) {
     float prevTime = millis();
     static uint32_t lastPublishTime = 0;
 
@@ -232,7 +232,7 @@ void TaskPose(void *pvParameters) {
 // ===============================================================
 // TASK: Pure Pursuit Controller
 // ===============================================================
-void TaskPurePursuit(void *pvParameters) {
+void TaskTestPurePursuit(void *pvParameters) {
     // Prepare path
     GlobalPathMessage msg;
     msg.current_length = path_Size;
@@ -398,16 +398,16 @@ void setup_test_freertos_path_follow() {
 
     
     //Core 0 from high to low priority : I2C
-    xTaskCreatePinnedToCore(TaskIMU,          "IMU",          4096, NULL, 3,  &imuTask,        0); //core 0
-    xTaskCreatePinnedToCore(TaskEncoder,      "Encoder",      4096, NULL, 2,  NULL,            0); //core 0 
+    xTaskCreatePinnedToCore(TaskTestIMU,          "IMU",          4096, NULL, 3,  &imuTestTask,        0); //core 0
+    xTaskCreatePinnedToCore(TaskTestEncoder,      "Encoder",      4096, NULL, 2,  NULL,            0); //core 0 
     //encoder might not need high priority if we consider speed is constant most of the time
 
 
     //xTaskCreatePinnedToCore(TaskOdometry,    "Odometry",    4096, NULL, 3, NULL,         0); // core 0
-    xTaskCreatePinnedToCore(TaskMotor,       "Motor",       4096, NULL, 2, &motorTask,   1); // core 1
-    xTaskCreatePinnedToCore(TaskUltrasonic,  "Ultrasonic",  4096, NULL, 2, &ultrasonicTask,1); // core 1
-    xTaskCreatePinnedToCore(TaskPose,        "Pose",        4096, NULL, 2, &poseTask,    1); // core 1
-    xTaskCreatePinnedToCore(TaskPurePursuit, "PurePursuit", 4096, NULL, 1, &pursuitTask, 1); // core 1
+    xTaskCreatePinnedToCore(TaskTestMotor,       "Motor",       4096, NULL, 2, &motorTestTask,   1); // core 1
+    xTaskCreatePinnedToCore(TaskTestUltrasonic,  "Ultrasonic",  4096, NULL, 2, &ultrasonicTestTask,1); // core 1
+    xTaskCreatePinnedToCore(TaskTestPose,        "Pose",        4096, NULL, 2, &poseTestTask,    1); // core 1
+    xTaskCreatePinnedToCore(TaskTestPurePursuit, "PurePursuit", 4096, NULL, 1, &pursuitTestTask, 1); // core 1
 
 
 }
