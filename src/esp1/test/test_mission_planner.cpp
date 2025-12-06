@@ -1,3 +1,5 @@
+
+#ifndef ARDUINO
 #include <SFML/Graphics.hpp>
 #include <SFML/Window.hpp>
 #include <SFML/System.hpp>
@@ -221,7 +223,7 @@ int main()
     robot_pose.theta = 0;
 
     GoalManager manager(robot_pose);
-    manager.set_mission_state(GoalManager::STATE_EXPLORING);
+    manager.set_mission_state(EXPLORATION_NODE);
 
     // ============================
     //   SFML 3.0 WINDOW
@@ -255,7 +257,7 @@ int main()
         // =============================
         MissionGoal goal = manager.update_goal(robot_pose, grid);
 
-        if (manager.get_current_state() == GoalManager::STATE_EXPLORING)
+        if (manager.get_current_state() == EXPLORATION_NODE)
             move_robot_towards(robot_pose, goal.target_pose);
 
         // =============================
@@ -303,7 +305,7 @@ int main()
         // =============================
         //         DRAW GOAL (RED)
         // =============================
-        if (manager.get_current_state() == GoalManager::STATE_EXPLORING)
+        if (manager.get_current_state() == EXPLORATION_NODE)
         {
             int gx, gy;
             world_to_grid(grid, goal.target_pose.x, goal.target_pose.y, gx, gy);
@@ -320,3 +322,4 @@ int main()
     return 0;
 }
 
+#endif
