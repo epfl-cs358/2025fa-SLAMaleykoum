@@ -1,5 +1,5 @@
 /**
- * @file main_esp1_dynamic_path_test.cpp
+ * @file test_send_dynamic_path.cpp
  * @brief ESP1 dynamic path update test.
  *
  * Sends:

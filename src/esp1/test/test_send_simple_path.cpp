@@ -1,5 +1,5 @@
 /**
- * @file main_esp1.cpp
+ * @file test_send_simple_path.cpp
  * @brief Minimal path sender for ESP2 testing
  *
  * This code ONLY sends a path to ESP2 via UART.
