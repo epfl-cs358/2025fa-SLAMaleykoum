@@ -68,11 +68,11 @@ static bool is_frontier_cell(const BayesianOccupancyGrid& grid, int x, int y)
 // -----------------------------------------------------------
 
 GoalManager::GoalManager(const Pose2D& initial_home_pose)
-    : current_state_(STATE_IDLE),
+    : current_state_(STATE_EXPLORING),
       home_pose_(initial_home_pose)
 {
     current_target_.target_pose = home_pose_;
-    current_target_.type        = MissionGoalType::IDLE;
+    current_target_.type        = MissionGoalType::EXPLORATION_NODE;
 
     std::cout << "[GoalManager] Home pose initialized at ("
               << home_pose_.x << ", " << home_pose_.y << ")\n";

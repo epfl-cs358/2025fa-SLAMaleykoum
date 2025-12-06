@@ -19,7 +19,6 @@ Connection connection("esp1");
 
 HardwareSerial& LIDAR_SERIAL = Serial2;
 Lidar lidar(LIDAR_SERIAL);
-Connection connection("esp1");
 WiFiServer tcpServer(TCP_PORT);
 WiFiClient tcpClient;
 LiDARScan scan;

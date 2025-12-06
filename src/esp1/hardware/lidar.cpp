@@ -120,7 +120,9 @@ float Lidar::calcDistance(uint8_t _lowByte,uint8_t _highByte)
 }
 
 void Lidar::build_scan(LiDARScan* scan, bool &scanComplete_, float& lastAngleESP_) {
-	scan->count = 0;
+	if (scanComplete_) {
+		scan->count = 0;
+	}
 
     // read lidar data
     uint16_t count = this->readMeasurePoints();

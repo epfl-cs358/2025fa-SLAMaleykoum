@@ -12,6 +12,7 @@
 #include "common/esp_link.h"
 #include "common/data_types.h"
 #include "common/wifi_connection.h"
+#include "test_common_esp1.h"
 
 const char* mqtt_topic_connection_receive_pos_setup = "slamaleykoum77/setupesp1";
 const char* mqtt_topic_connection_receive_pos = "slamaleykoum77/sendwaypoints";
@@ -22,7 +23,6 @@ Esp_link esp___link(Serial1);
 
 char bufrecpos[256];
 
-Connection connection;
 // ------------------------------------------
 // PATH A (the original one)
 // ------------------------------------------

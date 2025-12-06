@@ -82,6 +82,13 @@ public:
 	 */	
 	float calcDistance(uint8_t _lowByte, uint8_t _highByte);
 
+	/**
+	 * Builds a full scan from the Lidar
+	 * 
+	 * @param pointer to LiDARScan struct to fill
+	 * @param reference to bool that becomes true if a full scan is complete
+	 * @param reference to last angle read by ESP (to detect full rotation)
+	 */
 	void build_scan(LiDARScan* scan, bool &scanComplete_, float& lastAngleESP_);
 
 private:

@@ -11,6 +11,7 @@
 #include "esp1/hardware/lidar.h"
 #include "esp1/mapping/occupancy/bayesian_grid.h"
 #include "esp1/planning/global_planner.h"
+#include "esp1/planning/mission_planner.h"
 
 #include <WiFi.h>
 #include <WiFiClient.h>
@@ -22,23 +23,38 @@ const char* password = "l1darpass";
 const uint16_t TCP_PORT = 9000;
 
 WiFiServer tcpServer(TCP_PORT);
-WiFiClient tcpClient;
 
 // --- RTOS HANDLES ---
 QueueHandle_t Lidar_Buffer_Queue;
 QueueHandle_t Lidar_Pose_Queue;
 QueueHandle_t Path_Send_Queue;
+TaskHandle_t  TCP_Task_Handle = NULL;
 
 // MUTEXES
 SemaphoreHandle_t Bayesian_Grid_Mutex;
-SemaphoreHandle_t Pose_Mutex; // <--- NEW: Protects 'last_known_pose'
+SemaphoreHandle_t Pose_Mutex;
+SemaphoreHandle_t State_Mutex; 
 
 // --- GLOBAL OBJECTS ---
-const int grid_size_x = 200;
-const int grid_size_y = 200;
+const int grid_size_x = 80;
+const int grid_size_y = 80;
 const float resolution = 0.05f;
 
 BayesianOccupancyGrid* TheMap = nullptr;
+GoalManager* goalManager = nullptr; // <--- ADDED OBJECT
+
+// --- STATE VARIABLES ---
+Pose2D last_known_pose = {0,0,0,0};
+GlobalPathMessage current_global_path;
+MissionGoal current_mission_goal;
+
+// --- TRANSMISSION BUFFERS ---
+uint8_t* Tx_Map_Buffer = nullptr; 
+struct StateSnapshot {
+    Pose2D pose;
+    MissionGoal goal;
+    GlobalPathMessage path;
+} Tx_Snapshot;
 
 HardwareSerial& LIDAR_SERIAL = Serial2;
 Lidar lidar(LIDAR_SERIAL);
@@ -46,56 +62,35 @@ Lidar lidar(LIDAR_SERIAL);
 HardwareSerial& IPC_Serial = Serial1; 
 Esp_link esp_link(IPC_Serial); 
 
-// Global Pose (Protected by Pose_Mutex) - Initialized to zero
-Pose2D last_known_pose = {0.0f, 0.0f, 0.0f, 0};
-
-// --- HELPER FUNCTIONS ---
-void print_heap(const char* label) {
-    Serial.printf("[%s] Free Heap: %d bytes\n", label, esp_get_free_heap_size());
-}
-
 // =============================================================
 // TASK 1: IPC RECEIVE
-// Reads pose from ESP2 so the map knows where the car is.
 // =============================================================
 void IPC_Receive_Task(void* parameter) {
-    Serial.println("[Task] IPC Rx Started");
-    
-    // We expect packets starting with a MsgId byte
     while (1) {
         if (IPC_Serial.available()) {
             uint8_t msg_id = IPC_Serial.read();
-
-            // Check against data_types.h enums
             if (msg_id == MSG_POSE) {
                 Pose2D incoming_pose;
-                // Read the struct bytes directly
                 if (IPC_Serial.readBytes((char*)&incoming_pose, sizeof(Pose2D)) == sizeof(Pose2D)) {
-                    
-                    // Safely update the global variable
                     if (xSemaphoreTake(Pose_Mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
                         last_known_pose = incoming_pose;
-                        // Debug print to verify rotation
-                        // Serial.printf("Pose Update: x=%.2f y=%.2f th=%.2f\n", 
-                        //               last_known_pose.x, last_known_pose.y, last_known_pose.theta);
                         xSemaphoreGive(Pose_Mutex);
                     }
+                    
                 }
             }
         }
-        vTaskDelay(pdMS_TO_TICKS(10)); // Check every 10ms
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
 
 // =============================================================
-// TASK 2: LIDAR READ (DRIVER)
+// TASK 2: LIDAR READ 
 // =============================================================
 void Lidar_Read_Task(void* parameter) {
     const TickType_t xDelay = pdMS_TO_TICKS(10); 
     static LiDARScan scan; 
     float lastAngleESP = 0.0f; 
-
-    Serial.println("[Task] Real Lidar Read Started");
 
     while (1) {
         bool scanComplete = false;
@@ -103,9 +98,7 @@ void Lidar_Read_Task(void* parameter) {
 
         if (scanComplete) {
             if (scan.count > 10) { 
-                if (xQueueSend(Lidar_Buffer_Queue, &scan, 0) != pdPASS) {
-                    // Queue full, drop scan
-                }
+                xQueueSend(Lidar_Buffer_Queue, &scan, 0);
             }
             scan.count = 0;
             lastAngleESP = 0.0f; 
@@ -115,101 +108,156 @@ void Lidar_Read_Task(void* parameter) {
 }
 
 // =============================================================
-// TASK 3: SYNC (FUSION)
-// Combines Lidar Data + Current Pose
+// TASK 3: SYNC FUSION
 // =============================================================
 void Lidar_Sync_Map_Task(void* parameter) {
-    Serial.println("[Task] Sync Started");
-
     SyncedScan* synced_data = new SyncedScan();
     LiDARScan* scan_buffer = new LiDARScan();
-    
     int local_counter = 0;
     
     while (1) {
         if (xQueueReceive(Lidar_Buffer_Queue, scan_buffer, portMAX_DELAY) == pdPASS) {
             local_counter++;
-            // Downsample: Process only 1 out of 3 scans to save CPU
-            if (local_counter % 3 != 0) continue;
+            if (local_counter % 3 != 0) continue; 
 
             synced_data->scan = *scan_buffer;
-            
-            // --- CRITICAL: READ POSE SAFELY ---
             if (xSemaphoreTake(Pose_Mutex, portMAX_DELAY) == pdTRUE) {
                 synced_data->pose = last_known_pose;
                 xSemaphoreGive(Pose_Mutex);
             }
-            // ----------------------------------
-            
             xQueueSend(Lidar_Pose_Queue, synced_data, 0);
         }
     }
 }
 
 // =============================================================
-// TASK 4: BAYESIAN MAPPING & TCP
+// TASK 4: BAYESIAN MAPPING
 // =============================================================
 void Bayesian_Grid_Task(void* parameter) {
     static SyncedScan synced_data; 
-    Serial.println("[Task] Bayesian Started");
     
     while (1) {
-        // 1. Connection Logic
-        if (!tcpClient || !tcpClient.connected()) {
-            WiFiClient newClient = tcpServer.available();
-            if (newClient) {
-                tcpClient = newClient;
-                tcpClient.setNoDelay(true);
-                Serial.println(">>> TCP CLIENT CONNECTED <<<");
-            }
-        }
-
-        // 2. Data Logic
         if (xQueueReceive(Lidar_Pose_Queue, &synced_data, pdMS_TO_TICKS(100)) == pdPASS) {
+            
+            // 1. Update Map
             if (xSemaphoreTake(Bayesian_Grid_Mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
-                
-                // Update map logic
                 TheMap->update_map(synced_data.scan, synced_data.pose, 8.0f); 
-
-                // Send to PC
-                if (tcpClient && tcpClient.connected()) {
-                    uint32_t map_size = grid_size_x * grid_size_y;
-                    
-                    // Create Header: [Header ID ... Pose ... Size]
-                    // We send the pose in the header so the Visualizer knows how to rotate the car arrow
-                    uint8_t header[24];
-                    memset(header, 0, 24);
-                    
-                    // Bytes 0-3: Magic Word
-                    header[0] = 0xBE; header[1] = 0xEF;
-                    
-                    // Bytes 4-15: Pose (x, y, theta floats)
-                    memcpy(&header[4], &synced_data.pose.x, 4);
-                    memcpy(&header[8], &synced_data.pose.y, 4);
-                    memcpy(&header[12], &synced_data.pose.theta, 4);
-
-                    // Bytes 20-21: Map Size
-                    header[20] = (map_size >> 8) & 0xFF;
-                    header[21] = (map_size & 0xFF);
-
-                    // Send Header + Map
-                    tcpClient.write(header, 24);
-                    tcpClient.write(TheMap->get_map_data_color(), map_size);
-                }
                 xSemaphoreGive(Bayesian_Grid_Mutex);
+
+                // 2. Notify TCP Task
+                if (TCP_Task_Handle != NULL) xTaskNotifyGive(TCP_Task_Handle);
+            }
+            
+            // Update Pose Snapshot
+            if(xSemaphoreTake(State_Mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+                last_known_pose = synced_data.pose;
+                xSemaphoreGive(State_Mutex);
             }
         } 
     }
 }
 
 // =============================================================
-// MISSION PLANNER STUB
+// TASK 5: TCP TRANSMIT
+// =============================================================
+void TCP_Transmit_Task(void* parameter) {
+    WiFiClient tcpClient;
+    const uint32_t map_size = grid_size_x * grid_size_y;
+    uint8_t header[64]; 
+
+    while (1) {
+        if (!tcpClient || !tcpClient.connected()) {
+            WiFiClient newClient = tcpServer.available();
+            if (newClient) {
+                tcpClient = newClient;
+                tcpClient.setNoDelay(true);
+            } else {
+                vTaskDelay(pdMS_TO_TICKS(100));
+                continue;
+            }
+        }
+
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+
+        // SNAPSHOT
+        if (xSemaphoreTake(Bayesian_Grid_Mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+            memcpy(Tx_Map_Buffer, TheMap->get_map_data_color(), map_size);
+            xSemaphoreGive(Bayesian_Grid_Mutex);
+        } else continue;
+
+        if (xSemaphoreTake(State_Mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+            Tx_Snapshot.pose = last_known_pose;
+            Tx_Snapshot.path = current_global_path;
+            Tx_Snapshot.goal = current_mission_goal;
+            xSemaphoreGive(State_Mutex);
+        }
+
+        // HEADER
+        memset(header, 0, 64);
+        header[0] = 0xBE; header[1] = 0xEF;
+        uint32_t sz = map_size;
+        memcpy(&header[2], &sz, 4);
+        uint16_t plen = Tx_Snapshot.path.current_length;
+        if(plen > MAX_PATH_LENGTH) plen = 0;
+        memcpy(&header[6], &plen, 2);
+
+        memcpy(&header[8], &Tx_Snapshot.pose.x, 4);
+        memcpy(&header[12], &Tx_Snapshot.pose.y, 4);
+        memcpy(&header[16], &Tx_Snapshot.pose.theta, 4);
+
+        memcpy(&header[20], &Tx_Snapshot.goal.target_pose.x, 4);
+        memcpy(&header[24], &Tx_Snapshot.goal.target_pose.y, 4);
+        memcpy(&header[28], &Tx_Snapshot.goal.target_pose.theta, 4);
+
+        // SEND
+        if (tcpClient.connected()) {
+            tcpClient.write(header, 64);
+            if(plen > 0) tcpClient.write((uint8_t*)Tx_Snapshot.path.path, plen * sizeof(Waypoint));
+            tcpClient.write(Tx_Map_Buffer, map_size);
+            taskYIELD(); 
+        }
+    }
+}
+
+// =============================================================
+// REAL MISSION PLANNER TASK
 // =============================================================
 void Mission_Planner_Task(void* parameter) {
-    const TickType_t xDelay = pdMS_TO_TICKS(5000); 
+    Serial.println("[Task] Mission Planner Started");
+    
+    // Set initial state
+    goalManager->set_mission_state(GoalManager::STATE_EXPLORING);
+
     while (1) {
-        // Placeholder for future mission planning logic
-        vTaskDelay(xDelay);
+        Pose2D current_p;
+        
+        // 1. Get Current Pose safely
+        if(xSemaphoreTake(Pose_Mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+            current_p = last_known_pose;
+            xSemaphoreGive(Pose_Mutex);
+        } else {
+            vTaskDelay(pdMS_TO_TICKS(10)); 
+            continue;
+        }
+
+        // 2. Compute New Goal
+        // CRITICAL: We MUST lock the grid mutex because update_goal() reads the map.
+        // If the map is being updated (written) while we read, we get garbage or crash.
+        if (xSemaphoreTake(Bayesian_Grid_Mutex, pdMS_TO_TICKS(200)) == pdTRUE) {
+            
+            MissionGoal new_goal = goalManager->update_goal(current_p, *TheMap);
+            
+            xSemaphoreGive(Bayesian_Grid_Mutex);
+
+            // 3. Publish Goal to Global State (for TCP & Global Planner)
+            if(xSemaphoreTake(State_Mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+                current_mission_goal = new_goal;
+                xSemaphoreGive(State_Mutex);
+            }
+        }
+
+        // Run at 2Hz (every 500ms)
+        vTaskDelay(pdMS_TO_TICKS(500));
     }
 }
 
@@ -217,13 +265,18 @@ void Mission_Planner_Task(void* parameter) {
 // GLOBAL PLANNER STUB
 // =============================================================
 void Global_Planner_Task(void* parameter) {
-    const TickType_t xDelay = pdMS_TO_TICKS(1000); 
-    GlobalPathMessage new_path;
-    new_path.path_id = 1;
+    // Generate a fake path for visualization
     while (1) {
-        new_path.path_id++;
-        xQueueOverwrite(Path_Send_Queue, &new_path); 
-        vTaskDelay(xDelay);
+        if(xSemaphoreTake(State_Mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+            // Here you would normally call globalPlanner->plan(pose, current_mission_goal);
+            current_global_path.current_length = 5;
+            for(int i=0; i<5; i++) {
+                current_global_path.path[i].x = current_mission_goal.target_pose.x * (i/5.0);
+                current_global_path.path[i].y = current_mission_goal.target_pose.y * (i/5.0);
+            }
+            xSemaphoreGive(State_Mutex);
+        }
+        vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
 
@@ -233,42 +286,48 @@ void Global_Planner_Task(void* parameter) {
 void setup() {
     Serial.begin(115200);
     delay(1000);
-    Serial.println("\n--- ESP1 MAPPING NODE ---");
+    Serial.println("\n--- ESP1 FULL NODE ---");
 
-    // 1. Create Mutexes FIRST
     Bayesian_Grid_Mutex = xSemaphoreCreateMutex();
     Pose_Mutex = xSemaphoreCreateMutex();
+    State_Mutex = xSemaphoreCreateMutex();
 
-    // 2. Alloc Map
     TheMap = new BayesianOccupancyGrid(resolution, grid_size_x, grid_size_y);
-    if (!TheMap) { Serial.println("MAP ALLOC FAILED"); while(1); }
+    Tx_Map_Buffer = (uint8_t*)malloc(grid_size_x * grid_size_y);
+    
+    // Instantiate Goal Manager
+    goalManager = new GoalManager({0.0f, 0.0f, 0.0f, 0});
+    
+    if (!TheMap || !Tx_Map_Buffer || !goalManager) { 
+        Serial.println("MEMORY ALLOC FAILED"); 
+        while(1); 
+    }
 
-    // 3. WiFi
     WiFi.mode(WIFI_AP);
     WiFi.softAP(ssid, password);
-    Serial.print("IP: "); Serial.println(WiFi.softAPIP());
+    delay(3000);
+    Serial.println("AP Mode set");
     tcpServer.begin();
     tcpServer.setNoDelay(true);
 
-    // 4. Hardware
-    esp_link.begin(); // Ensure Serial1 is started
+    esp_link.begin(); 
     lidar.start(); 
+    delay(1000);
 
-    // 5. Queues
     Lidar_Buffer_Queue = xQueueCreate(1, sizeof(LiDARScan));
     Lidar_Pose_Queue   = xQueueCreate(1, sizeof(SyncedScan));
     Path_Send_Queue    = xQueueCreate(1, sizeof(GlobalPathMessage));
 
-    // 6. Tasks
-    // IPC Receive on Core 0 (Comms)
+    // Core 0
     xTaskCreatePinnedToCore(IPC_Receive_Task, "IPC_Rx", 4096, NULL, 5, NULL, 0);
-    xTaskCreatePinnedToCore(Mission_Planner_Task, "Mission_Plan", 2048, NULL, 2, NULL, 0);
-    xTaskCreatePinnedToCore(Global_Planner_Task, "Global_Plan", 2048, NULL, 2, NULL, 1);
+    xTaskCreatePinnedToCore(TCP_Transmit_Task, "TCP_Tx", 8192, NULL, 3, &TCP_Task_Handle, 0); 
+    xTaskCreatePinnedToCore(Mission_Planner_Task, "Mission", 4096, NULL, 2, NULL, 0); // Increased Stack
 
-    // Mapping on Core 1 (Math)
+    // Core 1
     xTaskCreatePinnedToCore(Lidar_Read_Task, "Lidar_Read", 4096, NULL, 4, NULL, 1);
     xTaskCreatePinnedToCore(Lidar_Sync_Map_Task, "Lidar_Sync", 8192, NULL, 4, NULL, 1);
-    xTaskCreatePinnedToCore(Bayesian_Grid_Task, "Map_Update", 8192, NULL, 3, NULL, 1);
+    xTaskCreatePinnedToCore(Bayesian_Grid_Task, "Map_Comp", 8192, NULL, 3, NULL, 1);
+    xTaskCreatePinnedToCore(Global_Planner_Task, "Global_Plan", 2048, NULL, 2, NULL, 1);
 }
 
 void loop() {}
