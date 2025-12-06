@@ -36,8 +36,8 @@ SemaphoreHandle_t Pose_Mutex;
 SemaphoreHandle_t State_Mutex; 
 
 // --- GLOBAL OBJECTS ---
-const int grid_size_x = 80;
-const int grid_size_y = 80;
+const int grid_size_x = 200;
+const int grid_size_y = 200;
 const float resolution = 0.05f;
 
 BayesianOccupancyGrid* TheMap = nullptr;
