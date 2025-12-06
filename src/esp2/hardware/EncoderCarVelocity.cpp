@@ -12,6 +12,8 @@
 #include <Wire.h>
 #include "hardware/I2C_wire.h"
 
+
+
 EncoderCarVelocity::EncoderCarVelocity() {}
 
 /**
@@ -25,9 +27,10 @@ EncoderCarVelocity::EncoderCarVelocity() {}
  * @return true if AS5600 is detected and configured successfully, false otherwise.
  */
 bool EncoderCarVelocity::begin() {
-     
-
-    //I2C_wire.begin(); 
+    
+    // *** ESP32 FIX: Set I2C timeout to prevent 1-second blocking ***
+    I2C_wire.setTimeout(10);  // 10ms timeout instead of 1000ms default
+    
 
 
     if (!as5600.begin()) {
@@ -39,6 +42,37 @@ bool EncoderCarVelocity::begin() {
     as5600.setDirection(AS5600_CLOCK_WISE);
     as5600.setHysteresis(2);     // suppress small noise
     as5600.setSlowFilter(2);     // optional, reduces jitter
+
+    //Check magnet detection
+    delay(10);  // Let sensor stabilize
+    if (!as5600.detectMagnet()) {
+        Serial.println("WARNING: No magnet detected!");
+        Serial.println("Check magnet position relative to AS5600 sensor");
+        
+    } else {
+        Serial.println("Magnet detected");
+        
+        // Check magnet strength
+        if (as5600.magnetTooStrong()) {
+            Serial.println("WARNING: Magnet too strong! Move it further away.");
+            
+        } else if (as5600.magnetTooWeak()) {
+            Serial.println("WARNING: Magnet too weak! Move it closer.");
+            
+        } else {
+            Serial.println("Magnet strength OK");
+           
+        }
+    }
+
+
+    // Prime getAngularSpeed() - first call is ALWAYS wrong per docs
+    as5600.getAngularSpeed(AS5600_MODE_RADIANS, true);
+    delay(10);
+
+    Serial.println("Encoder initialization complete");
+
+    delay(5000);
    
     return true;
 }
@@ -53,7 +87,21 @@ bool EncoderCarVelocity::begin() {
  */
 float EncoderCarVelocity::getMotorAngularVelocity() {
     // library handles delta / dt internally
-    return as5600.getAngularSpeed(AS5600_MODE_RADIANS, true);
+    //return as5600.getAngularSpeed(AS5600_MODE_RADIANS, true);
+    float rawSpeed = as5600.getAngularSpeed(AS5600_MODE_RADIANS, true);
+   
+    if (isnan(rawSpeed)) {
+        return 0.0f;
+    }
+
+    //Check for I2C errors
+    int error = as5600.lastError();
+    if (error != 0) {  // AS5600_OK = 0
+        Serial.printf("I2C Error: %d\n", error);
+        return 0.0f;
+    }
+
+    return rawSpeed;
 }
 
 /**
@@ -72,11 +120,22 @@ float EncoderCarVelocity::getFilteredAngularVelocity() {
      static float emaVel = 0.0f;
     static float buffer[5] = {0};
     static int idx = 0;
+    static bool initialized = false;
 
-    const float alpha = 0.02f;
+    const float alpha = 0.15f;
 
-    // Update EMA
+    
     float rawVel = getMotorAngularVelocity();
+
+     // *** ADDED: Initialize on first run ***
+    if (!initialized) {
+        emaVel = rawVel;
+        for (int i = 0; i < 5; i++) buffer[i] = rawVel;
+        initialized = true;
+        return rawVel;
+    }
+
+// Update EMA
     emaVel = alpha * rawVel + (1 - alpha) * emaVel;
 
     // Update buffer
