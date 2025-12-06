@@ -32,7 +32,7 @@ public:
      * @param scan The new LiDAR observation.
      * @param pose The robot's estimated pose during the scan (from ESP2).
      */
-    void update_map(const LiDARScan& scan, const Pose2D& pose, float lidar_max_range);
+    void update_map(const SyncedScan& lidar_scan,  float lidar_max_range);
 
     /**
      * @brief Retrieves the occupancy probability of a specific cell.
@@ -50,7 +50,7 @@ public:
      * @brief Exports the map data for use by the Global Planner.
      */
     // Returns a simplified map representation (e.g. pointer or some light compressed array).
-    const float* get_map_data() const;
+    const int8_t* get_map_data() const;
 
     // Internal 2D array or vector to hold log-odds values
     float grid_resolution;
@@ -58,10 +58,15 @@ public:
     uint16_t grid_size_y;
 
 private:
-    // ✔️ tableau interne, contigu, sans allocation dynamique
-    float* log_odds;
+    //  tableau interne, contigu, sans allocation dynamique
+    int8_t* log_odds;
 
     // Precomputed sin/cos tables for efficiency
-    float sin_table[3600];
-    float cos_table[3600];
+    static float sin_table[3600];
+    static float cos_table[3600];
+    
+    static bool trig_initialized;
+
+    static float prob_table[81];
+    static bool prob_table_initialized;
 };

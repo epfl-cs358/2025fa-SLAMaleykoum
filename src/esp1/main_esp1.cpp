@@ -76,7 +76,7 @@ void IPC_Receive_Task(void* parameter) {
                         last_known_pose = incoming_pose;
                         xSemaphoreGive(Pose_Mutex);
                     }
-                    
+
                 }
             }
         }
@@ -141,7 +141,7 @@ void Bayesian_Grid_Task(void* parameter) {
             
             // 1. Update Map
             if (xSemaphoreTake(Bayesian_Grid_Mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
-                TheMap->update_map(synced_data.scan, synced_data.pose, 8.0f); 
+                TheMap->update_map(synced_data, 8.0f); 
                 xSemaphoreGive(Bayesian_Grid_Mutex);
 
                 // 2. Notify TCP Task
