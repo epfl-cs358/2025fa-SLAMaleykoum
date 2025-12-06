@@ -73,7 +73,7 @@ void BayesianOccupancyGrid::update_map(const SyncedScan& lidar_scan,
     for (uint16_t i = 0; i < scan.count; ++i)
     {
         float r = scan.distances[i] * 0.001f;  // mm → m
-        bool is_hit = (r > 0);
+        bool is_hit = (r > 0 && r < lidar_max_range);
         if (!is_hit)
             r = lidar_max_range;
 
@@ -101,8 +101,8 @@ void BayesianOccupancyGrid::update_map(const SyncedScan& lidar_scan,
         int x0 = (int)(pose.x / grid_resolution) + grid_size_x / 2;
         int x1 = (int)(hit_x / grid_resolution) + grid_size_x / 2;
 
-        int y0 = (int)(-pose.y / grid_resolution) + grid_size_y / 2;
-        int y1 = (int)(-hit_y / grid_resolution) + grid_size_y / 2;
+        int y0 = (int)(pose.y / grid_resolution) + grid_size_y / 2;
+        int y1 = (int)(hit_y / grid_resolution) + grid_size_y / 2;
 
         // ------------------------------------------------------
         // Bresenham free cells

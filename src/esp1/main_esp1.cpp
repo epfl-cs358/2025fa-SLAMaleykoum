@@ -62,22 +62,31 @@ Lidar lidar(LIDAR_SERIAL);
 HardwareSerial& IPC_Serial = Serial1; 
 Esp_link esp_link(IPC_Serial); 
 
+float pathA_X[] = {
+    0.00, 0.00, 0.00, 0.00, 0.00, 0.00,
+    0.00, 0.00, 0.00, 0.00, 0.00, 0.00,
+    0.00, 0.00, 0.00, 0.00, 0.00, 0.00,
+    0.00, 0.00, 0.00, 0.00, 0.00, 0.00,
+};
+float pathA_Y[] = {
+    0.00, 0.20, 0.20, 0.20, 0.20, 0.20,
+    0.20, 0.20, 0.20, 0.20, 0.50, 1.00,
+    1.50, 2.00, 2.40, 2.40, 2.40, 2.40,
+    2.40, 2.40, 2.40, 2.40, 2.40, 2.40
+};
+const int pathA_size = sizeof(pathA_X) / sizeof(pathA_X[0]);
+
 // =============================================================
 // TASK 1: IPC RECEIVE
 // =============================================================
 void IPC_Receive_Task(void* parameter) {
     while (1) {
-        if (IPC_Serial.available()) {
-            uint8_t msg_id = IPC_Serial.read();
-            if (msg_id == MSG_POSE) {
-                Pose2D incoming_pose;
-                if (IPC_Serial.readBytes((char*)&incoming_pose, sizeof(Pose2D)) == sizeof(Pose2D)) {
-                    if (xSemaphoreTake(Pose_Mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
-                        last_known_pose = incoming_pose;
-                        xSemaphoreGive(Pose_Mutex);
-                    }
-
-                }
+        esp_link.poll();
+        Pose2D incoming_pose;
+        if (esp_link.get_pos(incoming_pose)) {
+            if (xSemaphoreTake(Pose_Mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+                last_known_pose = incoming_pose;
+                xSemaphoreGive(Pose_Mutex);
             }
         }
         vTaskDelay(pdMS_TO_TICKS(10));
@@ -141,7 +150,7 @@ void Bayesian_Grid_Task(void* parameter) {
             
             // 1. Update Map
             if (xSemaphoreTake(Bayesian_Grid_Mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
-                TheMap->update_map(synced_data, 8.0f); 
+                TheMap->update_map(synced_data, 3.0f); 
                 xSemaphoreGive(Bayesian_Grid_Mutex);
 
                 // 2. Notify TCP Task
@@ -190,6 +199,12 @@ void TCP_Transmit_Task(void* parameter) {
             Tx_Snapshot.path = current_global_path;
             Tx_Snapshot.goal = current_mission_goal;
             xSemaphoreGive(State_Mutex);
+        }
+
+        if (!isfinite(Tx_Snapshot.goal.target_pose.x) || 
+            !isfinite(Tx_Snapshot.goal.target_pose.y)) {
+            vTaskDelay(pdMS_TO_TICKS(100));
+            continue; // Skip cette frame
         }
 
         // HEADER
@@ -269,11 +284,14 @@ void Global_Planner_Task(void* parameter) {
     while (1) {
         if(xSemaphoreTake(State_Mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
             // Here you would normally call globalPlanner->plan(pose, current_mission_goal);
-            current_global_path.current_length = 5;
-            for(int i=0; i<5; i++) {
-                current_global_path.path[i].x = current_mission_goal.target_pose.x * (i/5.0);
-                current_global_path.path[i].y = current_mission_goal.target_pose.y * (i/5.0);
+            current_global_path.current_length = pathA_size;
+            current_global_path.timestamp_ms = millis();
+            for (int i = 0; i < pathA_size; i++) {
+                current_global_path.path[i].x = pathA_X[i];
+                current_global_path.path[i].y = pathA_Y[i];
             }
+            esp_link.sendPath(current_global_path);
+            
             xSemaphoreGive(State_Mutex);
         }
         vTaskDelay(pdMS_TO_TICKS(1000));
@@ -297,6 +315,11 @@ void setup() {
     
     // Instantiate Goal Manager
     goalManager = new GoalManager({0.0f, 0.0f, 0.0f, 0});
+
+    current_mission_goal.target_pose = {0.0f, 0.0f, 0.0f, 0};
+    current_mission_goal.type = EXPLORATION_NODE;
+    
+    current_global_path.current_length = 0;
     
     if (!TheMap || !Tx_Map_Buffer || !goalManager) { 
         Serial.println("MEMORY ALLOC FAILED"); 
@@ -318,6 +341,7 @@ void setup() {
     Lidar_Pose_Queue   = xQueueCreate(1, sizeof(SyncedScan));
     Path_Send_Queue    = xQueueCreate(1, sizeof(GlobalPathMessage));
 
+    delay(10000);
     // Core 0
     xTaskCreatePinnedToCore(IPC_Receive_Task, "IPC_Rx", 4096, NULL, 5, NULL, 0);
     xTaskCreatePinnedToCore(TCP_Transmit_Task, "TCP_Tx", 8192, NULL, 3, &TCP_Task_Handle, 0); 
