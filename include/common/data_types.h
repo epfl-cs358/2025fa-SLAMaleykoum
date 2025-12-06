@@ -15,7 +15,7 @@
 
 // Define the maximum number of waypoints the controller can handle.
 #define MAX_PATH_LENGTH 50
-#define MAX_LIDAR_POINTS 3000
+#define MAX_LIDAR_POINTS 500
 
 
 // --- Core Geometric Structures ---
