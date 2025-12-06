@@ -5,7 +5,7 @@
 #pragma once
 
 #include "common/data_types.h" // For Velocity and MotorOutputs types
-#include "MotorController.h"   // For NEUTRAL_US, MAX_FORWARD_US, MAX_REVERSE_US
+#include "hardware/MotorController.h"   // For NEUTRAL_US, MAX_FORWARD_US, MAX_REVERSE_US
 #include <Arduino.h>           // For constrain()
 
 // --- Tuning Parameters ---

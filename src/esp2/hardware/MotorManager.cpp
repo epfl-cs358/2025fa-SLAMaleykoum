@@ -5,7 +5,7 @@
  * @author SLAMaleykoum 
  * @date Oct 2025
  */
-#include "MotorManager.h"
+#include "hardware/MotorManager.h"
 
 MotorManager::MotorManager(int pwmPin) : motor(pwmPin) {}
 

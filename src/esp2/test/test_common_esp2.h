@@ -27,10 +27,14 @@
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include "common/wifi_connection.h"
-#include "EncoderCarVelocity.h"
-#include "MotorController.h"
+#include "hardware/EncoderCarVelocity.h"
+#include "hardware/MotorController.h"
 #include "AS5600.h"
+#include "../../include/common/esp_link.h"
+#include "esp2/control/pure_pursuit.h"
+#include "esp_wifi.h"
 #include "motor_pid.h"
+
 // Pins used by the hardware components on the esp 2
 #define ESC_PIN 15          // pin used for the motor
 #define SERVO_DIR_PIN 6     // the servo that modifies the direction of the wheels
@@ -38,6 +42,7 @@
 #define US_ECHO_PIN 19      // changé par rapport a avant sur conseil de chat
 #define SDA_PIN 8           // pin used for SDA of IMU
 #define SCL_PIN 9           // pin used for SCL of IMU
+#define LED_PIN LED_BUILTIN
 
 // Harwdare objects
 extern MotorManager motor;
@@ -48,8 +53,11 @@ extern ImuSensor imu;
 //extern AS5600Encoder encoder;
 extern EncoderCarVelocity encoder;
 extern Connection connection;
+extern HardwareSerial ESPS;
+extern Esp_link esp_link;
 
 extern MotorPID pid;
+extern PurePursuit purePursuit;
 
 // Prototypes of the functions
 void setup_all_together();          void loop_all_together();
@@ -62,3 +70,14 @@ void setup_encoder();               void loop_encoder();
 void setup_test_connection();       void loop_test_connection();
 void setup_pid_velocity();          void loop_pid_velocity();
 void setup_path_pid();              void loop_path_pid();
+void setup_test_freertos_path_follow();  void loop_test_freertos_path_follow();
+void setup_test_sensor();           void loop_test_sensor();
+void setup_test_encoder();           void loop_test_encoder(); 
+void setup_servo_calibration();     void loop_servo_calibration();
+void setup_test_odometry_freertos_path_follow(); void loop_test_odometry_freertos_path_follow();
+void setup_test_odometry_position(); void loop_test_odometry_position();
+void setup_esps_comm_esp2();        void loop_esps_comm_esp2();
+void setup_led_basic();             void loop_led_basic();
+void setup_clock_esp2();            void loop_clock_esp2();
+void setup_clock_esp2_STA();        void loop_clock_esp2_STA();
+void setup_test_comm();             void loop_test_comm();

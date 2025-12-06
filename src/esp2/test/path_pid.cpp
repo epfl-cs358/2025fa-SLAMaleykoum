@@ -3,17 +3,15 @@
  * @brief Fixed PID velocity control test
  */
 #include "test_common_esp2.h"
-#include "EncoderCarVelocity.h"
-#include "motor_pid.h"
 
 const char* mqtt_topic_connection_path_pid = "slamaleykoum77/print";
 
 // ===== Motor and control parameters =====
 const float GEAR_RATIO1 = 10.0f;
 const float WHEEL_RADIUS_M = 0.0495f;
-const float TARGET_SEGMENT_1_M = 0.3f;
+const float TARGET_SEGMENT_1_M = 1.5f;
 const float TARGET_SEGMENT_2_M = 0.1f;
-const float DESIRED_VELOCITY = 0.45f; // target speed in m/s
+const float DESIRED_VELOCITY = 0.25f; // target speed in m/s
 const float VELOCITY_TOLERANCE = 0.05f;
 const float PWM_SAFE_MIN = 0.0f;
 const float PWM_SAFE_MAX = 0.24f;
@@ -115,11 +113,11 @@ void loop_path_pid() {
     
     char msgDT[50];
     snprintf(msgDT, sizeof(msgDT), "pid given dt = %0.2f", dt);
-    connection.publish(mqtt_topic_connection_path_pid, msgDT);
+    //connection.publish(mqtt_topic_connection_path_pid, msgDT);
 
     char msgComputedPWM[50];
     snprintf(msgComputedPWM, sizeof(msgComputedPWM), "Computed pwm by pid = %0.2f", pwm_output);
-    connection.publish(mqtt_topic_connection_path_pid, msgComputedPWM);
+    //connection.publish(mqtt_topic_connection_path_pid, msgComputedPWM);
 
     float safe_pwm = constrain(pwm_output, PWM_SAFE_MIN, PWM_SAFE_MAX);
 

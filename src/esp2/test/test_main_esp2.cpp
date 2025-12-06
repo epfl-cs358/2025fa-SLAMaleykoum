@@ -46,7 +46,31 @@ void setup() {
     #elif TEST_ID == 9
         setup_pid_velocity();   
     #elif TEST_ID == 10
-        setup_path_pid();        
+        setup_path_pid(); 
+    #elif TEST_ID == 11
+        setup_test_freertos_path_follow();       
+    #elif TEST_ID == 12
+        setup_test_sensor();   
+    #elif TEST_ID == 13
+        setup_test_encoder(); 
+    #elif TEST_ID == 14
+        setup_servo_calibration();
+    #elif TEST_ID == 15
+        setup_test_odometry_freertos_path_follow();
+    #elif TEST_ID == 16
+        setup_test_odometry_position();
+    #elif TEST_ID == 17
+        setup_path_pid();
+    #elif TEST_ID == 18
+        setup_esps_comm_esp2();
+    #elif TEST_ID == 19
+        setup_led_basic();
+    #elif TEST_ID == 20
+        setup_clock_esp2();
+    #elif TEST_ID == 21
+        setup_clock_esp2_STA();
+    #elif TEST_ID == 22
+        setup_test_comm();
     #endif
 }
 
@@ -71,5 +95,29 @@ void loop() {
         loop_pid_velocity();
     #elif TEST_ID == 10
         loop_path_pid();
+    #elif TEST_ID == 11
+        loop_test_freertos_path_follow();
+    #elif TEST_ID == 12
+        loop_test_sensor();  
+    #elif TEST_ID == 13
+        loop_test_encoder(); 
+    #elif TEST_ID == 14
+        loop_servo_calibration();
+    #elif TEST_ID == 15
+        loop_test_odometry_freertos_path_follow();
+    #elif TEST_ID == 16
+        loop_test_odometry_position();
+    #elif TEST_ID == 17
+        setup_path_pid();
+    #elif TEST_ID == 18
+        loop_esps_comm_esp2();
+    #elif TEST_ID == 19
+        loop_led_basic();
+    #elif TEST_ID == 20
+        loop_clock_esp2();
+    #elif TEST_ID == 21
+        loop_clock_esp2_STA();
+    #elif TEST_ID == 22
+        loop_test_comm();
     #endif
 }

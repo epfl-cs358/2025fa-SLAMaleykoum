@@ -14,18 +14,13 @@
  */
 #include "test_common_esp1.h"
 
-HardwareSerial LIDAR_SERIAL(2);
-rpLidar* lidar = nullptr;
-DMS15 servo_dir(SERVO_DIR_PIN);
+HardwareSerial ESPS(1);
+Connection connection("esp1");
 
-Connection connection;
-
-void initGlobals() {
-    // Initialize the material serial port of the LIDAR
-    LIDAR_SERIAL.setRxBufferSize(LIDAR_SERIAL_BUFFER_SIZE);
-    LIDAR_SERIAL.begin(LIDAR_BAUDRATE, SERIAL_8N1, LIDAR_RX_PIN, LIDAR_TX_PIN);
-    delay(100);
-
-    // Create LIDAR object
-    lidar = new rpLidar(&LIDAR_SERIAL, LIDAR_BAUDRATE, LIDAR_RX_PIN, LIDAR_TX_PIN);
-}
+HardwareSerial& LIDAR_SERIAL = Serial2;
+Lidar lidar(LIDAR_SERIAL);
+WiFiServer tcpServer(TCP_PORT);
+WiFiClient tcpClient;
+LiDARScan scan;
+bool scanComplete = false;
+uint16_t lastSendTime = 0;

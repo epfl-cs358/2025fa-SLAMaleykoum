@@ -16,17 +16,9 @@
 #include <vector>
 #include <cstdint>
 
-// Define maximum points the raw sensor can return for buffer allocation
-const size_t MAX_RAW_LIDAR_POINTS = 360; 
-
-/**
- * @brief Represents a single raw point from the LiDAR sensor.
- */
-struct RawLiDARPoint {
-    float angle_rad; // Angle of the measurement
-    float distance_m; // Distance measurement (range)
-    uint8_t quality; // Quality/intensity of the return
-};
+extern rp_descriptor_t resp_descriptor[];	///< List of Response descriptors 
+extern rq_message_t req_message[];			///< List of Request Messages
+extern rq_Packet_t req_Express[];			///< Request Message for Express Scan Modes
 
 /**
  * @brief Driver and processing class for the LiDAR unit.
@@ -34,28 +26,83 @@ struct RawLiDARPoint {
  */
 class Lidar {
 public:
-    Lidar();
+    /**
+	 * Construcor of Class
+	 *
+	 * @param pointer to used USART
+	 * @param Baudrate
+	 */
+	Lidar(HardwareSerial& ser) : serial(ser) {}
 
     /**
-     * @brief Initializes the LiDAR hardware (e.g., UART connection, motor control).
-     * @return true if initialization was successful.
-     */
-    bool initialize();
+	 * Starts the Lidar and its measurement system
+	 * 
+	 * @param modus to run the lidar
+	 * @return true if mode started correctly, false if not 
+	 */	
+	bool start();
 
     /**
-     * @brief Performs the full read, processing, and feature extraction pipeline.
-     * This is the primary method called by the SLAM task.
-     * @return A LiDARScan struct containing only the extracted Landmarks (features).
-     */
-    LiDARScan get_processed_scan();
+	 * should be excecuted as often as possible to read the data from USART
+	 * 
+	 * @return the number of data for the running mode (express *40, standard *1)
+	 */	
+	uint16_t readMeasurePoints();
+
+    /**
+	 * Checks if no Serial Data ist available in a given time
+	 * 
+	 * @param wait time ms 
+	 * @param amount of expected bytes
+	 * @return true if a timeout happend
+	 */	
+	bool checkForTimeout(uint32_t _time,size_t _size);
+
+    /**
+	 * Compares two Response Descriptors 
+	 * @returns true if equal 
+	 */	
+	bool compareDescriptor(rp_descriptor_t _descr1,rp_descriptor_t _descr2);
+
+    // Storage to save the Data of a Standard Scan
+    rawScanDataPoint_t DataBuffer[3250];
+
+    /**
+	 * Calculates angle for Standard mode 
+	 * According to the Datasheet for standard mode angle´s
+	 * @param LS
+	 * @param MS
+	 * @returns angle 0.00-360.00
+	 */	
+	float calcAngle(uint8_t _lowByte, uint8_t _highByte);
+
+    /**
+	 * Calculates the distance for Standard mode
+	 * @returns distance in mm
+	 */	
+	float calcDistance(uint8_t _lowByte, uint8_t _highByte);
+
+	/**
+	 * Builds a full scan from the Lidar
+	 * 
+	 * @param pointer to LiDARScan struct to fill
+	 * @param reference to bool that becomes true if a full scan is complete
+	 * @param reference to last angle read by ESP (to detect full rotation)
+	 */
+	void build_scan(LiDARScan* scan, bool &scanComplete_, float& lastAngleESP_);
 
 private:
+	static constexpr uint32_t LIDAR_SERIAL_BUFFER_SIZE = 5000;
+    static constexpr uint8_t LIDAR_RX_PIN = 5;
+    static constexpr uint8_t LIDAR_TX_PIN = 4;
+    static constexpr uint32_t LIDAR_BAUDRATE = 460800;
+
     /**
-     * @brief Low-level function to communicate with the hardware and read a full sweep.
-     * @param raw_points Output vector to fill with raw sensor data.
-     * @return The timestamp of the completed scan.
-     */
-    uint32_t read_raw_data(std::vector<RawLiDARPoint>& raw_points);
+	 * Tries to read a new full cycle of Points
+	 * 
+	 * @return the number of points 
+	 */	
+	uint16_t awaitStandardScan();
 
     /**
      * @brief Converts raw data points into high-confidence, distinct features (Landmarks).
@@ -63,6 +110,12 @@ private:
      * @param raw_points The raw sensor data.
      * @return A vector of extracted Landmarks for the EKF-SLAM.
      */
-    std::vector<LiDARLandmark> extract_features(const std::vector<RawLiDARPoint>& raw_points);
+    //std::vector<LiDARLandmark> extract_features(const std::vector<RawLiDARPoint>& raw_points);
+    // RIEN A FAIRE DANS LA CLASS LIDAR NON??????????????????????????????????????????????????????????????????????
+
+    // pointer to HardwareSerial USART 
+    HardwareSerial& serial;
+
+
 };
 

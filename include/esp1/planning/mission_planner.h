@@ -4,7 +4,9 @@
 
 #pragma once
 
-#include "common/data_types.h"
+#include "../../common/data_types.h"
+#include "../../esp1/mapping/occupancy/bayesian_grid.h" 
+
 #include <stdint.h>
 #include <vector>
 
@@ -19,7 +21,6 @@ public:
     enum MissionState {
         STATE_IDLE,          // Waiting for a command
         STATE_EXPLORING,     // Actively exploring unmapped areas
-        STATE_NAVIGATING,    // Moving to a user-defined waypoint
         STATE_RETURNING_HOME,// Moving to the starting pose
         STATE_EMERGENCY_STOP // Halt all motion and tasks
     };
@@ -32,7 +33,7 @@ public:
      * @param current_pose The latest pose from the EKF_SLAM engine.
      * @return The MissionGoal (Pose2D target and type) for the Global Planner.
      */
-    MissionGoal update_goal(const Pose2D& current_pose);
+    MissionGoal update_goal(const Pose2D& current_pose, const BayesianOccupancyGrid& grid);
 
     /**
      * @brief Changes the robot's high-level mission state (e.g., from IDLE to EXPLORING).
