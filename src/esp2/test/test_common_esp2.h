@@ -34,6 +34,8 @@
 #include "esp2/control/pure_pursuit.h"
 #include "esp_wifi.h"
 #include "motor_pid.h"
+#include "esp2/localization/ekf_localizer.h"
+#include "esp2/localization/slip_localizer2.h"
 
 // Pins used by the hardware components on the esp 2
 #define ESC_PIN 15          // pin used for the motor
@@ -55,9 +57,10 @@ extern EncoderCarVelocity encoder;
 extern Connection connection;
 extern HardwareSerial ESPS;
 extern Esp_link esp_link;
-
 extern MotorPID pid;
 extern PurePursuit purePursuit;
+extern EKFLocalizer ekf;
+extern SlipLocalizer slipLocalizer;
 
 // Prototypes of the functions
 void setup_all_together();          void loop_all_together();
@@ -82,3 +85,4 @@ void setup_clock_esp2();            void loop_clock_esp2();
 void setup_clock_esp2_STA();        void loop_clock_esp2_STA();
 void setup_test_comm();             void loop_test_comm();
 void setup_ekfTest();               void loop_ekfTest();
+void setup_test_ekf2();               void loop_test_ekf2();

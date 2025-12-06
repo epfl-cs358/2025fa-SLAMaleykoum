@@ -23,7 +23,7 @@
 
 // Change the id depending on the test to run
 #ifndef TEST_ID
-#define TEST_ID 23
+#define TEST_ID 24
 #endif
 
 void setup() {
@@ -73,6 +73,8 @@ void setup() {
         setup_test_comm();
     #elif TEST_ID == 23
         setup_ekfTest();
+    #elif TEST_ID == 24
+        setup_test_ekf2();
     #endif
 }
 
@@ -123,5 +125,7 @@ void loop() {
         loop_test_comm();
     #elif TEST_ID == 23
         loop_ekfTest();
+    #elif TEST_ID == 24
+        loop_test_ekf2();
     #endif
 }

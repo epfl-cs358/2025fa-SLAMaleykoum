@@ -5,16 +5,16 @@
 
 // MQTT topic for debugging EKF
 const char* mqtt_topic_ekf_debug = "slamaleykoum77/ekf";
+static uint32_t last_us;
+uint32_t now_us;
 
 // Create the EKF localizer (start at origin)
-EKFLocalizer ekf({0,0,0,0});
 
 // Helper to publish JSON over MQTT
 void publish_mqtt(const char* fmt, ...) {
     char buf[300];
     snprintf(buf, sizeof(buf), fmt);
     connection.publish(mqtt_topic_ekf_debug, buf);
-    delay(500);
 }
 
 void setup_ekfTest() {
@@ -28,7 +28,8 @@ void setup_ekfTest() {
     delay(1000);
     connection.check_connection();
 
-    I2C_wire.begin(8,9);
+
+    I2C_wire.begin(8, 9);
 
     // Init IMU
     i2cMutexInit();
@@ -36,15 +37,15 @@ void setup_ekfTest() {
         Serial.println("IMU FAILED to init!");
         while (true) delay(1000);
     }
-    imu.readAndUpdate();
-    if (!encoder.begin()) {
+    if( !encoder.begin()) {
         Serial.println("Encoder FAILED to init!");
         while (true) delay(1000);
     }
-    if (!motor.begin()) {
+    if( !motor.begin()) {
         Serial.println("Motor FAILED to init!");
         while (true) delay(1000);
     }
+    last_us = micros();
 
     publish_mqtt("{\"type\":\"print\",\"msg\":\"EKF MQTT test initialized\"}");
 }
@@ -56,25 +57,35 @@ void loop_ekfTest() {
     // -----------------------------
     // 1) Read IMU
     // -----------------------------
+    now_us = micros();
+    float dt = (now_us - last_us) * 1e-6f;
+    Serial.printf("DT: %0.6f us\n", dt);
+    last_us = now_us;
+    i2c_lock();
     imu.readAndUpdate();
     IMUData imu_data = imu.imu_data;   // direct copy from driver
 
     // -----------------------------
-    // 2) Encoder → odometry
+    // 2) Encoder → odometrystatic uint32_t last_us = micros();
     // -----------------------------
-    static uint32_t last_ms = imu_data.timestamp_ms;
-    uint32_t now = imu_data.timestamp_ms;
 
-    float dt = (now - last_ms) * 0.001f;
-    if (dt < 0.001f) dt = 0.001f;
-    last_ms = now;
-
+    
     float wheel_vel = encoder.getWheelLinearVelocity();   // m/s
+    float distance = encoder.getDistance();
+    i2c_unlock();
     float delta_d   = wheel_vel * dt;                     // distance traveled in dt
+
+
+   /* char msgEncoder[50];
+    snprintf(msgEncoder, sizeof(msgEncoder), "velocity = %0.3f,distqance = %0.3f", wheel_vel,distance);
+    connection.publish(mqtt_topic_ekf_debug ,msgEncoder);
+    */
+
+
 
     OdometryData odom;
     odom.delta_distance = delta_d;
-    odom.timestamp_ms   = now;
+    odom.timestamp_ms   = now_us/1000;
 
     // -----------------------------
     // 3) EKF full update
@@ -90,6 +101,8 @@ void loop_ekfTest() {
     // -----------------------------
     // 5) Publish everything
     // -----------------------------
+
+
     publish_mqtt(
         "{"
           "\"type\":\"ekf\","
@@ -97,24 +110,18 @@ void loop_ekfTest() {
           "\"y\":%.3f,"
           "\"theta\":%.3f,"
           "\"v\":%.3f,"
-          "\"omega\":%.3f,"
           "\"acc_x\":%.3f,"
           "\"acc_y\":%.3f,"
-          "\"acc_z\":%.3f,"
           "\"odom_v\":%.3f,"
-          "\"timestamp\":%lu"
         "}",
         pose.x,
         pose.y,
         pose.theta,
-        v.v_linear,
-        v.v_angular,
+        delta_d/dt,
         imu_data.acc_x,
         imu_data.acc_y,
-        imu_data.acc_z,
-        wheel_vel,
-        (unsigned long)imu_data.timestamp_ms
-    );
+        wheel_vel);
+
 
     // -----------------------------
     // 6) Keep MQTT alive
@@ -122,6 +129,7 @@ void loop_ekfTest() {
     connection.check_connection();
 
     // Slow enough to be readable (20 Hz)
+    delay(50);
 }
 
 /** 

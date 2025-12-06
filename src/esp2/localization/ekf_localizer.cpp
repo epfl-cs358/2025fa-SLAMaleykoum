@@ -8,6 +8,7 @@
 // ================================================================
 // Angle wrapping helper
 // ================================================================
+
 float EKFLocalizer::wrapAngle(float a) {
     while (a >  M_PI) a -= 2.f * M_PI;
     while (a < -M_PI) a += 2.f * M_PI;
@@ -32,8 +33,7 @@ float computeYawFromIMU(const IMUData& imu) {
 // Constructor
 // ================================================================
 EKFLocalizer::EKFLocalizer(const Pose2D& initial_pose)
-    : initialized_(false),
-      last_imu_timestamp_ms_(0),
+    : last_imu_timestamp_ms_(0),
       last_odom_timestamp_ms_(0),
       last_theta_imu(0.0f)
 {
@@ -126,17 +126,12 @@ void EKFLocalizer::predict(const IMUData& imu)
 
     uint32_t ts = imu.timestamp_ms;
 
-    if (!initialized_) {
-        last_imu_timestamp_ms_ = ts;
-        initialized_ = true;
-        return;
-    }
-
+   
     // -------------------------
     // 1) dt computation
     // -------------------------
-    float dt = (ts - last_imu_timestamp_ms_) / 1000.0f;
-    if (dt <= 0.f) dt = 1e-3f;
+    float dt = (ts - last_imu_timestamp_ms_) / 1000000.0f;
+    if (dt <= 0.f) dt = 1e-6f;
     last_imu_timestamp_ms_ = ts;
 
     // -------------------------
@@ -169,6 +164,7 @@ if (first) {
 last_theta = theta_imu;
 last_omega_z_ = omega;
     */
+   ////////////////////////////////////////change this according to imu_calibration.cpp test 3
     float theta_imu = computeYawFromIMU(imu);   // yaw rate
     float acc_f   = imu.acc_y;     // forward acceleration (Y-forward!!)
     last_theta_imu = theta_imu;  // cache for velocity output
@@ -184,8 +180,9 @@ last_omega_z_ = omega;
     float s = sinf(theta_imu);
     float c = cosf(theta_imu);
 
-    float x_pred = x + v_pred * s * dt;
+    float x_pred = x - v_pred * s * dt;
     float y_pred = y + v_pred * c * dt;
+    
 
     // -------------------------
     // 6) Update state vector
@@ -236,15 +233,16 @@ void EKFLocalizer::updateWithOdometry(const OdometryData& odom)
 {
     uint32_t ts = odom.timestamp_ms;
 
-    if (!initialized_) {
+    if (!enc_initialized) {
         last_odom_timestamp_ms_ = ts;
+        enc_initialized = true;
         return;
     }
 
     // -------------------------
     // 1) compute dt for odometry
     // -------------------------
-    float dt = (ts - last_odom_timestamp_ms_) / 1000.0f;
+    float dt = (ts - last_odom_timestamp_ms_) / 1000000.0f;
     if (dt <= 0.f) {
         last_odom_timestamp_ms_ = ts;
         return;

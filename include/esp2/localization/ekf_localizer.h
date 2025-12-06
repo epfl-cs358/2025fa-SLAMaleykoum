@@ -8,6 +8,13 @@
  * @brief Implements an EKF to fuse wheel odometry and IMU data.
  * State: [x, y, theta, v_linear]^T
  *  - X to the right, Y forward, theta=0 facing +Y.
+#include "mini_mat.h"
+#include <stdint.h>
+
+/**
+ * @brief Implements an EKF to fuse wheel odometry and IMU data.
+ * State: [x, y, theta, v_linear]^T
+ *  - X to the right, Y forward, theta=0 facing +Y.
  */
 class EKFLocalizer {
 public:
@@ -20,6 +27,7 @@ public:
     Velocity get_current_velocity() const;
 
 private:
+    // Old idea:
     // Old idea:
     // Eigen::Vector3d state_vector_; // x, y, theta
     // Eigen::Matrix3d covariance_matrix_; // P
@@ -37,7 +45,8 @@ private:
     float slip_R_v_factor_;  // multiplier on slip
     float slip_a_lat_thresh_; // lateral accel threshold
 
-    bool initialized_;
+    bool imu_initialized;
+    bool enc_initialized;
     uint32_t last_imu_timestamp_ms_;
     uint32_t last_odom_timestamp_ms_;
 
