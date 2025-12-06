@@ -25,19 +25,30 @@ C_YELLOW = (255, 200, 0)   # Planned Path
 # --- COORDINATE TRANSFORMS ---
 def world_to_screen(wx, wy):
     """ 
-    Converts World Meters to Screen Pixels.
-    World: X is Right, Y is Up (North).
-    Screen: X is Right, Y is Down.
+    Converts World Meters to Screen Pixels with Safety Checks.
+    Returns None if the coordinate is invalid/overflowing.
     """
-    # Center of screen is (0,0) in World
-    cx_screen = (GRID_W / 2) * WINDOW_SCALE
-    cy_screen = (GRID_H / 2) * WINDOW_SCALE
-    
-    pixels_per_meter = (1.0 / RESOLUTION) * WINDOW_SCALE
+    try:
+        if not (math.isfinite(wx) and math.isfinite(wy)):
+            return None
+            
+        # Center of screen is (0,0) in World
+        cx_screen = (GRID_W / 2) * WINDOW_SCALE
+        cy_screen = (GRID_H / 2) * WINDOW_SCALE
+        
+        pixels_per_meter = (1.0 / RESOLUTION) * WINDOW_SCALE
 
-    sx = cx_screen + (wx * pixels_per_meter)
-    sy = cy_screen - (wy * pixels_per_meter) # Invert Y axis
-    return int(sx), int(sy)
+        sx = cx_screen + (wx * pixels_per_meter)
+        sy = cy_screen - (wy * pixels_per_meter) # Invert Y axis
+
+        # Clamp coordinates to avoid Pygame overflow (Keep within short int range)
+        # Even if off-screen, we clamp so the line is drawn to the edge
+        sx = max(-20000, min(20000, sx))
+        sy = max(-20000, min(20000, sy))
+
+        return int(sx), int(sy)
+    except (ValueError, OverflowError):
+        return None
 
 def main():
     pygame.init()
@@ -168,11 +179,21 @@ def main():
 
             # 3. Draw Planned Path (Yellow)
             if len(path_points) > 1:
-                pts_screen = [world_to_screen(p[0], p[1]) for p in path_points]
-                pygame.draw.lines(screen, C_YELLOW, False, pts_screen, 3)
-                # Draw small dots for waypoints
-                for pt in pts_screen:
-                    pygame.draw.circle(screen, C_YELLOW, pt, 2)
+                # 3.1. Convert and Filter out None values
+                pts_screen = []
+                for p in path_points:
+                    scr_pt = world_to_screen(p[0], p[1])
+                    if scr_pt is not None:
+                        pts_screen.append(scr_pt)
+                
+                # 3.2. Only draw if we have at least 2 valid points
+                if len(pts_screen) > 1:
+                    try:
+                        pygame.draw.lines(screen, C_YELLOW, False, pts_screen, 3)
+                        for pt in pts_screen:
+                            pygame.draw.circle(screen, C_YELLOW, pt, 2)
+                    except Exception as e:
+                        print(f"Draw error: {e}")
 
             # 4. Draw Goal (Green)
             gx_s, gy_s = world_to_screen(goal_pose['x'], goal_pose['y'])
