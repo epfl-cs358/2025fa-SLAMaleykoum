@@ -31,6 +31,7 @@ void setup() {
 
     // --- Hardware Init ---
     I2C_wire.begin(Config::SDA_PIN, Config::SCL_PIN);
+    I2C_wire.setTimeout(10);
     i2cMutexInit();
     esp_link.begin();
 
