@@ -6,6 +6,7 @@
  * and defined here to avoid multiple definition errors.
  */
 
+/*
 #include "esp2/global_state.h"
 #include "esp2/config.h"
 
@@ -56,3 +57,5 @@ float velocity = 0.0f;
 // Path data
 GlobalPathMessage receivedPath;
 volatile bool newPathArrived = false;
+*/
+
