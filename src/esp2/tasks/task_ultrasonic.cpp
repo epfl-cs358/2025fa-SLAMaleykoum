@@ -6,10 +6,10 @@
 
 void TaskUltrasonic(void *pvParameters) {
     for (;;) {
-        if (!startSignalReceived) {
+        /*if (!startSignalReceived) {
             vTaskDelay(pdMS_TO_TICKS(100));
             continue;
-        }
+        }*/
         float dist = ultrasonic.readDistance();
         if (dist > 0 && dist < Config::EMERGENCY_DISTANCE) {
             motor.stop();

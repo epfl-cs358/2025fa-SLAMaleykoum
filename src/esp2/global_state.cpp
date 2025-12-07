@@ -45,6 +45,7 @@ Esp_link esp_link(Serial1);
 bool emergencyStop = false;
 bool finishedPath = false;
 bool startSignalReceived = false;
+bool firstPathReceived = false;
 
 // Pose state
 float posX = 0.0f;
@@ -54,5 +55,5 @@ float velocity = 0.0f;
 // Pose2D currentPose = {posX, posY, yaw, millis()};
 
 // Path data
-GlobalPathMessage receivedPath;
+GlobalPathMessage receivedPath = {0};
 volatile bool newPathArrived = false;

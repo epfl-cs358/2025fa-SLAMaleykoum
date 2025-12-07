@@ -51,6 +51,7 @@ extern WiFiClient tcpClient;
 extern bool emergencyStop;
 extern bool finishedPath;
 extern bool startSignalReceived;
+extern bool firstPathReceived;
 
 // ===================================================================
 // POSE STATE - defined in global_state.cpp
