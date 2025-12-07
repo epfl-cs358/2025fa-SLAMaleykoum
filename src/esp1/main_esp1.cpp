@@ -123,6 +123,8 @@ void Lidar_Sync_Map_Task(void* parameter) {
     SyncedScan* synced_data = new SyncedScan();
     LiDARScan* scan_buffer = new LiDARScan();
     int local_counter = 0;
+
+    // TODO: SYNC DATA FROM TIMESTAMPS !!!
     
     while (1) {
         if (xQueueReceive(Lidar_Buffer_Queue, scan_buffer, portMAX_DELAY) == pdPASS) {
@@ -235,7 +237,7 @@ void TCP_Transmit_Task(void* parameter) {
 }
 
 // =============================================================
-// REAL MISSION PLANNER TASK
+// MISSION PLANNER TASK
 // =============================================================
 void Mission_Planner_Task(void* parameter) {
     Serial.println("[Task] Mission Planner Started");

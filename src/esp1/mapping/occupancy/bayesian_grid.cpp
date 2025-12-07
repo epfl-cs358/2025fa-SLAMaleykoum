@@ -68,7 +68,8 @@ void BayesianOccupancyGrid::update_map(const SyncedScan& lidar_scan,
     const LiDARScan& scan = lidar_scan.scan; 
     const Pose2D& pose = lidar_scan.pose; 
 
-    float pose_deg = pose.theta * (180.0f/M_PI);
+    // Precompute pose angle in degrees
+    float pose_deg = pose.theta * (180.0f/M_PI) + 90.0f;
 
     for (uint16_t i = 0; i < scan.count; ++i)
     {
@@ -80,7 +81,7 @@ void BayesianOccupancyGrid::update_map(const SyncedScan& lidar_scan,
         // -----------------------------
         // FAST ANGLE NORMALIZATION
         // -----------------------------
-        float angle_world = pose_deg + scan.angles[i];
+        float angle_world = pose_deg - scan.angles[i];
 
         while (angle_world >= 360.0f) angle_world -= 360.0f;
         while (angle_world <   0.0f)  angle_world += 360.0f;
@@ -101,8 +102,9 @@ void BayesianOccupancyGrid::update_map(const SyncedScan& lidar_scan,
         int x0 = (int)(pose.x / grid_resolution) + grid_size_x / 2;
         int x1 = (int)(hit_x / grid_resolution) + grid_size_x / 2;
 
-        int y0 = (int)(pose.y / grid_resolution) + grid_size_y / 2;
-        int y1 = (int)(hit_y / grid_resolution) + grid_size_y / 2;
+        // This ensures +Y (North) goes to Index 0 (Top)
+        int y0 = grid_size_y / 2 - (int)(pose.y / grid_resolution);
+        int y1 = grid_size_y / 2 - (int)(hit_y / grid_resolution);
 
         // ------------------------------------------------------
         // Bresenham free cells
