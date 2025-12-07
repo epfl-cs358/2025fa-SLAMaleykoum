@@ -64,3 +64,5 @@ void setup_bayesian_dynamic_tcp();          void loop_bayesian_dynamic_tcp();
 void setup_clock_esp1();                    void loop_clock_esp1();
 void setup_led_basic();                     void loop_led_basic();
 void setup_clock_esp1_AP();                 void loop_clock_esp1_AP();
+void setup_fake_occupancy_grid();           void loop_fake_occupancy_grid(); 
+void setup_fake_global_esp1();              void loop_fake_global_esp1();
