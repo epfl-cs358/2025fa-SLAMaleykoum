@@ -38,7 +38,7 @@ SemaphoreHandle_t State_Mutex;
 // --- GLOBAL OBJECTS ---
 const int grid_size_x = 200;
 const int grid_size_y = 200;
-const float resolution = 0.05f;
+const float resolution = 0.2f;
 
 BayesianOccupancyGrid* TheMap = nullptr;
 GoalManager* goalManager = nullptr; // <--- ADDED OBJECT
@@ -63,16 +63,14 @@ HardwareSerial& IPC_Serial = Serial1;
 Esp_link esp_link(IPC_Serial); 
 
 float pathA_X[] = {
-    0.00, 0.00, 0.00, 0.00, 0.00, 0.00,
-    0.00, 0.00, 0.00, 0.00, 0.00, 0.00,
-    0.00, 0.00, 0.00, 0.00, 0.00, 0.00,
-    0.00, 0.00, 0.00, 0.00, 0.00, 0.00,
+    0.00, 0.00, 2.00, 4.00, 6.00, 8.00,
+    8.50, 8.50, 8.50, 4.50, 2.50, 0.50,
+    -2.50, -3.50, -3.50
 };
 float pathA_Y[] = {
-    0.00, 0.20, 0.20, 0.20, 0.20, 0.20,
-    0.20, 0.20, 0.20, 0.20, 0.50, 1.00,
-    1.50, 2.00, 2.40, 2.40, 2.40, 2.40,
-    2.40, 2.40, 2.40, 2.40, 2.40, 2.40
+    0.00, 0.30, 0.30, 0.30, 0.30, 0.30,
+    0.30, -3.70, -5.40, -5.40, -5.40, -5.40,
+    -5.40, -5.40, 0.30
 };
 const int pathA_size = sizeof(pathA_X) / sizeof(pathA_X[0]);
 
@@ -169,51 +167,53 @@ void Bayesian_Grid_Task(void* parameter) {
 }
 
 // =============================================================
-// TASK 5: TCP TRANSMIT
+// TASK 5: TCP TRANSMIT (Zero-Copy & Chunked)
 // =============================================================
 void TCP_Transmit_Task(void* parameter) {
     WiFiClient tcpClient;
-    const uint32_t map_size = grid_size_x * grid_size_y;
     uint8_t header[64]; 
+    
+    // Chunk size: Small enough to not block WiFi, big enough to be efficient
+    const size_t CHUNK_SIZE = 512; 
+
+    const TickType_t TelemetryFreq = pdMS_TO_TICKS(100); 
+    const TickType_t MapFreq = pdMS_TO_TICKS(4000); // 4 Seconds
+    
+    TickType_t lastMapTime = 0;
+    TickType_t xLastWakeTime = xTaskGetTickCount();
 
     while (1) {
+        vTaskDelayUntil(&xLastWakeTime, TelemetryFreq);
+
         if (!tcpClient || !tcpClient.connected()) {
             WiFiClient newClient = tcpServer.available();
             if (newClient) {
                 tcpClient = newClient;
                 tcpClient.setNoDelay(true);
+                Serial.println("TCP: Connected!");
             } else {
-                vTaskDelay(pdMS_TO_TICKS(100));
                 continue;
             }
         }
 
-        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-
-        // SNAPSHOT
-        if (xSemaphoreTake(Bayesian_Grid_Mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
-            memcpy(Tx_Map_Buffer, TheMap->get_map_data_color(), map_size);
-            xSemaphoreGive(Bayesian_Grid_Mutex);
-        } else continue;
-
-        if (xSemaphoreTake(State_Mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        // 1. Prepare State (Quick Copy)
+        if (xSemaphoreTake(State_Mutex, pdMS_TO_TICKS(20)) == pdTRUE) {
             Tx_Snapshot.pose = last_known_pose;
             Tx_Snapshot.path = current_global_path;
             Tx_Snapshot.goal = current_mission_goal;
             xSemaphoreGive(State_Mutex);
         }
 
-        if (!isfinite(Tx_Snapshot.goal.target_pose.x) || 
-            !isfinite(Tx_Snapshot.goal.target_pose.y)) {
-            vTaskDelay(pdMS_TO_TICKS(100));
-            continue; // Skip cette frame
-        }
+        // 2. Decide if we send map
+        bool send_map_now = (xTaskGetTickCount() - lastMapTime > MapFreq);
+        uint32_t map_total_size = TheMap->get_total_size(); // 40,000
 
-        // HEADER
+        // 3. Header
         memset(header, 0, 64);
         header[0] = 0xBE; header[1] = 0xEF;
-        uint32_t sz = map_size;
-        memcpy(&header[2], &sz, 4);
+        uint32_t payload_map_sz = send_map_now ? map_total_size : 0;
+        memcpy(&header[2], &payload_map_sz, 4);
+        
         uint16_t plen = Tx_Snapshot.path.current_length;
         if(plen > MAX_PATH_LENGTH) plen = 0;
         memcpy(&header[6], &plen, 2);
@@ -226,12 +226,39 @@ void TCP_Transmit_Task(void* parameter) {
         memcpy(&header[24], &Tx_Snapshot.goal.target_pose.y, 4);
         memcpy(&header[28], &Tx_Snapshot.goal.target_pose.theta, 4);
 
-        // SEND
         if (tcpClient.connected()) {
             tcpClient.write(header, 64);
             if(plen > 0) tcpClient.write((uint8_t*)Tx_Snapshot.path.path, plen * sizeof(Waypoint));
-            tcpClient.write(Tx_Map_Buffer, map_size);
-            taskYIELD(); 
+            
+            // 4. STREAM MAP (If needed)
+            if (send_map_now) {
+                int8_t* raw_map = TheMap->get_raw_data_pointer();
+                size_t offset = 0;
+                
+                while (offset < map_total_size) {
+                    if (!tcpClient.connected()) break;
+
+                    size_t remaining = map_total_size - offset;
+                    size_t to_write = (remaining < CHUNK_SIZE) ? remaining : CHUNK_SIZE;
+
+                    // CRITICAL: Lock, Write, Unlock, Yield
+                    // We stream DIRECTLY from the map memory. No Buffer.
+                    if (xSemaphoreTake(Bayesian_Grid_Mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+                        tcpClient.write((uint8_t*)&raw_map[offset], to_write);
+                        xSemaphoreGive(Bayesian_Grid_Mutex);
+                    } else {
+                        // If we can't lock, wait a bit and retry (don't skip data)
+                        vTaskDelay(1); 
+                        continue; 
+                    }
+                    
+                    offset += to_write;
+                    
+                    // Give other tasks (Lidar/Wifi) a chance to breathe
+                    vTaskDelay(1); 
+                }
+                lastMapTime = xTaskGetTickCount();
+            }
         }
     }
 }
@@ -282,20 +309,31 @@ void Mission_Planner_Task(void* parameter) {
 // GLOBAL PLANNER STUB
 // =============================================================
 void Global_Planner_Task(void* parameter) {
-    // Generate a fake path for visualization
     while (1) {
+        GlobalPathMessage pathMsg;  // Local variable
+        
+        // Build the path inside the mutex (fast)
         if(xSemaphoreTake(State_Mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
-            // Here you would normally call globalPlanner->plan(pose, current_mission_goal);
-            current_global_path.current_length = pathA_size;
-            current_global_path.timestamp_ms = millis();
-            for (int i = 0; i < pathA_size; i++) {
-                current_global_path.path[i].x = pathA_X[i];
-                current_global_path.path[i].y = pathA_Y[i];
-            }
-            esp_link.sendPath(current_global_path);
+            pathMsg.current_length = pathA_size;
+            pathMsg.timestamp_ms = millis();
+            pathMsg.path_id = 0;
             
-            xSemaphoreGive(State_Mutex);
+            for (int i = 0; i < pathA_size; i++) {
+                pathMsg.path[i].x = pathA_X[i];
+                pathMsg.path[i].y = pathA_Y[i];
+            }
+            
+            // Also update the global state for TCP
+            current_global_path = pathMsg;
+            
+            xSemaphoreGive(State_Mutex);  // ← Release BEFORE sending
         }
+        
+       
+        
+        // Send AFTER releasing the mutex (slow operation)
+        esp_link.sendPath(pathMsg);        
+        
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
@@ -313,25 +351,19 @@ void setup() {
     State_Mutex = xSemaphoreCreateMutex();
 
     TheMap = new BayesianOccupancyGrid(resolution, grid_size_x, grid_size_y);
-    Tx_Map_Buffer = (uint8_t*)malloc(grid_size_x * grid_size_y);
-    
-    // Instantiate Goal Manager
     goalManager = new GoalManager({0.0f, 0.0f, 0.0f, 0});
-
     current_mission_goal.target_pose = {0.0f, 0.0f, 0.0f, 0};
     current_mission_goal.type = EXPLORATION_NODE;
-    
     current_global_path.current_length = 0;
     
-    if (!TheMap || !Tx_Map_Buffer || !goalManager) { 
+    if (!TheMap || !goalManager) { 
         Serial.println("MEMORY ALLOC FAILED"); 
         while(1); 
     }
 
     WiFi.mode(WIFI_AP);
     WiFi.softAP(ssid, password);
-    delay(3000);
-    Serial.println("AP Mode set");
+    delay(1000); // Give WiFi time to settle
     tcpServer.begin();
     tcpServer.setNoDelay(true);
 
@@ -339,21 +371,32 @@ void setup() {
     lidar.start(); 
     delay(1000);
 
-    Lidar_Buffer_Queue = xQueueCreate(1, sizeof(LiDARScan));
-    Lidar_Pose_Queue   = xQueueCreate(1, sizeof(SyncedScan));
+    // Queue Sizes: Increased Lidar buffer slightly to handle bursts
+    Lidar_Buffer_Queue = xQueueCreate(2, sizeof(LiDARScan));
+    Lidar_Pose_Queue   = xQueueCreate(2, sizeof(SyncedScan));
     Path_Send_Queue    = xQueueCreate(1, sizeof(GlobalPathMessage));
 
-    delay(10000);
-    // Core 0
-    xTaskCreatePinnedToCore(IPC_Receive_Task, "IPC_Rx", 4096, NULL, 5, NULL, 0);
-    xTaskCreatePinnedToCore(TCP_Transmit_Task, "TCP_Tx", 8192, NULL, 3, &TCP_Task_Handle, 0); 
-    xTaskCreatePinnedToCore(Mission_Planner_Task, "Mission", 4096, NULL, 2, NULL, 0); // Increased Stack
+    // --- TASK PRIORITIES & CORE ASSIGNMENT ---
+    // Rule: Higher number = Higher Priority.
+    // Core 0: System & Comm | Core 1: Math & Sensors
 
-    // Core 1
-    xTaskCreatePinnedToCore(Lidar_Read_Task, "Lidar_Read", 4096, NULL, 4, NULL, 1);
-    xTaskCreatePinnedToCore(Lidar_Sync_Map_Task, "Lidar_Sync", 8192, NULL, 4, NULL, 1);
-    xTaskCreatePinnedToCore(Bayesian_Grid_Task, "Map_Comp", 8192, NULL, 3, NULL, 1);
-    xTaskCreatePinnedToCore(Global_Planner_Task, "Global_Plan", 2048, NULL, 2, NULL, 1);
+    // -- Core 0 (Comms) --
+    // IPC is critical (100Hz), keep high.
+    xTaskCreatePinnedToCore(IPC_Receive_Task, "IPC_Rx", 4096, NULL, 5, NULL, 0);
+    // TCP is slow but needs to stay alive. Priority 3 is fine.
+    xTaskCreatePinnedToCore(TCP_Transmit_Task, "TCP_Tx", 8192, NULL, 3, &TCP_Task_Handle, 0); 
+    // Mission Planner is "Thinking", can be interrupted. Priority 2.
+    xTaskCreatePinnedToCore(Mission_Planner_Task, "Mission", 4096, NULL, 2, NULL, 0);
+
+    // -- Core 1 (Heavy Lifting) --
+    // Lidar Reading: Lowered to 3. If we miss a packet, it's better than freezing the CPU.
+    xTaskCreatePinnedToCore(Lidar_Read_Task, "Lidar_Read", 4096, NULL, 3, NULL, 1);
+    // Sync: Simple pass-through, matches Lidar.
+    xTaskCreatePinnedToCore(Lidar_Sync_Map_Task, "Lidar_Sync", 8192, NULL, 3, NULL, 1);
+    // Mapping: VERY HEAVY math. Lowered to 2. It runs in background.
+    xTaskCreatePinnedToCore(Bayesian_Grid_Task, "Map_Comp", 8192, NULL, 2, NULL, 1);
+    // Global Planner: Occasional heavy burst. Priority 2.
+    xTaskCreatePinnedToCore(Global_Planner_Task, "Global_Plan", 8192, NULL, 2, NULL, 1);
 }
 
 void loop() {}

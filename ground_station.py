@@ -8,47 +8,32 @@ import time
 # --- CONFIGURATION ---
 ESP_IP = "192.168.4.1" 
 PORT = 9000
-GRID_W = 200        # Width of the grid (cells)
-GRID_H = 200        # Height of the grid (cells)
-RESOLUTION = 0.05   # Meters per cell
-WINDOW_SCALE = 4    # Pixel scaling (Window size = 800x800)
+GRID_W = 200        
+GRID_H = 200        
+RESOLUTION = 0.2    
+WINDOW_SCALE = 4    
 
-# --- COLORS (R, G, B) ---
+# --- COLORS ---
 C_BLACK  = (0, 0, 0)
 C_WHITE  = (255, 255, 255)
-C_GREY   = (100, 100, 100) # Unknown areas
-C_RED    = (255, 50, 50)   # The Car
-C_GREEN  = (50, 255, 50)   # The Goal
-C_BLUE   = (0, 150, 255)   # History Trail
-C_YELLOW = (255, 200, 0)   # Planned Path
+C_GREY   = (100, 100, 100)
+C_RED    = (255, 50, 50)
+C_GREEN  = (50, 255, 50)
+C_YELLOW = (255, 200, 0)
 
 # --- COORDINATE TRANSFORMS ---
 def world_to_screen(wx, wy):
-    """ 
-    Converts World Meters to Screen Pixels with Safety Checks.
-    Returns None if the coordinate is invalid/overflowing.
-    """
     try:
-        if not (math.isfinite(wx) and math.isfinite(wy)):
-            return None
-            
-        # Center of screen is (0,0) in World
+        if not (math.isfinite(wx) and math.isfinite(wy)): return None
         cx_screen = (GRID_W / 2) * WINDOW_SCALE
         cy_screen = (GRID_H / 2) * WINDOW_SCALE
-        
         pixels_per_meter = (1.0 / RESOLUTION) * WINDOW_SCALE
-
         sx = cx_screen + (wx * pixels_per_meter)
-        sy = cy_screen - (wy * pixels_per_meter) # Invert Y axis
-
-        # Clamp coordinates to avoid Pygame overflow (Keep within short int range)
-        # Even if off-screen, we clamp so the line is drawn to the edge
+        sy = cy_screen - (wy * pixels_per_meter) 
         sx = max(-20000, min(20000, sx))
         sy = max(-20000, min(20000, sy))
-
         return int(sx), int(sy)
-    except (ValueError, OverflowError):
-        return None
+    except: return None
 
 def main():
     pygame.init()
@@ -56,9 +41,11 @@ def main():
     pygame.display.set_caption("ESP32 Mission Control")
     font = pygame.font.SysFont("Consolas", 16, bold=True)
     
-    # --- CONNECTION ---
+    # Transparent surface for the Ghost Trail
+    trail_surface = pygame.Surface((GRID_W * WINDOW_SCALE, GRID_H * WINDOW_SCALE), pygame.SRCALPHA)
+
     client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    client.settimeout(3.0) # 3s timeout
+    client.settimeout(5.0) 
     print(f"Connecting to {ESP_IP}:{PORT}...")
     try:
         client.connect((ESP_IP, PORT))
@@ -67,176 +54,146 @@ def main():
         print(f"Connection Failed: {e}")
         return
 
-    # --- STATE VARIABLES ---
     rx_buffer = b''
-    HEADER_SIZE = 64 # Matches ESP32 struct padding
+    HEADER_SIZE = 64
     
     car_pose  = {'x': 0.0, 'y': 0.0, 'theta': 0.0}
     goal_pose = {'x': 0.0, 'y': 0.0, 'theta': 0.0}
-    path_points = []  # List of (x,y) tuples
-    history_trail = [] # List of (x,y) tuples for past positions
+    path_points = []  
+    history_trail = [] 
     
     map_surface = None
 
     running = True
     while running:
-        # 1. EVENT HANDLING
         for event in pygame.event.get():
             if event.type == pygame.QUIT: running = False
-            # Add 'C' to clear history if it gets too messy
             if event.type == pygame.KEYDOWN and event.key == pygame.K_c:
                 history_trail = []
+                trail_surface.fill((0,0,0,0)) # Clear transparency layer
 
-        # 2. DATA RECEPTION
         try:
-            chunk = client.recv(8192)
-            if not chunk: 
-                print("Server closed connection.")
-                break
+            chunk = client.recv(65536)
+            if not chunk: break
             rx_buffer += chunk
 
-            # Process buffer until we run out of full packets
             while True:
-                # Need at least a header to know payload size
-                if len(rx_buffer) < HEADER_SIZE:
-                    break 
+                if len(rx_buffer) < HEADER_SIZE: break 
 
-                # Check Magic Word (0xBE, 0xEF)
                 if rx_buffer[0] != 0xBE or rx_buffer[1] != 0xEF:
-                    # Sync lost, slide buffer by 1 byte to find magic word
                     rx_buffer = rx_buffer[1:]
                     continue
                 
-                # Peek at header to calculate total packet size
-                # Format: Magic(2), MapSz(4), PathLen(2), Car(12), Goal(12), Padding(32)
-                # Map Size is at offset 2 (4 bytes, unsigned int)
-                # Path Len is at offset 6 (2 bytes, unsigned short)
+                # Dynamic Packet Size Reading
                 map_bytes_size = struct.unpack('<I', rx_buffer[2:6])[0]
                 path_len = struct.unpack('<H', rx_buffer[6:8])[0]
                 
                 total_packet_size = HEADER_SIZE + (path_len * 8) + map_bytes_size
                 
-                if len(rx_buffer) < total_packet_size:
-                    break # Wait for more data
+                if len(rx_buffer) < total_packet_size: break 
                 
-                # --- PACKET EXTRACTED ---
                 packet = rx_buffer[:total_packet_size]
-                rx_buffer = rx_buffer[total_packet_size:] # Remove from buffer
+                rx_buffer = rx_buffer[total_packet_size:]
 
-                # A. Decode Header
-                # Car: Offsets 8-20 (3 floats)
+                # --- 1. DECODE HEADER (Telemetry) ---
                 cx, cy, ct = struct.unpack('<fff', packet[8:20])
-                # Goal: Offsets 20-32 (3 floats)
                 gx, gy, gt = struct.unpack('<fff', packet[20:32])
                 
                 car_pose = {'x': cx, 'y': cy, 'theta': ct}
                 goal_pose = {'x': gx, 'y': gy, 'theta': gt}
 
-                # Update History (Only if moved significantly to save RAM/CPU)
-                if not history_trail or math.hypot(cx - history_trail[-1][0], cy - history_trail[-1][1]) > 0.05:
+                # --- 2. GHOST TRAIL LOGIC ---
+                # Only add point if moved > 10cm
+                if not history_trail or math.hypot(cx - history_trail[-1][0], cy - history_trail[-1][1]) > 0.1:
                     history_trail.append((cx, cy))
-                    if len(history_trail) > 1000: history_trail.pop(0)
+                    if len(history_trail) > 2000: history_trail.pop(0)
+                    
+                    # Draw new point onto the transparent surface immediately (Optimization)
+                    pt = world_to_screen(cx, cy)
+                    if pt:
+                        # Light Blue with Alpha=100 (0-255)
+                        pygame.draw.circle(trail_surface, (0, 150, 255, 50), pt, 4)
 
-                # B. Decode Path (Array of Waypoints)
-                # Payload starts after header
+                # --- 3. DECODE PATH ---
                 path_payload = packet[HEADER_SIZE : HEADER_SIZE + (path_len * 8)]
                 path_points = []
                 for i in range(path_len):
                     px, py = struct.unpack('<ff', path_payload[i*8 : (i+1)*8])
                     path_points.append((px, py))
 
-                # C. Decode Map
-                map_payload = packet[HEADER_SIZE + (path_len * 8) :]
-                grid = np.frombuffer(map_payload, dtype=np.uint8).reshape((GRID_H, GRID_W))
-                
-                # Convert Grid to RGB Surface
-                # 0=Black, 255=White, 127=Grey
-                rgb_map = np.zeros((GRID_H, GRID_W, 3), dtype=np.uint8)
-                occ_mask  = grid < 85      # v≈255*(1-prob), donc prob>0.66
-                free_mask   = grid > 170     # prob<0.33
-                unk_mask   = (~free_mask) & (~occ_mask)
+                # --- 4. DECODE MAP (Conditional) ---
+                if map_bytes_size > 0:
+                    map_payload = packet[HEADER_SIZE + (path_len * 8) :]
+                    
+                    # 1. Read as signed int8 (raw log odds)
+                    grid_log_odds = np.frombuffer(map_payload, dtype=np.int8).reshape((GRID_H, GRID_W))
+                    
+                    rgb_map = np.zeros((GRID_H, GRID_W, 3), dtype=np.uint8)
+                    
+                    # 2. Convert Log-Odds to Color on the PC side (Saving ESP32 CPU)
+                    # L_OCC_INT is +4, L_FREE_INT is -4 usually
+                    # High positive = Occupied (Black)
+                    # High negative = Free (White)
+                    # Near zero = Unknown (Grey)
+                    
+                    occ_mask  = grid_log_odds > 20   # Threshold for occupied
+                    free_mask = grid_log_odds < -20  # Threshold for free
+                    unk_mask  = (~free_mask) & (~occ_mask)
 
-                rgb_map[free_mask] = C_WHITE
-                rgb_map[occ_mask]  = C_BLACK
-                rgb_map[unk_mask]  = C_GREY
-                
-                # Pygame surfaces are (Width, Height). Numpy is (Row, Col) -> (Height, Width).
-                # We transpose and scale up
-                surf = pygame.surfarray.make_surface(np.transpose(rgb_map, (1, 0, 2)))
-                map_surface = pygame.transform.scale(surf, (GRID_W * WINDOW_SCALE, GRID_H * WINDOW_SCALE))
+                    rgb_map[free_mask] = C_WHITE
+                    rgb_map[occ_mask]  = C_BLACK
+                    rgb_map[unk_mask]  = C_GREY
+                    
+                    surf = pygame.surfarray.make_surface(np.transpose(rgb_map, (1, 0, 2)))
+                    map_surface = pygame.transform.scale(surf, (GRID_W * WINDOW_SCALE, GRID_H * WINDOW_SCALE))
 
-            # --- RENDERING ---
+            # --- RENDER FRAME ---
             screen.fill(C_GREY)
             
-            # 1. Draw Map
+            # Layer 1: Map (Bottom)
             if map_surface:
                 screen.blit(map_surface, (0, 0))
 
-            # 2. Draw History Trail (Blue)
-            if len(history_trail) > 1:
-                pts_screen = [world_to_screen(p[0], p[1]) for p in history_trail]
-                pygame.draw.lines(screen, C_BLUE, False, pts_screen, 1)
+            # Layer 2: Ghost Trail (Transparent)
+            screen.blit(trail_surface, (0,0))
 
-            # 3. Draw Planned Path (Yellow)
-            if len(path_points) > 1:
-                # 3.1. Convert and Filter out None values
-                pts_screen = []
-                for p in path_points:
-                    scr_pt = world_to_screen(p[0], p[1])
-                    if scr_pt is not None:
-                        pts_screen.append(scr_pt)
-                
-                # 3.2. Only draw if we have at least 2 valid points
-                if len(pts_screen) > 1:
-                    try:
-                        pygame.draw.lines(screen, C_YELLOW, False, pts_screen, 3)
-                        for pt in pts_screen:
-                            pygame.draw.circle(screen, C_YELLOW, pt, 2)
-                    except Exception as e:
-                        print(f"Draw error: {e}")
+            # Layer 3: Planned Path (Yellow)
+            pts_screen = [world_to_screen(p[0], p[1]) for p in path_points]
+            valid_pts = [p for p in pts_screen if p is not None]
+            if len(valid_pts) > 1:
+                pygame.draw.lines(screen, C_YELLOW, False, valid_pts, 3)
+                for pt in valid_pts: pygame.draw.circle(screen, C_YELLOW, pt, 2)
 
-            # 4. Draw Goal (Green)
+            # Layer 4: Car & Goal
             gx_s, gy_s = world_to_screen(goal_pose['x'], goal_pose['y'])
-            # Target Circle
-            pygame.draw.circle(screen, C_GREEN, (gx_s, gy_s), 8, 2) 
-            pygame.draw.circle(screen, C_GREEN, (gx_s, gy_s), 2) 
-            # Orientation Line (User Def: 0=North, 90=West)
-            # Math: X = -sin(th), Y = cos(th). Screen Y inverted -> -cos(th)
-            ge_x = gx_s - 20 * math.sin(goal_pose['theta']) 
-            ge_y = gy_s - 20 * math.cos(goal_pose['theta'])
-            pygame.draw.line(screen, C_GREEN, (gx_s, gy_s), (ge_x, ge_y), 2)
+            if gx_s:
+                pygame.draw.circle(screen, C_GREEN, (gx_s, gy_s), 8, 2) 
+                ge_x = gx_s - 20 * math.sin(goal_pose['theta']) 
+                ge_y = gy_s - 20 * math.cos(goal_pose['theta'])
+                pygame.draw.line(screen, C_GREEN, (gx_s, gy_s), (ge_x, ge_y), 2)
 
-            # 5. Draw Car (Red)
             cx_s, cy_s = world_to_screen(car_pose['x'], car_pose['y'])
-            pygame.draw.circle(screen, C_RED, (cx_s, cy_s), 7)
-            # Orientation
-            ce_x = cx_s - 20 * math.sin(car_pose['theta'])
-            ce_y = cy_s - 20 * math.cos(car_pose['theta'])
-            pygame.draw.line(screen, C_RED, (cx_s, cy_s), (ce_x, ce_y), 3)
-            
-            # 6. HUD Text Overlay
+            if cx_s:
+                pygame.draw.circle(screen, C_RED, (cx_s, cy_s), 7)
+                ce_x = cx_s + 20 * (-math.sin(car_pose['theta']))
+                ce_y = cy_s - 20 * (math.cos(car_pose['theta']))
+                pygame.draw.line(screen, C_RED, (cx_s, cy_s), (ce_x, ce_y), 3)
+
+            # HUD
             status_lines = [
-                f"CAR POS : X{car_pose['x']:5.2f} Y{car_pose['y']:5.2f} T{math.degrees(car_pose['theta']):5.1f}°",
-                f"GOAL    : X{goal_pose['x']:5.2f} Y{goal_pose['y']:5.2f}",
-                f"STATUS  : {'NAVIGATING' if len(path_points) > 0 else 'IDLE'}",
-                f"PATH LEN: {len(path_points)}"
+                f"CAR   : X{car_pose['x']:5.2f} Y{car_pose['y']:5.2f} T{math.degrees(car_pose['theta']):5.1f}",
+                f"PATH  : {len(path_points)} pts",
+                f"MAP   : {'UPDATING' if map_bytes_size > 0 else 'CACHED'}"
             ]
-            
             for i, line in enumerate(status_lines):
-                # Draw text with black shadow for readability
-                txt_shad = font.render(line, True, C_BLACK)
-                txt_main = font.render(line, True, C_YELLOW)
-                screen.blit(txt_shad, (12, 12 + i * 20))
-                screen.blit(txt_main, (10, 10 + i * 20))
+                screen.blit(font.render(line, True, C_BLACK), (12, 12 + i * 20))
+                screen.blit(font.render(line, True, C_YELLOW), (10, 10 + i * 20))
 
             pygame.display.flip()
 
-        except socket.timeout:
-            pass # No data received, keep rendering last frame
-        except KeyboardInterrupt:
-            break
-        except Exception as e:
-            print(f"Error: {e}")
+        except socket.timeout: pass 
+        except Exception as e: 
+            print(e)
             break
 
     client.close()
@@ -244,4 +201,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-
+    

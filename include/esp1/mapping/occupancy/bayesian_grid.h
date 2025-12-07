@@ -40,11 +40,11 @@ public:
      */
     float get_cell_probability(float x_m, float y_m) const;
 
-    /**
-     * @brief Exports the map data for use by the Global Planner.
-     */
-    // Returns a simplified map representation (e.g. pointer or some light compressed array).
-    const uint8_t* get_map_data_color() const;
+    // /**
+    //  * @brief Exports the map data for use by the Global Planner.
+    //  */
+    // // Returns a simplified map representation (e.g. pointer or some light compressed array).
+    // const uint8_t* get_map_data_color() const;
 
     /**
      * @brief Exports the map data for use by the Global Planner.
@@ -56,6 +56,10 @@ public:
     float grid_resolution;
     uint16_t grid_size_x;
     uint16_t grid_size_y;
+
+    // Optimisation:
+    int8_t* get_raw_data_pointer() { return log_odds; }
+    uint32_t get_total_size() const { return grid_size_x * grid_size_y; }
 
 private:
     //  tableau interne, contigu, sans allocation dynamique

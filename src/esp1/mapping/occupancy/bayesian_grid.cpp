@@ -83,6 +83,9 @@ void BayesianOccupancyGrid::update_map(const SyncedScan& lidar_scan,
         // -----------------------------
         float angle_world = pose_deg - scan.angles[i];
 
+        // SAFETY: Check for NaN (Not a Number) to prevent random crash
+        if (isnan(angle_world)) continue;
+
         while (angle_world >= 360.0f) angle_world -= 360.0f;
         while (angle_world <   0.0f)  angle_world += 360.0f;
 
@@ -172,28 +175,28 @@ float BayesianOccupancyGrid::get_cell_probability(float x_idx,
     return prob_table[ log_odds[idx] + 40 ];
 }
 
-// ------------------------------------------------------
-// Export grayscale map
-// ------------------------------------------------------
-const uint8_t* BayesianOccupancyGrid::get_map_data_color() const
-{
-    static uint8_t export_data[GRID_MAX_SIZE];
+// // ------------------------------------------------------
+// // Export grayscale map
+// // ------------------------------------------------------
+// const uint8_t* BayesianOccupancyGrid::get_map_data_color() const
+// {
+//     // static uint8_t export_data[GRID_MAX_SIZE];
 
-    for (int y = 0; y < grid_size_y; y++)
-    {
-        for (int x = 0; x < grid_size_x; x++)
-        {
-            float p = get_cell_probability(x, y);
+//     // for (int y = 0; y < grid_size_y; y++)
+//     // {
+//     //     for (int x = 0; x < grid_size_x; x++)
+//     //     {
+//     //         float p = get_cell_probability(x, y);
 
-            float v = 255.0f * (1.0f - p);
-            if (v < 0) v = 0;
-            if (v > 255) v = 255;
+//     //         float v = 255.0f * (1.0f - p);
+//     //         if (v < 0) v = 0;
+//     //         if (v > 255) v = 255;
 
-            export_data[y * grid_size_x + x] = (uint8_t)v;
-        }
-    }
-    return export_data;
-}
+//     //         export_data[y * grid_size_x + x] = (uint8_t)v;
+//     //     }
+//     // }
+//     return (const uint8_t*)log_odds;
+// }
 
 // ------------------------------------------------------
 // Return raw int8 grid
