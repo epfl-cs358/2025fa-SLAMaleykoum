@@ -19,11 +19,11 @@
  */
 #pragma once
 #include <Arduino.h>
-#include "MotorManager.h"
-#include "DMS15.h"
-#include "UltraSonicSensor.h"
-#include "ImuSensor.h"
-#include "I2C_mutex.h"
+#include "hardware/MotorManager.h"
+#include "hardware/DMS15.h"
+#include "hardware/UltraSonicSensor.h"
+#include "hardware/ImuSensor.h"
+#include "hardware/I2C_mutex.h"
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include "common/wifi_connection.h"
