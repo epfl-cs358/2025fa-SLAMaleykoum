@@ -53,7 +53,7 @@ const int pathB_size = sizeof(pathB_X) / sizeof(pathB_X[0]);
 // ===============================================================
 void setup_send_dynamic_path() {
     Serial.begin(115200);
-    delay(20000);
+    delay(6000);
 
     Serial.println("\n=== ESP1 Dynamic Path Test ===");
 
@@ -78,6 +78,7 @@ void setup_send_dynamic_path() {
     // Wait 20 seconds
     Serial.println("\nWaiting 20 seconds before sending new path...");
     delay(20000);
+
 
     // --- Send PATH B -----------------------------------------
     GlobalPathMessage pathB;
