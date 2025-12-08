@@ -14,8 +14,8 @@
 
 
 // Define the maximum number of waypoints the controller can handle.
-#define MAX_PATH_LENGTH 500
-#define MAX_LIDAR_POINTS 3000
+#define MAX_PATH_LENGTH 50
+#define MAX_LIDAR_POINTS 500
 #define ROBOT_RADIUS 0.3f
 
 
@@ -227,7 +227,7 @@ struct LoopClosureCorrection {
  * @brief High-level goal state for the robot.
  */
 enum MissionGoalType {
-    EXPLORATION_NODE,
+    EXPLORATION_MODE,
     RETURN_HOME,
     IDLE
 };

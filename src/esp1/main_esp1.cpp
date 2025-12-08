@@ -41,7 +41,7 @@ const int grid_size_y = 200;
 const float resolution = 0.2f;
 
 BayesianOccupancyGrid* TheMap = nullptr;
-GoalManager* goalManager = nullptr; // <--- ADDED OBJECT
+MissionPlanner* mission_planner = nullptr; // <--- ADDED OBJECT
 
 // --- STATE VARIABLES ---
 Pose2D last_known_pose = {0,0,0,0};
@@ -270,7 +270,7 @@ void Mission_Planner_Task(void* parameter) {
     Serial.println("[Task] Mission Planner Started");
     
     // Set initial state
-    goalManager->set_mission_state(GoalManager::STATE_EXPLORING);
+    mission_planner->set_mission_state(MissionGoalType::EXPLORATION_MODE);
 
     while (1) {
         Pose2D current_p;
@@ -289,16 +289,16 @@ void Mission_Planner_Task(void* parameter) {
         // If the map is being updated (written) while we read, we get garbage or crash.
         if (xSemaphoreTake(Bayesian_Grid_Mutex, pdMS_TO_TICKS(200)) == pdTRUE) {
             
-            MissionGoal new_goal = goalManager->update_goal(current_p, *TheMap);
-            
-            xSemaphoreGive(Bayesian_Grid_Mutex);
+            MissionGoal new_goal = mission_planner->update_goal(current_p, *TheMap);
 
             // 3. Publish Goal to Global State (for TCP & Global Planner)
-            if(xSemaphoreTake(State_Mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+            if (xSemaphoreTake(State_Mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
                 current_mission_goal = new_goal;
                 xSemaphoreGive(State_Mutex);
             }
-        }
+            
+            xSemaphoreGive(Bayesian_Grid_Mutex);
+        } 
 
         // Run at 2Hz (every 500ms)
         vTaskDelay(pdMS_TO_TICKS(500));
@@ -329,10 +329,8 @@ void Global_Planner_Task(void* parameter) {
             xSemaphoreGive(State_Mutex);  // ← Release BEFORE sending
         }
         
-       
-        
         // Send AFTER releasing the mutex (slow operation)
-        esp_link.sendPath(pathMsg);        
+        esp_link.sendPath(pathMsg);
         
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
@@ -351,12 +349,12 @@ void setup() {
     State_Mutex = xSemaphoreCreateMutex();
 
     TheMap = new BayesianOccupancyGrid(resolution, grid_size_x, grid_size_y);
-    goalManager = new GoalManager({0.0f, 0.0f, 0.0f, 0});
+    mission_planner = new MissionPlanner({0.0f, 0.0f, 0.0f, 0});
     current_mission_goal.target_pose = {0.0f, 0.0f, 0.0f, 0};
-    current_mission_goal.type = EXPLORATION_NODE;
+    current_mission_goal.type = EXPLORATION_MODE;
     current_global_path.current_length = 0;
     
-    if (!TheMap || !goalManager) { 
+    if (!TheMap || !mission_planner) { 
         Serial.println("MEMORY ALLOC FAILED"); 
         while(1); 
     }

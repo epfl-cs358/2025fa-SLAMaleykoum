@@ -7,7 +7,6 @@
 #include "../../common/data_types.h"
 #include "../../esp1/mapping/occupancy/bayesian_grid.h" 
 
-#include <stdint.h>
 #include <vector>
 
 /**
@@ -18,8 +17,6 @@ public:
     /**
      * @brief Defines the available mission states or modes.
      */
-
-
     MissionPlanner(const Pose2D& initial_home_pose);
 
     /**
@@ -50,8 +47,6 @@ public:
     return remaining_frontier_clusters_;
     }
 
-
-
     MissionGoalType get_current_state() const { return current_state_; }
 
 private:
@@ -60,5 +55,4 @@ private:
     std::vector<Pose2D> waypoint_queue_;
     MissionGoal current_target_;
     std::vector<std::vector<std::pair<int,int>>> remaining_frontier_clusters_;
-    
 };
