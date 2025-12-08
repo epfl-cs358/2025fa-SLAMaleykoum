@@ -228,7 +228,6 @@ struct LoopClosureCorrection {
  */
 enum MissionGoalType {
     EXPLORATION_NODE,
-    NAVIGATION_TO_WAYPOINT,
     RETURN_HOME,
     IDLE
 };

@@ -7,11 +7,11 @@ LDFLAGS = -L/opt/homebrew/lib
 SFML_LIBS = -lsfml-graphics -lsfml-window -lsfml-system -pthread
 
 # ----------------------------
-#       Sources communes
+#       Sources
 # ----------------------------
 BAYESIAN_SRC = src/esp1/mapping/occupancy/bayesian_grid.cpp
 PLANNER_SRC  = src/esp1/planning/global_planner.cpp
-MISSION_SRC  = src/esp1/planning/mission_planner.cpp
+MISSION_SRC  = src/esp1/planning/mission_planner.cpp   # <-- OK, seul fichier mission
 
 # ----------------------------
 #       Tests
@@ -53,7 +53,7 @@ $(PLANNER_TEST_BIN): $(PLANNER_TEST_SRC) $(BAYESIAN_SRC) $(PLANNER_SRC)
 	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS) $(SFML_LIBS)
 
 # ----------------------------
-#       Mission Planner Frontier Test
+#       Mission Planner Test
 # ----------------------------
 $(MISSION_TEST_BIN): $(MISSION_TEST_SRC) $(BAYESIAN_SRC) $(MISSION_SRC)
 	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS) $(SFML_LIBS)

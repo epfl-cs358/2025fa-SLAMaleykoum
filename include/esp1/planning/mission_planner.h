@@ -1,4 +1,4 @@
-// Filename: esp1/planning/goal_manager.h
+// Filename: esp1/planning/mission_planner.h
 // Description: Contract for managing the high-level mission objective and determining
 // the robot's next goal target (e.g., exploration points, return home).
 
@@ -13,14 +13,14 @@
 /**
  * @brief Manages the overall mission state and provides the current target for the Global Planner.
  */
-class GoalManager {
+class MissionPlanner {
 public:
     /**
      * @brief Defines the available mission states or modes.
      */
 
 
-    GoalManager(const Pose2D& initial_home_pose);
+    MissionPlanner(const Pose2D& initial_home_pose);
 
     /**
      * @brief The main update loop for the Goal Manager.
@@ -45,6 +45,11 @@ public:
      * @brief Checks if the current goal has been achieved within a tolerance.
      */
     bool is_current_goal_achieved(const Pose2D& current_pose) const;
+
+   const std::vector<std::vector<std::pair<int,int>>>& get_frontier_clusters() const {
+    return remaining_frontier_clusters_;
+    }
+
 
 
     MissionGoalType get_current_state() const { return current_state_; }
