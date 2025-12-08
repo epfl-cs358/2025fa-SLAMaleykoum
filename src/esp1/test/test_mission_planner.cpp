@@ -28,18 +28,16 @@ std::vector<sf::Color> cluster_colors = {
 // ===============================================================
 //                 MAP FILLER (TEST MAP)
 // ===============================================================
-
 static void fill_test_map(BayesianOccupancyGrid& grid)
 {
     int8_t* map = const_cast<int8_t*>(grid.get_map_data());
     int W = grid.grid_size_x;
     int H = grid.grid_size_y;
 
-    // Tout en inconnu (log odds = 0)
+    // Tout en inconnu
     for (int i = 0; i < W * H; i++)
         map[i] = 0;
 
-    // Centre
     int cx = W / 2;
     int cy = H / 2;
 
@@ -55,20 +53,19 @@ static void fill_test_map(BayesianOccupancyGrid& grid)
         {cx + 40, cy - 20}
     };
 
-    // ------------------------------
-    // REMPLIR L’INTÉRIEUR DU POLYGONE (FREE = -4)
-    // ------------------------------
-
+    // ============
+    // INSIDE = FREE
+    // ============
     auto inside_poly = [&](int x, int y)
     {
         bool c = false;
-        for (int i = 0, j = poly.size() - 1; i < (int)poly.size(); j = i++)
+        for (int i = 0, j = poly.size() - 1; i < poly.size(); j = i++)
         {
             int xi = poly[i].x, yi = poly[i].y;
             int xj = poly[j].x, yj = poly[j].y;
 
             bool inter = ((yi > y) != (yj > y)) &&
-                         (x < (float)(xj - xi) * (y - yi) / float(yj - yi + 1e-6f) + xi);
+                (x < float(xj - xi) * (y - yi) / (float(yj - yi) + 1e-6f) + xi);
 
             if (inter) c = !c;
         }
@@ -77,20 +74,22 @@ static void fill_test_map(BayesianOccupancyGrid& grid)
 
     for (int y = 0; y < H; y++)
         for (int x = 0; x < W; x++)
-            if (inside_poly(x, y))
-                map[y * W + x] = -4;   // FREE
+            if (inside_poly(x,y))
+                map[y * W + x] = -4; // FREE
 
-    // ------------------------------
-    // DESSINER LES CONTOURS (OCCUPIED = +4)
-    // ------------------------------
+
+    // =====================================
+    // DRAW ONLY 3 SIDES OF THE POLYGON
+    // => PRODUCES EXACTLY 3 FRONTIER CLUSTERS
+    // =====================================
 
     auto draw_line = [&](P a, P b)
     {
         int x0 = a.x, y0 = a.y;
         int x1 = b.x, y1 = b.y;
 
-        int dx = std::abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
-        int dy = -std::abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
+        int dx = abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
+        int dy = -abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
         int err = dx + dy;
 
         while (true)
@@ -105,17 +104,19 @@ static void fill_test_map(BayesianOccupancyGrid& grid)
         }
     };
 
-    int N = poly.size();
-    int skip1 = 0;
-    int skip2 = 3;
-    int skip3 = 6;
+    // On ferme seulement 3 côtés → 3 frontières séparées
 
-    for (int i = 0; i < N; i++)
-    {
-        int j = (i + 1) % N;
-        if (i == skip1 || i == skip2 || i == skip3) continue;
-        draw_line(poly[i], poly[j]);
-    }
+    int N = poly.size();
+
+    int f1 = 0;   // côté entre poly[0] et poly[1]
+    int f2 = 2;   // côté entre poly[2] et poly[3]
+    int f3 = 5;   // côté entre poly[5] et poly[6]
+
+    draw_line(poly[f1], poly[(f1+1)%N]);
+    draw_line(poly[f2], poly[(f2+1)%N]);
+    draw_line(poly[f3], poly[(f3+1)%N]);
+
+    // Les autres côtés restent ouverts → pas de frontier là-bas
 }
 
 // ===============================================================
@@ -222,7 +223,7 @@ int main()
 
         // UPDATE MISSION
         MissionGoal goal = planner.update_goal(robot_pose, grid);
-    
+ 
 
         if (planner.get_current_state() == EXPLORATION_NODE)
             move_robot_towards(robot_pose, goal.target_pose);
