@@ -111,10 +111,12 @@ static void fill_test_map(BayesianOccupancyGrid& grid)
     int f1 = 0;   // côté entre poly[0] et poly[1]
     int f2 = 2;   // côté entre poly[2] et poly[3]
     int f3 = 5;   // côté entre poly[5] et poly[6]
+    int f4 = 6; 
 
     draw_line(poly[f1], poly[(f1+1)%N]);
     draw_line(poly[f2], poly[(f2+1)%N]);
     draw_line(poly[f3], poly[(f3+1)%N]);
+    draw_line(poly[f4], poly[(f4+1)%N]);
 
     // Les autres côtés restent ouverts → pas de frontier là-bas
 }

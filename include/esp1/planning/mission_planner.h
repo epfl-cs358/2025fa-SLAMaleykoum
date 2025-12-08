@@ -60,5 +60,5 @@ private:
     std::vector<Pose2D> waypoint_queue_;
     MissionGoal current_target_;
     std::vector<std::vector<std::pair<int,int>>> remaining_frontier_clusters_;
-    static bool first; 
+    
 };
