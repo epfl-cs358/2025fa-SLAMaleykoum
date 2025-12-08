@@ -161,7 +161,7 @@ float BayesianOccupancyGrid::get_cell_probability(float x_idx,
     int y = (int)y_idx;
 
     // Out of bounds → unknown = 0.5
-    if ((unsigned)x >= grid_size_x || (unsigned)y >= grid_size_y)
+    if (x < 0 || x >= grid_size_x || y < 0 || y >= grid_size_y)
         return 0.5f;
 
     int idx = y * grid_size_x + x;
@@ -170,6 +170,8 @@ float BayesianOccupancyGrid::get_cell_probability(float x_idx,
     return prob_table[ log_odds[idx] + 40 ];
 }
 
+
+    
 // ------------------------------------------------------
 // Export grayscale map
 // ------------------------------------------------------

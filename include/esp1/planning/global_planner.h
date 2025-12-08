@@ -1,27 +1,27 @@
 // Filename: esp1/planning/global_planner.h
-// Description: Contract for generating a global path (list of Waypoints).
-// Contracted Team: Planning
+// Description: Global path planning using A* on the Bayesian Occupancy Grid.
 
 #pragma once
 
-#include "common/data_types.h"
-#include "esp1/mapping/occupancy/bayesian_grid.h" 
-#include <vector>
+#include "../../../include/common/data_types.h"
+#include "../../../include/esp1/mapping/occupancy/bayesian_grid.h"
 
 /**
- * @brief Generates a list of Waypoints based on the current mission goal, using the Occupancy Grid.
- * This will typically involve a search algorithm like A* or Dijkstra's.
+ * @brief Global Planner implementing an A* search on the occupancy grid.
+ * Produces a list of world-coordinate waypoints for the robot to follow.
  */
 class GlobalPlanner {
 public:
     GlobalPlanner();
 
     /**
-     * @brief Computes a new global path from the current pose to the target goal using the map.
-     * @param current_pose The robot's current location (from EKF_SLAM).
-     * @param goal The target destination/objective from the Goal Manager.
-     * @param map The current coarse occupancy grid (required for pathfinding).
-     * @return A vector of Waypoints for ESP_2 to follow.
+     * @brief Compute a global path from the robot pose to the mission goal.
+     *
+     * @param current_pose  Current pose from localization.
+     * @param goal          Mission goal from Goal Manager.
+     * @param map           Coarse Bayesian occupancy grid.
+     *
+     * @return GlobalPathMessage containing waypoints in world coordinates.
      */
     GlobalPathMessage generate_path(
         const Pose2D& current_pose,
@@ -29,9 +29,4 @@ public:
         const BayesianOccupancyGrid& map
     );
 
-    /**
-     * @brief Checks if the path needs re-planning (e.g., goal achieved, path too old).
-     * @return true if the path needs re-planning.
-     */
-    bool needs_replanning() const;
 };

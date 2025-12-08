@@ -17,7 +17,7 @@
 //                 CONFIG
 // ===============================================================
 
-static const int CELL_SIZE = 4;  // px per grid cell
+static const int CELL_SIZE = 10;  // px per grid cell
 static const float MOVE_STEP = 0.05f;
 
 // ===============================================================
@@ -211,8 +211,8 @@ static void move_robot_towards(Pose2D& robot, const Pose2D& goal)
 
 int main()
 {
-    int W = 200, H = 200;
-    float resolution = 0.05f;
+    int W = 80, H = 80;
+    float resolution = 0.07f;
 
     BayesianOccupancyGrid grid(resolution, W, H);
     fill_test_map(grid);
