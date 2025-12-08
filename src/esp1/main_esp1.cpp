@@ -38,10 +38,10 @@ SemaphoreHandle_t State_Mutex;
 // --- GLOBAL OBJECTS ---
 const int grid_size_x = 200;
 const int grid_size_y = 200;
-const float resolution = 0.2f;
+const float resolution = 0.05f;
 
 BayesianOccupancyGrid* TheMap = nullptr;
-MissionPlanner* mission_planner = nullptr; // <--- ADDED OBJECT
+MissionPlanner* mission_planner = nullptr; 
 
 // --- STATE VARIABLES ---
 Pose2D last_known_pose = {0,0,0,0};
@@ -167,15 +167,18 @@ void Bayesian_Grid_Task(void* parameter) {
 }
 
 // =============================================================
-// TASK 5: TCP TRANSMIT (Zero-Copy & Chunked)
+// TASK 5: TCP TRANSMIT
 // =============================================================
+// TODO: We can optimize here
+// RLE COMPRESSION FOR MAP TRANSMISSION (!!!! CAN GET RID OF THIS IF IT TAKES TOO MUCH SPACE or time !!!!)
+// RLE Buffer: 200x200 = 40000 bytes. RLE typically reduces this >90%.
+// We allocate a static buffer to handle the worst case.
+static uint8_t rle_buffer[10000]; // 10KB static buffer for compressed map
+
 void TCP_Transmit_Task(void* parameter) {
     WiFiClient tcpClient;
     uint8_t header[64]; 
     
-    // Chunk size: Small enough to not block WiFi, big enough to be efficient
-    const size_t CHUNK_SIZE = 512; 
-
     const TickType_t TelemetryFreq = pdMS_TO_TICKS(100); 
     const TickType_t MapFreq = pdMS_TO_TICKS(4000); // 4 Seconds
     
@@ -206,12 +209,45 @@ void TCP_Transmit_Task(void* parameter) {
 
         // 2. Decide if we send map
         bool send_map_now = (xTaskGetTickCount() - lastMapTime > MapFreq);
-        uint32_t map_total_size = TheMap->get_total_size(); // 40,000
+        uint32_t payload_map_sz = 0;
+
+        // ---------------------------------------------------------
+        // RLE COMPRESSION (NO MUTEX)
+        // ---------------------------------------------------------
+        // We read the map "Dirty". If Lidar writes to it while we read,
+        // we might get a single pixel "tear", which is fine for debug.
+        if (send_map_now) {
+            // OPTIMIZATION: REMOVED MUTEX LOCK
+            const int8_t* raw_map = TheMap->get_map_data();
+            uint32_t total_cells = TheMap->get_total_size();
+            
+            uint32_t rle_idx = 0;
+            uint32_t raw_idx = 0;
+
+            while (raw_idx < total_cells && rle_idx < sizeof(rle_buffer) - 2) {
+                int8_t current_val = raw_map[raw_idx];
+                uint8_t count = 0;
+
+                // Count identical bytes (max 255)
+                // If raw_map[raw_idx] changes mid-loop due to Lidar, loop breaks.
+                // This is safe; it just starts a new RLE run.
+                while (raw_idx < total_cells && raw_map[raw_idx] == current_val && count < 255) {
+                    count++;
+                    raw_idx++;
+                }
+
+                rle_buffer[rle_idx++] = count;
+                rle_buffer[rle_idx++] = (uint8_t)current_val;
+            }
+            
+            payload_map_sz = rle_idx; // Compressed size
+        }
 
         // 3. Header
         memset(header, 0, 64);
         header[0] = 0xBE; header[1] = 0xEF;
-        uint32_t payload_map_sz = send_map_now ? map_total_size : 0;
+        
+        // Send COMPRESSED size
         memcpy(&header[2], &payload_map_sz, 4);
         
         uint16_t plen = Tx_Snapshot.path.current_length;
@@ -230,33 +266,9 @@ void TCP_Transmit_Task(void* parameter) {
             tcpClient.write(header, 64);
             if(plen > 0) tcpClient.write((uint8_t*)Tx_Snapshot.path.path, plen * sizeof(Waypoint));
             
-            // 4. STREAM MAP (If needed)
-            if (send_map_now) {
-                int8_t* raw_map = TheMap->get_raw_data_pointer();
-                size_t offset = 0;
-                
-                while (offset < map_total_size) {
-                    if (!tcpClient.connected()) break;
-
-                    size_t remaining = map_total_size - offset;
-                    size_t to_write = (remaining < CHUNK_SIZE) ? remaining : CHUNK_SIZE;
-
-                    // CRITICAL: Lock, Write, Unlock, Yield
-                    // We stream DIRECTLY from the map memory. No Buffer.
-                    if (xSemaphoreTake(Bayesian_Grid_Mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
-                        tcpClient.write((uint8_t*)&raw_map[offset], to_write);
-                        xSemaphoreGive(Bayesian_Grid_Mutex);
-                    } else {
-                        // If we can't lock, wait a bit and retry (don't skip data)
-                        vTaskDelay(1); 
-                        continue; 
-                    }
-                    
-                    offset += to_write;
-                    
-                    // Give other tasks (Lidar/Wifi) a chance to breathe
-                    vTaskDelay(1); 
-                }
+            // 4. SEND COMPRESSED MAP 
+            if (payload_map_sz > 0) {
+                tcpClient.write(rle_buffer, payload_map_sz);
                 lastMapTime = xTaskGetTickCount();
             }
         }
@@ -285,9 +297,11 @@ void Mission_Planner_Task(void* parameter) {
         }
 
         // 2. Compute New Goal
-        // CRITICAL: We MUST lock the grid mutex because update_goal() reads the map.
-        // If the map is being updated (written) while we read, we get garbage or crash.
-        if (xSemaphoreTake(Bayesian_Grid_Mutex, pdMS_TO_TICKS(200)) == pdTRUE) {
+        // OPTIMIZATION: REMOVED MUTEX LOCK!
+        // We read the map "dirty" (without lock). The map is a fixed array of int8.
+        // Reading a byte while it is being written is atomic on ESP32.
+        // This prevents the heavy Mission Planner from blocking TCP or Lidar tasks.
+        if (mission_planner->get_current_state() != RETURN_HOME) {
             
             MissionGoal new_goal = mission_planner->update_goal(current_p, *TheMap);
 
@@ -326,7 +340,7 @@ void Global_Planner_Task(void* parameter) {
             // Also update the global state for TCP
             current_global_path = pathMsg;
             
-            xSemaphoreGive(State_Mutex);  // ← Release BEFORE sending
+            xSemaphoreGive(State_Mutex); 
         }
         
         // Send AFTER releasing the mutex (slow operation)
@@ -383,17 +397,15 @@ void setup() {
     xTaskCreatePinnedToCore(IPC_Receive_Task, "IPC_Rx", 4096, NULL, 5, NULL, 0);
     // TCP is slow but needs to stay alive. Priority 3 is fine.
     xTaskCreatePinnedToCore(TCP_Transmit_Task, "TCP_Tx", 8192, NULL, 3, &TCP_Task_Handle, 0); 
-    // Mission Planner is "Thinking", can be interrupted. Priority 2.
-    xTaskCreatePinnedToCore(Mission_Planner_Task, "Mission", 4096, NULL, 2, NULL, 0);
+    
+    // Mission Planner (OPTIMIZATION: LOWERED PRIORITY)
+    // Was 2, now 1. It runs in background and shouldn't starve TCP.
+    xTaskCreatePinnedToCore(Mission_Planner_Task, "Mission", 4096, NULL, 1, NULL, 0);
 
     // -- Core 1 (Heavy Lifting) --
-    // Lidar Reading: Lowered to 3. If we miss a packet, it's better than freezing the CPU.
     xTaskCreatePinnedToCore(Lidar_Read_Task, "Lidar_Read", 4096, NULL, 3, NULL, 1);
-    // Sync: Simple pass-through, matches Lidar.
     xTaskCreatePinnedToCore(Lidar_Sync_Map_Task, "Lidar_Sync", 8192, NULL, 3, NULL, 1);
-    // Mapping: VERY HEAVY math. Lowered to 2. It runs in background.
     xTaskCreatePinnedToCore(Bayesian_Grid_Task, "Map_Comp", 8192, NULL, 2, NULL, 1);
-    // Global Planner: Occasional heavy burst. Priority 2.
     xTaskCreatePinnedToCore(Global_Planner_Task, "Global_Plan", 8192, NULL, 2, NULL, 1);
 }
 
