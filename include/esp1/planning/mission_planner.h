@@ -1,4 +1,4 @@
-// Filename: esp1/planning/goal_manager.h
+// Filename: esp1/planning/mission_planner.h
 // Description: Contract for managing the high-level mission objective and determining
 // the robot's next goal target (e.g., exploration points, return home).
 
@@ -13,19 +13,14 @@
 /**
  * @brief Manages the overall mission state and provides the current target for the Global Planner.
  */
-class GoalManager {
+class MissionPlanner {
 public:
     /**
      * @brief Defines the available mission states or modes.
      */
-    enum MissionState {
-        STATE_IDLE,          // Waiting for a command
-        STATE_EXPLORING,     // Actively exploring unmapped areas
-        STATE_RETURNING_HOME,// Moving to the starting pose
-        STATE_EMERGENCY_STOP // Halt all motion and tasks
-    };
 
-    GoalManager(const Pose2D& initial_home_pose);
+
+    MissionPlanner(const Pose2D& initial_home_pose);
 
     /**
      * @brief The main update loop for the Goal Manager.
@@ -38,7 +33,8 @@ public:
     /**
      * @brief Changes the robot's high-level mission state (e.g., from IDLE to EXPLORING).
      */
-    void set_mission_state(MissionState new_state);
+
+    void set_mission_state(MissionGoalType new_state);
 
     /**
      * @brief Registers a new user-defined waypoint for NAVIGATING state.
@@ -50,11 +46,19 @@ public:
      */
     bool is_current_goal_achieved(const Pose2D& current_pose) const;
 
-    MissionState get_current_state() const { return current_state_; }
+   const std::vector<std::vector<std::pair<int,int>>>& get_frontier_clusters() const {
+    return remaining_frontier_clusters_;
+    }
+
+
+
+    MissionGoalType get_current_state() const { return current_state_; }
 
 private:
-    MissionState current_state_;
+    MissionGoalType current_state_;
     Pose2D home_pose_;
     std::vector<Pose2D> waypoint_queue_;
     MissionGoal current_target_;
+    std::vector<std::vector<std::pair<int,int>>> remaining_frontier_clusters_;
+    
 };
