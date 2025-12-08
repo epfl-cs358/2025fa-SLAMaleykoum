@@ -1,17 +1,18 @@
-// Filename: esp1/planning/mission_planner.h
-// Description: Contract for managing the high-level mission objective and determining
-// the robot's next goal target (e.g., exploration points, return home).
-
 #pragma once
 
 #include "../../common/data_types.h"
 #include "../../esp1/mapping/occupancy/bayesian_grid.h" 
 
-#include <vector>
+#include <stdint.h>
 
-/**
- * @brief Manages the overall mission state and provides the current target for the Global Planner.
- */
+// =============================================================
+// TUNING & MEMORY LIMITS
+// =============================================================
+#define MAX_FRONTIER_CANDIDATES 20  
+#define BFS_QUEUE_SIZE 400          
+#define SEARCH_BOUND_M 6.0f         
+#define MIN_CLUSTER_SIZE 6          
+
 class MissionPlanner {
 public:
     /**
@@ -19,40 +20,30 @@ public:
      */
     MissionPlanner(const Pose2D& initial_home_pose);
 
-    /**
-     * @brief The main update loop for the Goal Manager.
-     * Determines the next target goal based on the current state and pose.
-     * @param current_pose The latest pose from the EKF_SLAM engine.
-     * @return The MissionGoal (Pose2D target and type) for the Global Planner.
-     */
     MissionGoal update_goal(const Pose2D& current_pose, const BayesianOccupancyGrid& grid);
 
-    /**
-     * @brief Changes the robot's high-level mission state (e.g., from IDLE to EXPLORING).
-     */
-
     void set_mission_state(MissionGoalType new_state);
-
-    /**
-     * @brief Registers a new user-defined waypoint for NAVIGATING state.
-     */
     void add_user_waypoint(const Pose2D& waypoint);
-
-    /**
-     * @brief Checks if the current goal has been achieved within a tolerance.
-     */
     bool is_current_goal_achieved(const Pose2D& current_pose) const;
-
-   const std::vector<std::vector<std::pair<int,int>>>& get_frontier_clusters() const {
-    return remaining_frontier_clusters_;
-    }
 
     MissionGoalType get_current_state() const { return current_state_; }
 
 private:
+void search_for_candidates(const BayesianOccupancyGrid& grid, 
+                               int x_min, int x_max, int y_min, int y_max, 
+                               int& candidate_count);
+
     MissionGoalType current_state_;
     Pose2D home_pose_;
-    std::vector<Pose2D> waypoint_queue_;
     MissionGoal current_target_;
-    std::vector<std::vector<std::pair<int,int>>> remaining_frontier_clusters_;
+    
+    struct ClusterCandidate {
+        int center_x;
+        int center_y;
+        int size;
+        bool valid;
+    };
+
+    ClusterCandidate candidates[MAX_FRONTIER_CANDIDATES];
+    uint8_t visited_mask[200][25];
 };
