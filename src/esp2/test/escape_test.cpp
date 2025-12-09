@@ -77,94 +77,31 @@ void setup_escapeTest() {
 
     
     last_us = micros();
-    /*motor.stop();
-    motor.update();
-    motor.stop();
-    motor.update();
-    motor.stop();
-    motor.update();*/
 
    
 }
 
 void loop_escapeTest() {
     // Compute dt
-    /*uint32_t now = micros();
+    uint32_t now = micros();
     float dt = (now - last_us) * 1e-6f;
-    last_us = now;*/
-
-    // Read IMU
+    last_us = now;
 
 
-    //connection.check_connection();
 
-    //i2c_lock();
-    //imu.readAndUpdate();
-    //IMUData imuData = imu.data();
-    //i2c_unlock();
+    i2c_lock();
+    imu.readAndUpdate();
+    IMUData imuData = imu.data();
+    i2c_unlock();
 
-    //connection.check_connection();
-    //float yaw = getYawIMU(imuData); // rad
+    float yaw = getYawIMU(imuData); // rad
 
-    //snprintf(bufcren, sizeof(bufcren), "yaw0=  %f, yaw= %f", yaw0* 180.0f / PI, yaw* 180.0f / PI);
-    //Serial.printf("%s\n", bufcren);
     motor.forward(0.17f);
     motor.update();
- 
-    //motor.update();
-    //motor.forward(0.17f);
-    //motor.update();
-    //connection.publish(mqtt_topic_escape, bufcren);
-/*
-    if(((yaw0 + M_PI) < yaw)||(yaw0+ 179/180*M_PI<yaw)){
-        servo_dir.setAngle(60);
-        motor.forward(0.17f);
-        motor.update();
-        motor.forward(0.17f);
-        motor.update();
-        motor.forward(0.17f);
-        motor.update();
-        delay(15000);
 
-        motor.stop();
-        motor.update();
-        motor.stop();
-        motor.update();
-
-        delay(15000);
-
-
-    }
-    
-    if(yaw0 + M_PI < yaw){
-        servo_dir.setAngle(120);
-        motor.backward(0.21f);
-        motor.update();
-        motor.backward(0.21f);
-        motor.update();
-        motor.backward(0.21f);
-        motor.update();
-
-        delay(15000);
-
-        motor.stop();
-        motor.update();
-        motor.stop();
-        motor.update();
-        motor.stop();
-        motor.update();
-
-
-
-
-        delay(15000);
-    }*/
-
-
-
-    // Run escape behavior
-    //escape.update(yaw, dt);
+    //Run escape behavior
+    escape.update(yaw, dt);
 
     // Motor smoothing update
-    //motor.update();
+    motor.update();
 }
