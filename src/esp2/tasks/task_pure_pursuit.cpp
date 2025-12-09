@@ -1,4 +1,4 @@
-#include "tasks/task_pure_pursuit.h"
+/*#include "tasks/task_pure_pursuit.h"
 #include "esp2/global_state.h"
 #include "esp2/config.h"
 #include "pure_pursuit.h"
@@ -46,3 +46,4 @@ void TaskPurePursuit(void *pvParameters) {
         vTaskDelay(pdMS_TO_TICKS(50));
     }
 }
+*/

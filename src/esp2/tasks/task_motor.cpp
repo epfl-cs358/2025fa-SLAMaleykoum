@@ -1,4 +1,4 @@
-#include "esp2/tasks/task_motor.h"
+/*#include "esp2/tasks/task_motor.h"
 #include "esp2/global_state.h"
 #include "esp2/config.h"
 #include "hardware/MotorManager.h"
@@ -14,5 +14,6 @@ void TaskMotor(void *pvParameters) {
         }
         motor.update();
         vTaskDelay(pdMS_TO_TICKS(20));
-    }
+    }       
 }
+*/

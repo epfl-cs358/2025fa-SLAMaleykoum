@@ -1,3 +1,4 @@
+/*
 #include <Arduino.h>
 #include <WiFi.h>
 
@@ -64,3 +65,4 @@ void loop() {
     // Main loop is empty because all operations are handled in FreeRTOS tasks
     // Once the taks are created in setup(), they run independently
 }
+*/

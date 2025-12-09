@@ -5,7 +5,7 @@
  */
 #include "test_common_esp2.h"
 
-static int drivePower = 20;
+static int drivePower = 17;
 
 void setup_motor_start_stop() {
     
@@ -25,16 +25,16 @@ void setup_motor_start_stop() {
 void loop_motor_start_stop() {
     // make the motor and the wheels turn
     motor.forward(drivePower / 100.0f);
-    delay(10);
+    //delay(10);
     motor.update();
     Serial.println("I'm moving forward");
 
-    delay(30000);
+    /*delay(30000);
 
     motor.stop();
     delay(10);
     motor.update();
     Serial.println("I stop");
 
-    delay(10000);
+    delay(10000);*/
 }

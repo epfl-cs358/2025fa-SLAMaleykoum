@@ -1,4 +1,4 @@
-#include "tasks/task_ultrasonic.h"
+/*#include "tasks/task_ultrasonic.h"
 #include "global_state.h"
 #include "config.h"
 #include "hardware/UltraSonicSensor.h"
@@ -19,3 +19,4 @@ void TaskUltrasonic(void *pvParameters) {
         vTaskDelay(pdMS_TO_TICKS(200));
     }
 }
+*/

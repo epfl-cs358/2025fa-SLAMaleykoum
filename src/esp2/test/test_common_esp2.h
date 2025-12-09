@@ -34,6 +34,7 @@
 #include "esp2/control/pure_pursuit.h"
 #include "esp_wifi.h"
 #include "motor_pid.h"
+#include "EscapeController.h"
 
 // Pins used by the hardware components on the esp 2
 #define ESC_PIN 15          // pin used for the motor
@@ -58,6 +59,7 @@ extern Esp_link esp_link;
 
 extern MotorPID pid;
 extern PurePursuit purePursuit;
+extern EscapeController escape;
 
 // Prototypes of the functions
 void setup_all_together();          void loop_all_together();
@@ -81,3 +83,4 @@ void setup_led_basic();             void loop_led_basic();
 void setup_clock_esp2();            void loop_clock_esp2();
 void setup_clock_esp2_STA();        void loop_clock_esp2_STA();
 void setup_test_comm();             void loop_test_comm();
+void setup_escapeTest();            void loop_escapeTest();

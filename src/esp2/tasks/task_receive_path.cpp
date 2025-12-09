@@ -1,4 +1,4 @@
-#include "tasks/task_receive_path.h"
+/*#include "tasks/task_receive_path.h"
 #include "esp2/global_state.h"
 #include "common/esp_link.h"
 #include "common/data_types.h"
@@ -14,3 +14,4 @@ void TaskReceivePath(void *pvParameters) {
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
+*/
