@@ -47,6 +47,10 @@ bool finishedPath = false;
 bool startSignalReceived = false;
 bool firstPathReceived = false;
 
+bool isCrenFinished = false;
+
+bool isPerformingCreneau = false;  // ADD THIS LINE - Flag to disable emergency stop during maneuver
+
 // Pose state
 float posX = 0.0f;
 float posY = 0.0f;
