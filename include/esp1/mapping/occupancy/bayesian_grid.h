@@ -52,7 +52,7 @@ public:
     // Returns a simplified map representation (e.g. pointer or some light compressed array).
     const int8_t* get_map_data() const;
 
-    // Internal 2D array or vector to hold log-odds values
+    // Internal 2D array to hold log-odds values
     float grid_resolution;
     uint16_t grid_size_x;
     uint16_t grid_size_y;

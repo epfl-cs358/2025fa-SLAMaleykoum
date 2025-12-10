@@ -3,7 +3,6 @@
 #include <freertos/task.h>
 #include <freertos/queue.h>
 #include <freertos/semphr.h>
-#include <vector>
 
 // --- Include Headers ---
 #include "common/data_types.h"
@@ -60,7 +59,7 @@ HardwareSerial& LIDAR_SERIAL = Serial2;
 Lidar lidar(LIDAR_SERIAL);
 
 HardwareSerial& IPC_Serial = Serial1; 
-Esp_link esp_link(IPC_Serial); 
+Esp_link esp_link(IPC_Serial);
 
 float pathA_X[] = {
     0.00, 0.00, 2.00, 4.00, 6.00, 8.00,
@@ -320,7 +319,7 @@ void Mission_Planner_Task(void* parameter) {
 }
 
 // =============================================================
-// GLOBAL PLANNER STUB
+// GLOBAL PLANNER TASK
 // =============================================================
 void Global_Planner_Task(void* parameter) {
     while (1) {
@@ -340,11 +339,13 @@ void Global_Planner_Task(void* parameter) {
             // Also update the global state for TCP
             current_global_path = pathMsg;
             
-            xSemaphoreGive(State_Mutex); 
+            xSemaphoreGive(State_Mutex);  // ← Release BEFORE sending
         }
         
+       
+        
         // Send AFTER releasing the mutex (slow operation)
-        esp_link.sendPath(pathMsg);
+        esp_link.sendPath(pathMsg);        
         
         vTaskDelay(pdMS_TO_TICKS(1000));
     }

@@ -13,7 +13,6 @@
 #pragma once
 
 #include "common/data_types.h"
-#include <vector>
 #include <cstdint>
 
 extern rp_descriptor_t resp_descriptor[];	///< List of Response descriptors 
