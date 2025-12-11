@@ -1,42 +1,37 @@
 #include "../../../../include/esp1/mapping/occupancy/bayesian_grid.h"
 #include <cmath>
-#include <algorithm>
-#include <cstdint>
+// #include <algorithm>
+// #include <cstdint>
+#include "../../include/common/utils.h"
 
-#define L_FREE_INT      -4     // -0.4  * 10
-#define L_OCC_INT       +4     // +0.4  * 10
+
+#define L_FREE_INT      -6     // -0.4  * 10
+#define L_OCC_INT       +15     // +0.4  * 10
 #define L_MIN_INT      -40     // -4.0  * 10
 #define L_MAX_INT       40     // +4.0  * 10
 
-float BayesianOccupancyGrid::sin_table[3600];
-float BayesianOccupancyGrid::cos_table[3600];
+float* BayesianOccupancyGrid::sin_table = nullptr;
+float* BayesianOccupancyGrid::cos_table = nullptr;
 bool  BayesianOccupancyGrid::trig_initialized = false;
 
-float BayesianOccupancyGrid::prob_table[81];
+float* BayesianOccupancyGrid::prob_table = nullptr;
 bool  BayesianOccupancyGrid::prob_table_initialized = false;
 
 // ------------------------------------------------------
 // Constructor
 // ------------------------------------------------------
-BayesianOccupancyGrid::BayesianOccupancyGrid(float resolution_m,
-                                             uint16_t size_x,
-                                             uint16_t size_y)
+BayesianOccupancyGrid::BayesianOccupancyGrid(float resolution_m, uint16_t size_x, uint16_t size_y) 
+    : grid_size_x(size_x), grid_size_y(size_y), grid_resolution(resolution_m)
 {
-    if (size_x > GRID_MAX_X) size_x = GRID_MAX_X;
-    if (size_y > GRID_MAX_Y) size_y = GRID_MAX_Y;
 
-    grid_resolution = resolution_m;
-    grid_size_x = size_x;
-    grid_size_y = size_y;
-
-    // Allocate compact int8 log-odds map
-    log_odds = new int8_t[grid_size_x * grid_size_y];
+    log_odds = (int8_t*) heap_caps_malloc(grid_size_x * grid_size_y * sizeof(int8_t), MALLOC_CAP_SPIRAM);
     memset(log_odds, 0, grid_size_x * grid_size_y);
 
     // Precompute sin/cos tables
-
-
     if(!trig_initialized){
+        sin_table = (float*) heap_caps_malloc(3600 * sizeof(float), MALLOC_CAP_SPIRAM);
+        cos_table = (float*) heap_caps_malloc(3600 * sizeof(float), MALLOC_CAP_SPIRAM);
+        
         for (int i = 0; i < 3600; i++)
         {
             float a = i * 0.1f * M_PI / 180.0f;
@@ -48,11 +43,12 @@ BayesianOccupancyGrid::BayesianOccupancyGrid(float resolution_m,
 
     if (!prob_table_initialized)
     {
-        for (int i = -40; i <= 40; ++i)
+        prob_table = (float*) heap_caps_malloc(81 * sizeof(float), MALLOC_CAP_SPIRAM);
+        for (int i = L_MIN_INT; i <= L_MAX_INT; ++i)
         {
             float L = i * 0.1f;       // log-odds in real units
             float odds = expf(L);
-            prob_table[i + 40] = odds / (1.0f + odds);
+            prob_table[i + L_MAX_INT] = odds / (1.0f + odds);
         }
 
         prob_table_initialized = true;
@@ -62,8 +58,7 @@ BayesianOccupancyGrid::BayesianOccupancyGrid(float resolution_m,
 // ------------------------------------------------------
 // Update log occupancy grid
 // ------------------------------------------------------
-void BayesianOccupancyGrid::update_map(const SyncedScan& lidar_scan,
-                                       const float lidar_max_range)
+void BayesianOccupancyGrid::update_map(const SyncedScan& lidar_scan)
 {
     const LiDARScan& scan = lidar_scan.scan; 
     const Pose2D& pose = lidar_scan.pose; 
@@ -71,12 +66,11 @@ void BayesianOccupancyGrid::update_map(const SyncedScan& lidar_scan,
     // Precompute pose angle in degrees
     float pose_deg = pose.theta * (180.0f/M_PI) + 90.0f;
 
-    for (uint16_t i = 0; i < scan.count; ++i)
+    for (uint16_t i = 0; i < scan.count; i++)
     {
-        float r = scan.distances[i] * 0.001f;  // mm → m
-        bool is_hit = (r > 0 && r < lidar_max_range);
-        if (!is_hit)
-            r = lidar_max_range;
+        float rayon = scan.distances[i] * 0.001f;  // mm → m
+        bool is_hit = (0 < rayon && rayon < SEARCH_BOUND_M);
+        rayon = is_hit ? rayon : SEARCH_BOUND_M;
 
         // -----------------------------
         // FAST ANGLE NORMALIZATION
@@ -95,44 +89,42 @@ void BayesianOccupancyGrid::update_map(const SyncedScan& lidar_scan,
         if (idx >= 3600) idx -= 3600;
         if (idx < 0)     idx += 3600;
 
-        float s = sin_table[idx];
-        float c = cos_table[idx];
+        float sin = sin_table[idx];
+        float cos = cos_table[idx];
 
         // Compute world hit point
-        float hit_x = pose.x + r * c;
-        float hit_y = pose.y + r * s;
+        float hit_x = pose.x + rayon * cos;
+        float hit_y = pose.y + rayon * sin;
 
-        int x0 = (int)(pose.x / grid_resolution) + grid_size_x / 2;
-        int x1 = (int)(hit_x / grid_resolution) + grid_size_x / 2;
+        int x0, y0, xhit, yhit; 
+        // int x0 = (int)(pose.x / grid_resolution) + grid_size_x / 2;
+        // int xhit = (int)(hit_x / grid_resolution) + grid_size_x / 2;
 
-        // This ensures +Y (North) goes to Index 0 (Top)
-        int y0 = grid_size_y / 2 - (int)(pose.y / grid_resolution);
-        int y1 = grid_size_y / 2 - (int)(hit_y / grid_resolution);
+        // // This ensures +Y (North) goes to Index 0 (Top)
+        // int y0 = grid_size_y / 2 - (int)(pose.y / grid_resolution);
+        // int yhit = grid_size_y / 2 - (int)(hit_y / grid_resolution);
+
+        world_to_grid(pose.x, pose.y, x0, y0, grid_resolution, grid_size_x, grid_size_y);
+        world_to_grid(hit_x, hit_y, xhit, yhit, grid_resolution, grid_size_x, grid_size_y);
 
         // ------------------------------------------------------
         // Bresenham free cells
         // ------------------------------------------------------
-        int dx = abs(x1 - x0);
-        int dy = abs(y1 - y0);
-        int sx = (x0 < x1) ? 1 : -1;
-        int sy = (y0 < y1) ? 1 : -1;
+        int dx = abs(xhit - x0);
+        int dy = abs(yhit - y0);
+        int sx = (x0 < xhit) ? 1 : -1;
+        int sy = (y0 < yhit) ? 1 : -1;
         int err = dx - dy;
 
         int x = x0;
         int y = y0;
 
-        while (true)
-        {
-            if (x == x1 && y == y1)
-                break;
-
-            if ((unsigned)x < grid_size_x && (unsigned)y < grid_size_y)
-            {
+        while (!(x == xhit && y == yhit)) {
+            if ((unsigned)x < grid_size_x && (unsigned)y < grid_size_y) {
                 int idxg = y * grid_size_x + x;
-                int v = log_odds[idxg] + L_FREE_INT;
 
-                v = std::max((int)L_MIN_INT, std::min((int)L_MAX_INT, v));
-                log_odds[idxg] = (int8_t)v;
+                int v = log_odds[idxg] + L_FREE_INT;
+                log_odds[idxg] = (int8_t) (L_MIN_INT > v ? L_MIN_INT : v);
             }
 
             int e2 = 2 * err;
@@ -143,15 +135,11 @@ void BayesianOccupancyGrid::update_map(const SyncedScan& lidar_scan,
         // ------------------------------------------------------
         // Occupied cell at ray end
         // ------------------------------------------------------
-        if (is_hit &&
-            (unsigned)x1 < grid_size_x &&
-            (unsigned)y1 < grid_size_y)
-        {
-            int idxg = y1 * grid_size_x + x1;
-            int v = log_odds[idxg] + L_OCC_INT;
+        if (is_hit) {
+            int idxg = yhit * grid_size_x + xhit;
 
-            v = std::max((int)L_MIN_INT, std::min((int)L_MAX_INT, v));
-            log_odds[idxg] = (int8_t)v;
+            int v = log_odds[idxg] + L_OCC_INT;
+            log_odds[idxg] = (int8_t) (v > L_MAX_INT ? L_MAX_INT : v);
         }
     }
 }
@@ -159,15 +147,12 @@ void BayesianOccupancyGrid::update_map(const SyncedScan& lidar_scan,
 // ------------------------------------------------------
 // convert int8 log-odds → probability
 // ------------------------------------------------------
-float BayesianOccupancyGrid::get_cell_probability(float x_idx,
-                                                   float y_idx) const
+float BayesianOccupancyGrid::get_cell_probability(int x,
+                                                   int y) const
 {
-    int x = (int)x_idx;
-    int y = (int)y_idx;
-
-    // Out of bounds → unknown = 0.5
+    // Out of bounds → unreachable = -1 ------------------------------- FAIRE ATTENTION
     if (x < 0 || x >= grid_size_x || y < 0 || y >= grid_size_y)
-        return 0.5f;
+        return -1.f;
 
     int idx = y * grid_size_x + x;
 
@@ -201,7 +186,7 @@ float BayesianOccupancyGrid::get_cell_probability(float x_idx,
 // ------------------------------------------------------
 // Return raw int8 grid
 // ------------------------------------------------------
-const int8_t* BayesianOccupancyGrid::get_map_data() const
+int8_t* BayesianOccupancyGrid::get_map_data() const
 {
     return log_odds;
 }

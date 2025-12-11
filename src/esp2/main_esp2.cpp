@@ -52,6 +52,8 @@ void setup() {
 
     Serial.println("---- Initialization complete. ----");
 
+    delay(30000);
+
     // --- FreeRTOS Tasks Creation ---
     xTaskCreatePinnedToCore(TaskReceivePath,            "RX_Path",      4096, NULL, 3, &receiveTask,    0);
     xTaskCreatePinnedToCore(TaskOdometryUnified_Stable, "Odom",         8192, NULL, 3, &odomTask,       0);

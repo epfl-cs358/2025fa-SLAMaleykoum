@@ -1,43 +1,26 @@
 #include "esp1/planning/mission_planner.h"
 #include <cmath>
+#include "../../include/common/utils.h"
 
 // ============================================================
 // HELPERS : LOGODDS + FRONTIER CHECK
 // ============================================================
 
-static inline float lo(const BayesianOccupancyGrid& grid, int x, int y)
-{
-    return grid.get_map_data()[y * grid.grid_size_x + x];
-}
+// static inline float proba(const BayesianOccupancyGrid& grid, int x, int y)
+// {
+//     return grid.get_map_data()[y * grid.grid_size_x + x];
+// }
 
-static inline bool is_unknown(float lo)
-{
-    float p = 1.f / (1.f + std::exp(-lo));
-    return (0.35f < p) && (p < 0.6f);
-}
-
-static inline bool is_free(float lo)
-{
-    float p = 1.f / (1.f + std::exp(-lo));
-    return p < 0.49f;
-}
+// static inline bool is_unknown(float lo)
+// {
+//     float p = 1.f / (1.f + std::exp(-lo));
+//     return (0.35f < p) && (p < 0.6f);
+// }
 
 // ============================================================
 // SAFETY CHECK FOR ROBOT RADIUS
 // ============================================================
-
-static void index_to_world(int ix, int iy, float resolution, Pose2D& out_pose) {
-    int center_x = 100; int center_y = 100;
-    out_pose.x = (ix - center_x) * resolution;
-    out_pose.y = (center_y - iy) * resolution; 
-    out_pose.theta = 0;
-}
-
-static void world_to_index(const Pose2D& pose, float resolution, int& out_x, int& out_y) {
-    int center_x = 100; int center_y = 100;
-    out_x = (int)(pose.x / resolution) + center_x;
-    out_y = center_y - (int)(pose.y / resolution);
-}
+// constantes center a remettre au propre + fonctions c'est la meme utilise dans global planner et d'autre endroits ----------------
 
 static bool is_point_safe(const BayesianOccupancyGrid& grid, int gx, int gy)
 {
@@ -52,9 +35,7 @@ static bool is_point_safe(const BayesianOccupancyGrid& grid, int gx, int gy)
             int nx = gx + dx;
             int ny = gy + dy;
             if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
-            float lo_val = lo(grid, nx, ny);
-            float p = 1.f / (1.f + std::exp(-lo_val));
-            if (p > 0.60f) return false;
+            if (grid.get_cell_probability(nx, ny) > 0.60f) return false;
         }
     }
     return true;
@@ -68,28 +49,26 @@ static bool is_frontier_cell(const BayesianOccupancyGrid& grid, int x, int y)
 {
     // 1. FILTER: MAP EDGES ARE NOT FRONTIERS
     // We ignore the 2 outer layers of pixels to avoid "leaking" out of the map.
-    if (x <= 1 || x >= grid.grid_size_x - 2 || y <= 1 || y >= grid.grid_size_y - 2) {
+    if (x <= 1 || x >= grid.grid_size_x - 2 || y <= 1 || y >= grid.grid_size_y - 2)
         return false;
-    }
 
-    float v = lo(grid, x, y);
-    if (!is_free(v))
-        return false;
+    // if occupied 
+    if (grid.get_cell_probability(x, y) >= 0.5f) return false;
     
     static int dx[4] = {1, -1, 0, 0};
     static int dy[4] = {0, 0, 1, -1};
 
-    for (int i = 0; i < 4; i++)
-    {
+    for (int i = 0; i < 4; i++) {
         int nx = x + dx[i];
         int ny = y + dy[i];
         // Bounds check included in edge filter above, but safety first:
         if (nx < 0 || ny < 0 || nx >= grid.grid_size_x || ny >= grid.grid_size_y) continue;
 
-        float pt = lo(grid, nx, ny);
-        if (is_unknown(pt))
-            return true;
+        float p = grid.get_cell_probability(nx, ny);
+        // if unknown
+        if (0.35f < p && p < 0.65f) return true;
     }
+
     return false;
 }
 
@@ -198,11 +177,11 @@ MissionPlanner::MissionPlanner(const Pose2D& initial_home_pose) : home_pose_(ini
 }
 void MissionPlanner::set_mission_state(MissionGoalType st) { current_state_ = st; }
 void MissionPlanner::add_user_waypoint(const Pose2D& wp) {}
-bool MissionPlanner::is_current_goal_achieved(const Pose2D& pose) const {
-    float dx = pose.x - current_target_.target_pose.x;
-    float dy = pose.y - current_target_.target_pose.y;
-    return (dx*dx + dy*dy) < (0.20f * 0.20f); 
-}
+// bool MissionPlanner::is_current_goal_achieved(const Pose2D& pose) const {
+//     float dx = pose.x - current_target_.target_pose.x;
+//     float dy = pose.y - current_target_.target_pose.y;
+//     return (dx*dx + dy*dy) < (0.20f * 0.20f); 
+// }
 
 // ============================================================
 // MAIN LOGIC
@@ -217,9 +196,9 @@ MissionGoal MissionPlanner::update_goal(const Pose2D& pose, const BayesianOccupa
             return current_target_;
             
         case RETURN_HOME:
-            // current_target_.target_pose = home_pose_;
-            current_target_.target_pose.x = 10.f;
-            current_target_.target_pose.y = 10.f;
+            current_target_.target_pose = home_pose_;
+            // current_target_.target_pose.x = 10.f;
+            // current_target_.target_pose.y = 10.f;
             current_target_.type = RETURN_HOME;
             return current_target_;
 
@@ -241,7 +220,7 @@ MissionGoal MissionPlanner::update_goal(const Pose2D& pose, const BayesianOccupa
             // STEP 1: DEFINE SEARCH BOUNDS
             // --------------------------------------------------------
             int rx, ry;
-            world_to_index(pose, grid.grid_resolution, rx, ry);
+            world_to_grid(pose.x, pose.y, rx, ry, grid.grid_resolution, grid.grid_size_x, grid.grid_size_y);
             
             // Calculate Local Bounding Box (+/- SEARCH_BOUND_M)
             int range_cells = (int)(SEARCH_BOUND_M / grid.grid_resolution); 
@@ -297,10 +276,10 @@ MissionGoal MissionPlanner::update_goal(const Pose2D& pose, const BayesianOccupa
                     
                     patience_counter = 0; // Success! Reset failure counter.
 
-                    index_to_world(candidates[best_idx].center_x, 
+                    grid_to_world(candidates[best_idx].center_x, 
                                    candidates[best_idx].center_y, 
-                                   grid.grid_resolution, 
-                                   current_target_.target_pose);
+                                   current_target_.target_pose.x, current_target_.target_pose.y,
+                                   grid.grid_resolution, grid.grid_size_x, grid.grid_size_y);
                     
                     current_target_.type = MissionGoalType::EXPLORATION_MODE;
                     return current_target_;

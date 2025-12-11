@@ -14,8 +14,8 @@
 
 // TODO: For now we could use a 4bit value per cell to keep it lightweitgt ?
 //      Could always change later ?
-#define GRID_MAX_X 200
-#define GRID_MAX_Y 200
+#define GRID_MAX_X 100
+#define GRID_MAX_Y 100
 #define GRID_MAX_SIZE (GRID_MAX_X * GRID_MAX_Y)
 /**
  * @brief Manages the coarse occupancy map using Bayesian filtering.
@@ -32,13 +32,13 @@ public:
      * @param scan The new LiDAR observation.
      * @param pose The robot's estimated pose during the scan (from ESP2).
      */
-    void update_map(const SyncedScan& lidar_scan,  float lidar_max_range);
+    void update_map(const SyncedScan& lidar_scan);
 
     /**
      * @brief Retrieves the occupancy probability of a specific cell.
      * @return Probability (0.0 to 1.0).
      */
-    float get_cell_probability(float x_m, float y_m) const;
+    float get_cell_probability(int x, int y) const;
 
     // /**
     //  * @brief Exports the map data for use by the Global Planner.
@@ -50,7 +50,7 @@ public:
      * @brief Exports the map data for use by the Global Planner.
      */
     // Returns a simplified map representation (e.g. pointer or some light compressed array).
-    const int8_t* get_map_data() const;
+    int8_t* get_map_data() const;
 
     // Internal 2D array or vector to hold log-odds values
     float grid_resolution;
@@ -66,11 +66,11 @@ private:
     int8_t* log_odds;
 
     // Precomputed sin/cos tables for efficiency
-    static float sin_table[3600];
-    static float cos_table[3600];
+    static float* sin_table;
+    static float* cos_table;
     
     static bool trig_initialized;
 
-    static float prob_table[81];
+    static float* prob_table;
     static bool prob_table_initialized;
 };

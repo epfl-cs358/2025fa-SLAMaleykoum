@@ -27,7 +27,7 @@
 const Pose2D pos_eps1 = {5, 5, 5, 0};
 const Pose2D pos_eps2 = {2, 2, 2, 2};
 
-const GlobalPathMessage path_esp1 = {
+const PathMessage path_esp1 = {
     .path = {
         {0.0f, 0.0f},
         {1.0f, 0.0f},
@@ -39,7 +39,7 @@ const GlobalPathMessage path_esp1 = {
     .path_id = 12,
     .timestamp_ms = 5
 };
-const GlobalPathMessage path_esp2 = {
+const PathMessage path_esp2 = {
     .path = {
         { 5.0f,  5.0f},
         { 6.0f,  5.0f},
@@ -57,10 +57,10 @@ const char* mqtt_topic_esps2_gpm = "slamaleykoum77/gpm2";
 // helper functions
 void mqtt_print(const char* str, const char* topic = "slamaleykoum77/esps");
 const char* pos_to_cstr(const Pose2D& p);
-const char* gpm_to_cstr(const GlobalPathMessage& gpm);
+const char* gpm_to_cstr(const PathMessage& gpm);
 inline bool operator==(const Pose2D& a, const Pose2D& b);
 inline bool operator==(const Waypoint& a, const Waypoint& b);
-inline bool operator==(const GlobalPathMessage& a, const GlobalPathMessage& b);
+inline bool operator==(const PathMessage& a, const PathMessage& b);
 
 void test_pos();
 void test_path();
@@ -104,7 +104,7 @@ void test_pos() {
 }
 
 void test_path() {
-    GlobalPathMessage out;
+    PathMessage out;
     if (esp_link.get_path(out)) {
         mqtt_print("path recevied on esp2");
         mqtt_print(gpm_to_cstr(out), mqtt_topic_esps2_gpm);
@@ -132,7 +132,7 @@ const char* pos_to_cstr(const Pose2D& p) {
     return buf;
 }
 
-const char* gpm_to_cstr(const GlobalPathMessage& gpm) {
+const char* gpm_to_cstr(const PathMessage& gpm) {
     static char buf[512];
     size_t pos = 0;
 
@@ -162,7 +162,7 @@ inline bool operator==(const Waypoint& a, const Waypoint& b) {
     return a.x == b.x && a.y == b.y;
 }
 
-inline bool operator==(const GlobalPathMessage& a, const GlobalPathMessage& b) {
+inline bool operator==(const PathMessage& a, const PathMessage& b) {
     if (a.path_id        != b.path_id)        return false;
     if (a.timestamp_ms   != b.timestamp_ms)   return false;
 

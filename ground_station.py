@@ -15,11 +15,10 @@ ESP_IP = "192.168.4.1"
 PORT = 9000
 
 # Map & Rendering Settings
-GRID_W = 200        # Width of the grid in cells
-GRID_H = 200        # Height of the grid in cells
-RESOLUTION = 0.05   # Size of one cell in meters (5cm)
-WINDOW_SCALE = 4    # Scale factor for the display window
-DEBUG_VIEW_SIZE = 30  
+GRID_W = 25        # Width of the grid in cells
+GRID_H = 25        # Height of the grid in cells
+RESOLUTION = 0.4   # Size of one cell in meters (5cm)
+WINDOW_SCALE = 20    # Scale factor for the display window
 
 # Colors (RGB Tuples)
 C_BLACK  = (0, 0, 0)        # Occupied cell (Wall)
@@ -121,7 +120,7 @@ def find_frontiers_python(grid):
             
             # Condition 1: Cell must be Free
             # Threshold: >= -2 is Unknown/Occupied. < -2 is Free.
-            if val >= -2: continue 
+            if val >= -8: continue 
             
             # Condition 2: Must have at least one Unknown neighbor (LogOdds == 0)
             is_frontier = False
@@ -212,8 +211,9 @@ def main():
                 
                 # 3. Read Dynamic Packet Sizes
                 map_bytes_size = struct.unpack('<I', rx_buffer[2:6])[0]
-                path_len = struct.unpack('<H', rx_buffer[6:8])[0]
-                total_packet_size = HEADER_SIZE + (path_len * 8) + map_bytes_size
+                global_len = struct.unpack('<H', rx_buffer[6:8])[0]
+                local_len  = struct.unpack('<H', rx_buffer[8:10])[0]
+                total_packet_size = HEADER_SIZE + (global_len * 8) + (local_len * 8) + map_bytes_size
                 
                 # Wait for full packet
                 if len(rx_buffer) < total_packet_size: break 
@@ -225,8 +225,8 @@ def main():
                 # --- Packet Decoding ---
                 
                 # Decode Poses
-                cx, cy, ct = struct.unpack('<fff', packet[8:20])
-                gx, gy, gt = struct.unpack('<fff', packet[20:32])
+                cx, cy, ct = struct.unpack('<fff', packet[10:22])
+                gx, gy, gt = struct.unpack('<fff', packet[22:34])
                 car_pose = {'x': cx, 'y': cy, 'theta': ct}
                 goal_pose = {'x': gx, 'y': gy, 'theta': gt}
 
@@ -238,15 +238,28 @@ def main():
                     if pt: pygame.draw.circle(trail_surface, (0, 150, 255, 50), pt, 4)
 
                 # Decode Path
-                path_payload = packet[HEADER_SIZE : HEADER_SIZE + (path_len * 8)]
+                offset = HEADER_SIZE
+                path_payload = packet[offset : offset + (global_len * 8)]
                 path_points = []
-                for i in range(path_len):
+                for i in range(global_len):
                     px, py = struct.unpack('<ff', path_payload[i*8 : (i+1)*8])
                     path_points.append((px, py))
 
+                offset += global_len * 8
+
+                # LOCAL PATH
+                local_path_payload = packet[offset : offset + (local_len * 8)]
+
+                local_path_points = []
+                for i in range(local_len):
+                    px, py = struct.unpack('<ff', local_path_payload[i*8 : (i+1)*8])
+                    local_path_points.append((px, py))
+
+                offset += local_len * 8
+
                 # Decode Map (only if present)
                 if map_bytes_size > 0:
-                    map_payload = packet[HEADER_SIZE + (path_len * 8) :]
+                    map_payload = packet[HEADER_SIZE + (global_len * 8) :]
                     rle_data = np.frombuffer(map_payload, dtype=np.uint8)
                     try:
                         # Decompress RLE to 2D Grid
@@ -254,8 +267,8 @@ def main():
                         
                         # Generate RGB Surface
                         rgb_map = np.zeros((GRID_H, GRID_W, 3), dtype=np.uint8)
-                        occ_mask  = grid_log_odds > 8  
-                        free_mask = grid_log_odds < -8  
+                        occ_mask  = grid_log_odds > 4
+                        free_mask = grid_log_odds < -8
                         unk_mask  = (~free_mask) & (~occ_mask)
                         
                         rgb_map[free_mask] = C_WHITE
@@ -289,8 +302,18 @@ def main():
             pts_screen = [world_to_screen(p[0], p[1]) for p in path_points]
             valid_pts = [p for p in pts_screen if p is not None]
             if len(valid_pts) > 1:
-                pygame.draw.lines(screen, C_YELLOW, False, valid_pts, 3)
+                # pygame.draw.lines(screen, C_YELLOW, False, valid_pts, 3)
                 for pt in valid_pts: pygame.draw.circle(screen, C_YELLOW, pt, 2)
+
+            # GLOBAL PATH = jaune
+            for px, py in path_points:
+                pt = world_to_screen(px, py)
+                if pt: pygame.draw.circle(screen, C_YELLOW, pt, 3)
+
+            # LOCAL PATH = cyan
+            for px, py in local_path_points:
+                pt = world_to_screen(px, py)
+                if pt: pygame.draw.circle(screen, C_CYAN, pt, 3)
 
             # Layer 5: Goal (Green)
             gx_s, gy_s = world_to_screen(goal_pose['x'], goal_pose['y'])
@@ -310,11 +333,19 @@ def main():
                 ce_y = cy_s - 20 * (math.cos(car_pose['theta']))
                 pygame.draw.line(screen, C_RED, (cx_s, cy_s), (ce_x, ce_y), 3)
 
+            # Formater global path
+            if len(path_points) > 0:
+                gp_str = " ".join([f"({px:.1f},{py:.1f})" for px, py in path_points])
+            else:
+                gp_str = "NONE"
+
             # HUD (Text Overlay)
             status_lines = [
+                f"POSITION: X {cx:5.2f} Y {cy:5.2f}",
                 f"FRONTIERS: {len(detected_frontiers)}",
                 f"GOAL     : X{goal_pose['x']:5.2f} Y{goal_pose['y']:5.2f}",
-                f"STATE    : {'RETURNING HOME' if abs(goal_pose['x'])<0.01 and len(detected_frontiers)==0 else 'EXPLORING'}"
+                f"STATE    : {'NOTHING' if abs(goal_pose['x'])<0.01 and len(detected_frontiers)==0 else 'EXPLORING'}",
+                f"GLOBAL   : {gp_str}"
             ]
             for i, line in enumerate(status_lines):
                 # Draw black shadow for readability

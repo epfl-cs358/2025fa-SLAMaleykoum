@@ -234,7 +234,7 @@ void TaskPose(void *pvParameters) {
 // ===============================================================
 void TaskTestPurePursuit(void *pvParameters) {
     // Prepare path
-    GlobalPathMessage msg;
+    PathMessage msg;
     msg.current_length = path_Size;
     msg.timestamp_ms = millis();
     msg.path_id = 1;

@@ -70,7 +70,7 @@ void setup_receive_pos() {
 
 
     // --- Send PATH A ---
-    GlobalPathMessage pathA;
+    PathMessage pathA;
     pathA.current_length = pathA_size;
     pathA.path_id = 1;
     pathA.timestamp_ms = millis();

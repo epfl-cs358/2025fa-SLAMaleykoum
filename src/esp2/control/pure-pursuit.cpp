@@ -37,22 +37,16 @@ float PurePursuit::get_dist_sq(const Pose2D& pose, const Waypoint& wp) const {
 //      It's assumed that the new path is always better than the old one. (e.g. discovered a "cul de sac",
 //      or in further versions, dynamic obstacles).
 
-void PurePursuit::set_path(const GlobalPathMessage& path_msg) {
-    // Determine the number of points to copy, clamping to the max size.
-    uint16_t length_to_copy = std::min((uint16_t)MAX_PATH_LENGTH, path_msg.current_length);
+void PurePursuit::set_path(const PathMessage& path_msg) {
+    path_length_ = path_msg.current_length;
 
     // Perform a fast, direct memory copy. This is efficient and avoids dynamic allocation.
-    std::memcpy(current_path_, path_msg.path, length_to_copy * sizeof(Waypoint));
-    
-    // Update the internal state variables.
-    path_length_ = length_to_copy;
-    
+    std::memcpy(current_path_, path_msg.path, path_length_ * sizeof(Waypoint));
+        
     // IMPORTANT: Reset the lookahead index. When a new path is received, 
     // we must start tracking from the beginning of this new path.
     last_target_index_ = 0; 
 }
-
-
 
 /**
  * @brief Computes the motion command (speed and steering angle) using the Pure Pursuit algorithm.

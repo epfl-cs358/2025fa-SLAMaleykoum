@@ -10,7 +10,6 @@
 // =============================================================
 #define MAX_FRONTIER_CANDIDATES 20  
 #define BFS_QUEUE_SIZE 400          
-#define SEARCH_BOUND_M 6.0f         
 #define MIN_CLUSTER_SIZE 6          
 
 class MissionPlanner {
@@ -24,7 +23,7 @@ public:
 
     void set_mission_state(MissionGoalType new_state);
     void add_user_waypoint(const Pose2D& waypoint);
-    bool is_current_goal_achieved(const Pose2D& current_pose) const;
+    // bool is_current_goal_achieved(const Pose2D& current_pose) const;
 
     MissionGoalType get_current_state() const { return current_state_; }
 

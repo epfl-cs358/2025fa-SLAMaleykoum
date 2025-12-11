@@ -20,7 +20,7 @@ class Odometry;
 class Esp_link;
 class WiFiServer;
 class WiFiClient;
-class GlobalPathMessage;
+class PathMessage;
 
 // ===================================================================
 // HARDWARE INSTANCES - defined in global_state.cpp
@@ -64,7 +64,7 @@ extern float velocity;  // m/s
 // ===================================================================
 // PATH DATA - defined in global_state.cpp
 // ===================================================================
-extern GlobalPathMessage receivedPath;
+extern PathMessage receivedPath;
 extern volatile bool newPathArrived;
 
 // ===================================================================

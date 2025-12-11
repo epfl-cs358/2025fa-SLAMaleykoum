@@ -27,7 +27,7 @@ char bufreceive[100];
 Esp_link esp__link(Serial1);
 
 // Storage for received path
-GlobalPathMessage received__Path;
+PathMessage received__Path;
 
 void setup_test_comm() {
     Serial.begin(115200);

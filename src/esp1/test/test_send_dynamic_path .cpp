@@ -61,7 +61,7 @@ void setup_send_dynamic_path() {
     Serial.println("UART initialized.");
 
     // --- Send PATH A -----------------------------------------
-    GlobalPathMessage pathA;
+    PathMessage pathA;
     pathA.current_length = pathA_size;
     pathA.path_id = 1;
     pathA.timestamp_ms = millis();
@@ -81,7 +81,7 @@ void setup_send_dynamic_path() {
 
 
     // --- Send PATH B -----------------------------------------
-    GlobalPathMessage pathB;
+    PathMessage pathB;
     pathB.current_length = pathB_size;
     pathB.path_id = 2;  // NEW PATH ID!
     pathB.timestamp_ms = millis();

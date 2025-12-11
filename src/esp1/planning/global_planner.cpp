@@ -1,9 +1,6 @@
 #include "../../../include/esp1/planning/global_planner.h"
-#include <queue>
-#include <cmath>
-#include <limits>
-#include <algorithm>
-#include <cstdio>
+#include "esp_wifi.h"
+#include "../../include/common/utils.h"
 
 // ---------------------------------------------------------
 //                    A* NODE
@@ -19,15 +16,11 @@ struct Node {
 
 GlobalPlanner::GlobalPlanner() {}
 
-
 // ---------------------------------------------------------
 //              COLLISION CHECK WITH ROBOT RADIUS
 // ---------------------------------------------------------
 
-static inline bool robot_circle_collides(
-    int cx, int cy,
-    const BayesianOccupancyGrid& map)
-{
+static inline bool robot_circle_collides(int cx, int cy, const BayesianOccupancyGrid& map) {
     const int sx = map.grid_size_x;
     const int sy = map.grid_size_y;
 
@@ -36,176 +29,206 @@ static inline bool robot_circle_collides(
     for (int dy = -radius_cells; dy <= radius_cells; dy++) {
         for (int dx = -radius_cells; dx <= radius_cells; dx++) {
 
-            if (dx*dx + dy*dy > radius_cells*radius_cells)
-                continue;
+            if (dx*dx + dy*dy > radius_cells*radius_cells) continue;
 
             int nx = cx + dx;
             int ny = cy + dy;
 
-            if (nx < 0 || nx >= sx || ny < 0 || ny >= sy)
-                return true;
+            if (nx < 0 || nx >= sx || ny < 0 || ny >= sy) return true;
 
-            if (map.get_cell_probability(nx, ny) > 0.7f)
-                return true;
+            if (map.get_cell_probability(nx, ny) > 0.7f) return true;
         }
     }
     return false;
 }
 
-
-// ---------------------------------------------------------
-//            WORLD <-> GRID CONVERSION
-// ---------------------------------------------------------
-
-static inline void world_to_grid(
-    const Pose2D& pose,
-    int& gx, int& gy,
-    float res, int sx, int sy)
-{
-    gx = int(pose.x / res) + sx / 2;
-    gy = int(-pose.y / res) + sy / 2;
-}
-
-static inline void world_to_grid_goal(
-    float x, float y,
-    int& gx, int& gy,
-    float res, int sx, int sy)
-{
-    gx = int(x / res) + sx / 2;
-    gy = int(-y / res) + sy / 2;
-}
-
-
 // ---------------------------------------------------------
 //                       A* PLANNER
 // ---------------------------------------------------------
+#define GP_MAX_W  50     // largeur max de la carte coarse
+#define GP_MAX_H  50     // hauteur max
+#define GP_MAX_N  (GP_MAX_W * GP_MAX_H)
 
-GlobalPathMessage GlobalPlanner::generate_path(
+PathMessage GlobalPlanner::generate_path(
     const Pose2D& current_pose,
     const MissionGoal& goal,
-    const BayesianOccupancyGrid& map)
+    const BayesianOccupancyGrid& map
+)
 {
-    GlobalPathMessage msg{};
+    PathMessage msg{};
     msg.current_length = 0;
     msg.path_id = 0;
-    msg.timestamp_ms = 0;
+    msg.timestamp_ms = esp_wifi_get_tsf_time(WIFI_IF_AP);
 
+    const int W = map.grid_size_x;
+    const int H = map.grid_size_y;
     const float res = map.grid_resolution;
-    const int sx   = map.grid_size_x;
-    const int sy   = map.grid_size_y;
 
-    if (sx <= 0 || sy <= 0) return msg;
+    if (W <= 0 || H <= 0 || W > GP_MAX_W || H > GP_MAX_H)
+        return msg;
 
-    int start_x, start_y, goal_x, goal_y;
-    world_to_grid(current_pose, start_x, start_y, res, sx, sy);
-    world_to_grid_goal(goal.target_pose.x, goal.target_pose.y, goal_x, goal_y, res, sx, sy);
+    // -------------------------------------------
+    // 1) Convert start & goal to grid
+    // -------------------------------------------
+    int sx, sy, gx, gy;
+    world_to_grid(current_pose.x, current_pose.y, sx, sy, res, W, H);
+    world_to_grid(goal.target_pose.x, goal.target_pose.y, gx, gy, res, W, H);
 
-    auto inside = [&](int x, int y) {
-        return (x >= 0 && x < sx && y >= 0 && y < sy);
+    if (sx<0||sx>=W||sy<0||sy>=H) return msg;
+    if (gx<0||gx>=W||gy<0||gy>=H) return msg;
+
+    // -------------------------------------------
+    // A* Buffers (static)
+    // -------------------------------------------
+    static float g_cost[GP_MAX_H][GP_MAX_W];
+    static int parent_x[GP_MAX_H][GP_MAX_W];
+    static int parent_y[GP_MAX_H][GP_MAX_W];
+    static bool closed[GP_MAX_H][GP_MAX_W];
+
+    for (int y=0;y<H;y++){
+        for (int x=0;x<W;x++){
+            g_cost[y][x] = 1e9f;
+            parent_x[y][x] = -1;
+            parent_y[y][x] = -1;
+            closed[y][x] = false;
+        }
+    }
+
+    // -------------------------------------------
+    // priority queue simple
+    // -------------------------------------------
+    struct Node { int x, y; float f; };
+    static Node pq[GP_MAX_N];
+    int pq_size = 0;
+
+    auto pq_push = [&](int x,int y,float f){
+        if (pq_size < GP_MAX_N) pq[pq_size++] = {x,y,f};
     };
 
-    if (!inside(start_x,start_y) || !inside(goal_x,goal_y)) return msg;
-
-    auto index = [&](int x, int y){ return y * sx + x; };
-
-    std::vector<float> g_cost(sx * sy, std::numeric_limits<float>::infinity());
-    std::vector<int> parent(sx * sy, -1);
-
-    std::priority_queue<Node, std::vector<Node>, std::greater<Node>> pq;
-
-    Node start{
-        start_x, start_y,
-        0.f,
-        float(std::hypot(goal_x - start_x, goal_y - start_y))
+    auto pq_pop = [&](){
+        int best = 0;
+        for(int i=1;i<pq_size;i++){
+            if(pq[i].f < pq[best].f)
+                best = i;
+        }
+        Node r = pq[best];
+        pq[best] = pq[--pq_size];
+        return r;
     };
 
-    pq.push(start);
-    g_cost[index(start_x, start_y)] = 0.f;
+    // -------------------------------------------
+    // Start A*
+    // -------------------------------------------
+    g_cost[sy][sx] = 0.f;
+    float h0 = sqrtf((gx-sx)*(gx-sx) + (gy-sy)*(gy-sy));
+    pq_push(sx, sy, h0);
 
-    const int moves[8][2] = {
+    const int MOVES[4][2] = {
         {1,0},{-1,0},{0,1},{0,-1},
-        {1,1},{1,-1},{-1,1},{-1,-1}
     };
 
     bool found = false;
 
-    // ---------------------- A* LOOP ------------------------
-    while (!pq.empty()) {
+    // -------------------------------------------
+    // 2) A*
+    // -------------------------------------------
+    while(pq_size > 0){
+        Node cur = pq_pop();
+        int cx = cur.x, cy = cur.y;
 
-        Node cur = pq.top();
-        pq.pop();
+        if (closed[cy][cx]) continue;
+        closed[cy][cx] = true;
 
-        if (cur.x == goal_x && cur.y == goal_y) {
+        if (cx == gx && cy == gy) {
             found = true;
             break;
         }
 
-        int cur_index = index(cur.x, cur.y);
+        float gc = g_cost[cy][cx];
 
-        for (auto& m : moves) {
+        for (int i=0;i<4;i++){
+            int nx = cx + MOVES[i][0];
+            int ny = cy + MOVES[i][1];
 
-            int nx = cur.x + m[0];
-            int ny = cur.y + m[1];
+            if (nx<0||ny<0||nx>=W||ny>=H) continue;
+            if (closed[ny][nx]) continue;
+            if (map.get_cell_probability(nx, ny) >= 0.5f) continue;
 
-            if (!inside(nx, ny))
-                continue;
+            float new_g = gc + 1;
 
-            // COLLISION CHECK (robot circle)
-            if (robot_circle_collides(nx, ny, map))
-                continue;
+            if(new_g < g_cost[ny][nx]){
+                g_cost[ny][nx] = new_g;
+                parent_x[ny][nx] = cx;
+                parent_y[ny][nx] = cy;
 
-            // movement cost
-            bool diag = (m[0] != 0 && m[1] != 0);
-            float step = diag ? 1.41421356f : 1.f;
-
-            float prob = map.get_cell_probability(nx, ny);
-            float weight = step * (1.f + prob * 2.f);
-
-            float new_g = g_cost[cur_index] + weight;
-            int n_index = index(nx, ny);
-
-            if (new_g < g_cost[n_index]) {
-                g_cost[n_index] = new_g;
-                parent[n_index] = cur_index;
-
-                float h = std::hypot(goal_x - nx, goal_y - ny);
-                pq.push({nx, ny, new_g, h});
+                float h = sqrtf((gx-nx)*(gx-nx) + (gy-ny)*(gy-ny));
+                pq_push(nx, ny, new_g + h);
             }
-        } // <-- FIN DU FOR MANQUANT AVANT !!
+        }
     }
 
-    if (!found) return msg;
+    if (!found)
+        return msg;
 
-    // -----------------------------------------------------
-    //            RECONSTRUCT PATH
-    // -----------------------------------------------------
+    // -------------------------------------------
+    // 3) Reconstruction backward
+    // -------------------------------------------
+    static int px[GP_MAX_N];
+    static int py[GP_MAX_N];
+    int plen = 0;
 
-    std::vector<std::pair<int,int>> rev;
-    int cx = goal_x, cy = goal_y;
+    while(!(gx==sx && gy==sy) && plen < GP_MAX_N){
+        px[plen] = gx;
+        py[plen] = gy;
+        plen++;
 
-    while (!(cx == start_x && cy == start_y)) {
-        rev.emplace_back(cx, cy);
-        int p = parent[index(cx,cy)];
-        if (p < 0) return msg;
-        cy = p / sx;
-        cx = p % sx;
+        int px2 = parent_x[gy][gx];
+        int py2 = parent_y[gy][gx];
+
+        if (px2 < 0) break;
+
+        gx = px2;
+        gy = py2;
     }
 
-    rev.emplace_back(start_x, start_y);
-    std::reverse(rev.begin(), rev.end());
+    // position 0 dans tableau = goal
+    // -------------------------------------------
+    // 4) ÉCHANTILLONNER pour max 5 points
+    // -------------------------------------------
+    if (plen <= MAX_PATH_LENGTH && plen >= 1) {
+        msg.current_length = plen;
 
-    // -----------------------------------------------------
-    //            GRID → WORLD
-    // -----------------------------------------------------
+        int j = 0;
+        for (int i = plen - 1; i >= 0; i--) {
+            // msg.path[j].x = float((px[i] - (W/2)) * res);
+            // msg.path[j].y = float(- (py[i] - (H/2)) * res);
+            grid_to_world(px[i], py[i], msg.path[j].x, msg.path[j].y, res, W, H);
+            j++; 
+        }
+    } else {
+        msg.current_length = MAX_PATH_LENGTH;
 
-    int count = 0;
-    for (auto& c : rev) {
-        if (count >= MAX_PATH_LENGTH) break;
-        msg.path[count].x = (c.first - sx/2) * res;
-        msg.path[count].y = -(c.second - sy/2) * res;
-        count++;
+        // 1) Le premier waypoint = juste après notre position
+        //    donc px[plen-1]
+        // msg.path[0].x = float((px[plen - 1] - (W/2)) * res);
+        // msg.path[0].y = float(- (py[plen - 1] - (H/2)) * res);
+        grid_to_world(px[plen - 1], py[plen - 1], msg.path[0].x, msg.path[0].y, res, W, H);
+
+        // 2) Le dernier waypoint = goal → px[0]
+        // msg.path[MAX_PATH_LENGTH - 1].x = float((px[0] - (W/2)) * res);
+        // msg.path[MAX_PATH_LENGTH - 1].y = float(- (py[0] - (H/2)) * res);
+        grid_to_world(px[0], py[0], msg.path[MAX_PATH_LENGTH - 1].x, msg.path[MAX_PATH_LENGTH - 1].y, res, W, H);
+
+        float ratio = float(plen - 2) / (MAX_PATH_LENGTH - 1);
+
+        for (int k = 1; k < MAX_PATH_LENGTH - 1; k++) {
+            int idx = (plen - 2) - int(k * ratio);
+
+            // msg.path[k].x = float((px[idx] - (W/2)) * res);
+            // msg.path[k].y = float(- (py[idx] - (H/2)) * res);
+            grid_to_world(px[idx], py[idx], msg.path[k].x, msg.path[k].y, res, W, H);
+
+        }
     }
-
-    msg.current_length = count;
     return msg;
 }

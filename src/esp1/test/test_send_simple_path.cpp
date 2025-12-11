@@ -78,7 +78,7 @@ void setup_send_simple_path() {
     delay(5000);
     
     // Create path message
-    GlobalPathMessage pathMsg;
+    PathMessage pathMsg;
     pathMsg.current_length = pathSize;
     pathMsg.path_id = 1;
     pathMsg.timestamp_ms = millis();

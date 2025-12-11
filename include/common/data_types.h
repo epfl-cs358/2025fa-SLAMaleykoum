@@ -4,9 +4,6 @@
 
 #pragma once
 
-#include <vector>
-#include <cstdint>
-
 #ifdef ARDUINO
     #include <Arduino.h>
 #endif
@@ -14,11 +11,11 @@
 
 
 // Define the maximum number of waypoints the controller can handle.
-#define MAX_PATH_LENGTH 50
+#define MAX_PATH_LENGTH 5
+#define MAX_LOCAL_PATH_LENGTH 10
 #define MAX_LIDAR_POINTS 500
 #define ROBOT_RADIUS 0.3f
-
-
+#define SEARCH_BOUND_M 3.0f
 
 // --- Core Geometric Structures ---
 /**
@@ -178,15 +175,6 @@ struct LiDARLandmark {
     float quality; // Confidence/strength of the feature detection (0.0 to 1.0)
 };
 
-/**
- * @brief Full LiDAR scan structure.
- */
-/*struct LiDARScan {
-    std::vector<LiDARLandmark> landmarks; // The processed list of features
-    uint32_t timestamp_ms;
-};*/ // c'est quoi ça -----------------------------------------------------------------------------------
-
-
 // --- Inter-Processor Communication (IPC) Structures ---
 
 /**
@@ -203,11 +191,11 @@ struct MotionCommand {
  * indicates how many waypoints in the array are valid, it is also constantly updated.
  * current_length <= MAX_PATH_LENGTH
  */
-struct GlobalPathMessage {
+struct PathMessage {
     Waypoint path[MAX_PATH_LENGTH]; // Fixed-size array
-    uint16_t current_length;        // Actual number of valid waypoints in the array
-    uint32_t path_id; 
-    uint32_t timestamp_ms;
+    uint8_t current_length;        // Actual number of valid waypoints in the array
+    uint16_t path_id; 
+    uint64_t timestamp_ms;
 };
 
 /**
@@ -247,9 +235,15 @@ struct MissionGoal {
  * and knos what to do with the following message.
  */
 enum MsgId : uint8_t {
-  MSG_PATH = 1,       // GloablPathMessage ESP1->ESP2
-  MSG_CORR = 2,       // LoopClosureCorrection ESP1->ESP2
-  MSG_POSE = 3,       // Pose2D ESP2->ESP1
-  MSG_TXT = 4
+  MSG_PATH_GLOBAL = 1,       // GloablPathMessage ESP1->ESP2
+  MSG_PATH_LOCAL = 2,
+  MSG_CORR = 3,       // LoopClosureCorrection ESP1->ESP2
+  MSG_POSE = 4,       // Pose2D ESP2->ESP1
+  MSG_TXT = 5
   // maybe more to add
+};
+
+enum PathType : uint8_t {
+    GLOBAL = 1,
+    LOCAL = 2
 };
