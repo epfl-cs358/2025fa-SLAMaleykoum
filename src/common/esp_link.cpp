@@ -61,13 +61,52 @@ void Esp_link::poll() {
       
       lpm_available = true;
       break;
+    
     }
+    case MSG_EMERGENCY_STOP_ACTIVE: {
+      if (ser_.available() < sizeof(Status)) return;
+      Status status;
+      ser_.readBytes(reinterpret_cast<uint8_t*>(&status), sizeof(Status));
+      stat_emergency_stop_active = status;
+      break;
+    }
+    case MSG_ESCAPE_MANEUVER_STOP: {
+      if (ser_.available() < sizeof(Status)) return;
+      Status status;
+      ser_.readBytes(reinterpret_cast<uint8_t*>(&status), sizeof(Status));
+      stat_escape_maneuver_stop = status;
+      break;
+    }
+    case MSG_NEW_PATH_AVAILABLE: {
+      if (ser_.available() < sizeof(Status)) return;
+      Status status;
+      ser_.readBytes(reinterpret_cast<uint8_t*>(&status), sizeof(Status));
+      stat_new_path_available = status;
+      break;
+    }
+
   }
 }
 
 void Esp_link::sendPos(const Pose2D& p) {
   ser_.write(MSG_POSE << (BYTE_SIZE - MSG_ID_SIZE));
   ser_.write(reinterpret_cast<const uint8_t*>(&p), sizeof(Pose2D));
+}
+void Esp_link::sendStatus(StatusType s_type, Status status) {
+  uint8_t header;
+  switch (s_type) {
+    case EMERGENCY:
+      header= MSG_EMERGENCY_STOP_ACTIVE << (BYTE_SIZE - MSG_ID_SIZE);
+      break;
+    case MANEUVER:
+      header= MSG_ESCAPE_MANEUVER_STOP << (BYTE_SIZE - MSG_ID_SIZE);
+      break;
+    case NEW_PATH:
+      header= MSG_NEW_PATH_AVAILABLE << (BYTE_SIZE - MSG_ID_SIZE);
+      break;
+  }
+  ser_.write(MSG_EMERGENCY_STOP_ACTIVE << (BYTE_SIZE - MSG_ID_SIZE));
+  ser_.write(reinterpret_cast<const uint8_t*>(&status), sizeof(Status));
 }
 
 void Esp_link::sendPath(const PathMessage& pm, PathType type) {
@@ -98,6 +137,21 @@ bool Esp_link::get_pos(Pose2D& out){
   count_pos--;
 
   return true;
+}
+bool Esp_link::get_status(StatusType s_type, Status out){
+    if(sizeof(out)!=sizeof(Status)) return false;
+    switch(s_type){
+        case EMERGENCY:
+          out = stat_emergency_stop_active;
+            break;
+        case MANEUVER:
+          out = stat_escape_maneuver_stop;
+            break;
+        case NEW_PATH:
+          out = stat_new_path_available;
+          break;
+    }
+    return true;    
 }
 
 bool Esp_link::get_path(PathMessage& out, PathType type){

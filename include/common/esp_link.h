@@ -69,6 +69,8 @@ class Esp_link {
      * @param p Pose2D struct to transmit.
      */
     void sendPos(const Pose2D& p);
+    
+    void sendStatus(StatusType s_type, Status status);
 
     /**
      * @brief Sends a GlobalPathMessage message over the ESP-to-ESP UART link.
@@ -94,6 +96,8 @@ class Esp_link {
      * @return true if a Pose2D was retrieved, false if the queue is empty.
      */
     bool get_pos(Pose2D& out);
+
+    bool get_status(StatusType s_type, Status status);
 
     /**
      * @brief Retrieves the most recently received GlobalPathMessage.
@@ -124,6 +128,10 @@ class Esp_link {
     PathMessage lpm_;
     bool gpm_available = false;
     bool lpm_available = false;
+    Status stat_emergency_stop_active= false;
+    Status stat_escape_maneuver_stop= false; 
+    Status stat_new_path_available= false; 
+
 
     /**
      * @brief Stores a received Pose2D in the queue.

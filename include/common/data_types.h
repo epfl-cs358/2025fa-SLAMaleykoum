@@ -22,12 +22,18 @@
 /**
  * @brief 2D pose structure (Position and Orientation).
  */
+
 struct Pose2D {
     float x;     // Global X position (m)
     float y;     // Global Y position (m)
     float theta; // Global Yaw angle (rad)
     uint64_t timestamp_ms;
 };
+/** 
+ * @brief Robot operational status.
+ */
+typedef bool Status;
+
 
 /**
  * @brief Velocity state.
@@ -248,13 +254,23 @@ struct MissionGoal {
 enum MsgId : uint8_t {
   MSG_PATH_GLOBAL = 1,       // GloablPathMessage ESP1->ESP2
   MSG_PATH_LOCAL = 2,
-  MSG_CORR = 3,       // LoopClosureCorrection ESP1->ESP2
   MSG_POSE = 4,       // Pose2D ESP2->ESP1
-  MSG_TXT = 5
+  MSG_EMERGENCY_STOP_ACTIVE = 5,
+  MSG_ESCAPE_MANEUVER_STOP = 6,
+  MSG_NEW_PATH_AVAILABLE = 7,
+    //msg esp2 -> esp1 ultrasonic initialized, wait 5sec to start mapping
+    //esp1 -> esp2 start following path
   // maybe more to add
 };
 
 enum PathType : uint8_t {
     GLOBAL = 1,
     LOCAL = 2
+};
+
+
+enum StatusType : uint8_t {
+    EMERGENCY= 1,
+    MANEUVER = 2,
+    NEW_PATH = 3
 };
