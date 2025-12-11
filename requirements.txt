@@ -2,7 +2,8 @@
 paho-mqtt~=1.6
 
 # Plotting and Visualization (plotting of the lidar)
-matplotlib~=3.8
+matplotlib~=3.10
 
-# For lidar plotting window
+# For groundstation GUI
 pygame~=2.6
+numpy~=2.2

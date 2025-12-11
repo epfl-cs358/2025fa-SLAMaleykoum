@@ -68,7 +68,7 @@ HardwareSerial& LIDAR_SERIAL = Serial2;
 Lidar lidar(LIDAR_SERIAL);
 
 HardwareSerial& IPC_Serial = Serial1; 
-Esp_link esp_link(IPC_Serial); 
+Esp_link esp_link(IPC_Serial);
 
 // uint8_t* rle_buffer = nullptr;
 
@@ -411,7 +411,7 @@ void Mission_Planner_Task(void* parameter) {
 }
 
 // =============================================================
-// GLOBAL PLANNER STUB
+// GLOBAL PLANNER TASK
 // =============================================================
 void Global_Planner_Task(void* parameter) {
     // Serial.println("[Task] Global Planner Started (A*)");
