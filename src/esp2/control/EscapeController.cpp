@@ -17,12 +17,6 @@
 EscapeController::EscapeController(MotorManager& m, DMS15& s)
     : motor(m), steering(s) {}
 
-float EscapeController::wrapAngle(float a) {
-    while (a >  M_PI) a -= 2.0f * M_PI;
-    while (a < -M_PI) a += 2.0f * M_PI;
-    return a;
-}
-
 void EscapeController::begin(float startYaw) {
     if (state != IDLE) return;
 
