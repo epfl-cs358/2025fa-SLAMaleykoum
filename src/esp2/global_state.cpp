@@ -22,7 +22,6 @@
 #include <WiFi.h>
 #include <WiFiClient.h>
 #include <WiFiServer.h>
-
 // ===================================================================
 // HARDWARE INSTANCES
 // ===================================================================
@@ -48,15 +47,15 @@ bool startSignalReceived = false;
 bool firstPathReceived = false;
 
 bool isCrenFinished = false;
-
-bool isPerformingCreneau = false;  // ADD THIS LINE - Flag to disable emergency stop during maneuver
+bool isPerformingCreneau = false; 
 
 // Pose state
 float posX = 0.0f;
 float posY = 0.0f;
 float yaw = 0.0f;
 float velocity = 0.0f;
-// Pose2D currentPose = {posX, posY, yaw, millis()};
+
+Pose2D currentPose = {0.0f, 0.0f, 0.0f, 0};
 
 // Path data
 GlobalPathMessage receivedPath = {0};

@@ -4,9 +4,14 @@
  * 
  * These variables are defined in src/esp2/global_state.cpp
  * and shared across all tasks.
+ * 
+ * @author SLAMaleykoum 
+ * @date Dec 2025
  */
 
 #pragma once
+
+#include "common/data_types.h" 
 
 // Forward declarations (avoid circular includes)
 class MotorManager;
@@ -52,7 +57,6 @@ extern bool emergencyStop;
 extern bool finishedPath;
 extern bool startSignalReceived;
 extern bool firstPathReceived;
-
 extern bool isCrenFinished;
 extern bool isPerformingCreneau;
 // ===================================================================
@@ -62,7 +66,7 @@ extern float posX;      // meters
 extern float posY;      // meters
 extern float yaw;       // radians
 extern float velocity;  // m/s
-
+extern Pose2D currentPose;  // Current robot position and yaw
 // ===================================================================
 // PATH DATA - defined in global_state.cpp
 // ===================================================================

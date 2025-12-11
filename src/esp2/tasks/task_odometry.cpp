@@ -39,13 +39,13 @@ void TaskOdometryUnified_Stable(void *pvParameters) {
         posX -= velocity * sinf(yaw) * dt;
         posY += velocity * cosf(yaw) * dt;
 
-        Pose2D pose;
-        pose.x = posX;
-        pose.y = posY;
-        pose.theta = yaw;
-        pose.timestamp_ms = millis();
+        //Updates current position determined by the IMU and Encoder
+        currentPose.x = posX;
+        currentPose.y = posY;
+        currentPose.theta = yaw;
+        currentPose.timestamp_ms = millis();
         
-        esp_link.sendPos(pose);
+        esp_link.sendPos(currentPose);
         
         if (millis() - lastPrintTime > 1000) {
             Serial.printf("Pose TX: X=%.3f Y=%.3f θ=%.3f | 100Hz\n", posX, posY, yaw);

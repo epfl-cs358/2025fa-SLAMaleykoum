@@ -17,12 +17,8 @@ void TaskUltrasonic(void *pvParameters) {
             motor.update();
             emergencyStop = true;
 
-            //say cren needs activation
-
-            
-            isCrenFinished = false;
-            
-            
+            //Sets state that says if the turning maneuver is finished or not
+            isCrenFinished = false;   
         } 
         vTaskDelay(pdMS_TO_TICKS(200));
     }

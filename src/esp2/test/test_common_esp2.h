@@ -82,3 +82,4 @@ void setup_clock_esp2();            void loop_clock_esp2();
 void setup_clock_esp2_STA();        void loop_clock_esp2_STA();
 void setup_test_comm();             void loop_test_comm();
 void setup_test_turning_around();   void loop_test_turning_around();
+void setup_maneuvers_state_machine_test(); void loop_maneuvers_state_machine_test();

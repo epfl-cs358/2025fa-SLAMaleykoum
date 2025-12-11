@@ -23,7 +23,7 @@
 
 // Change the id depending on the test to run
 #ifndef TEST_ID
-#define TEST_ID 23
+#define TEST_ID 24
 #endif
 
 void setup() {
@@ -73,6 +73,8 @@ void setup() {
         setup_test_comm();
     #elif TEST_ID == 23
         setup_test_turning_around();
+    #elif TEST_ID == 24
+        setup_maneuvers_state_machine_test();
     #endif
 }
 
@@ -123,5 +125,7 @@ void loop() {
         loop_test_comm();
     #elif TEST_ID == 23
         loop_test_turning_around();
+    #elif TEST_ID == 24
+        loop_maneuvers_state_machine_test();
     #endif
 }
