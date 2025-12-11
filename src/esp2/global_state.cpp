@@ -58,5 +58,5 @@ float velocity = 0.0f;
 Pose2D currentPose = {0.0f, 0.0f, 0.0f, 0};
 
 // Path data
-GlobalPathMessage receivedPath = {0};
+PathMessage receivedPath = {0};
 volatile bool newPathArrived = false;

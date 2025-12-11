@@ -45,7 +45,7 @@ GoalManager* goalManager = nullptr; // <--- ADDED OBJECT
 
 // --- STATE VARIABLES ---
 Pose2D last_known_pose = {0,0,0,0};
-GlobalPathMessage current_global_path;
+PathMessage current_global_path;
 MissionGoal current_mission_goal;
 
 // --- TRANSMISSION BUFFERS ---
@@ -53,7 +53,7 @@ uint8_t* Tx_Map_Buffer = nullptr;
 struct StateSnapshot {
     Pose2D pose;
     MissionGoal goal;
-    GlobalPathMessage path;
+    PathMessage path;
 } Tx_Snapshot;
 
 HardwareSerial& LIDAR_SERIAL = Serial2;
@@ -310,7 +310,7 @@ void Mission_Planner_Task(void* parameter) {
 // =============================================================
 void Global_Planner_Task(void* parameter) {
     while (1) {
-        GlobalPathMessage pathMsg;  // Local variable
+        PathMessage pathMsg;  // Local variable
         
         // Build the path inside the mutex (fast)
         if(xSemaphoreTake(State_Mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
@@ -332,7 +332,7 @@ void Global_Planner_Task(void* parameter) {
        
         
         // Send AFTER releasing the mutex (slow operation)
-        esp_link.sendPath(pathMsg);        
+        esp_link.sendPath(pathMsg, GLOBAL);        
         
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
@@ -374,7 +374,7 @@ void setup() {
     // Queue Sizes: Increased Lidar buffer slightly to handle bursts
     Lidar_Buffer_Queue = xQueueCreate(2, sizeof(LiDARScan));
     Lidar_Pose_Queue   = xQueueCreate(2, sizeof(SyncedScan));
-    Path_Send_Queue    = xQueueCreate(1, sizeof(GlobalPathMessage));
+    Path_Send_Queue    = xQueueCreate(1, sizeof(PathMessage));
 
     // --- TASK PRIORITIES & CORE ASSIGNMENT ---
     // Rule: Higher number = Higher Priority.

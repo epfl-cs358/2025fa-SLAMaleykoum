@@ -82,7 +82,7 @@ class Esp_link {
      *
      * @param gpm GlobalPathMessage struct to transmit.
      */
-    void sendPath(const GlobalPathMessage& gpm);
+    void sendPath(const PathMessage& pm, PathType type);
 
     /**
      * @brief Retrieves the oldest pending Pose2D message from the queue.
@@ -105,10 +105,10 @@ class Esp_link {
      * @param out Reference where the stored GlobalPathMessage will be written.
      * @return true always, since a path is always considered available.
      */
-    bool get_path(GlobalPathMessage& out);
+    bool get_path(PathMessage& out, PathType type);
 
     private:
-    static constexpr size_t QUEUE_CAP = 1;
+    static constexpr size_t QUEUE_CAP = 3;
     static constexpr uint8_t RX_ESPS = 13;
     static constexpr uint8_t TX_ESPS = 12;
     static constexpr uint32_t ESPS_BAUDRATE = 2000000;
@@ -120,8 +120,10 @@ class Esp_link {
     size_t tail_pos = 0;
     size_t count_pos = 0;
 
-    GlobalPathMessage gpm_;
+    PathMessage gpm_;
+    PathMessage lpm_;
     bool gpm_available = false;
+    bool lpm_available = false;
 
     /**
      * @brief Stores a received Pose2D in the queue.

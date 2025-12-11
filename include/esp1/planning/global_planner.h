@@ -23,7 +23,7 @@ public:
      * @param map The current coarse occupancy grid (required for pathfinding).
      * @return A vector of Waypoints for ESP_2 to follow.
      */
-    GlobalPathMessage generate_path(
+    PathMessage generate_path(
         const Pose2D& current_pose,
         const MissionGoal& goal,
         const BayesianOccupancyGrid& map

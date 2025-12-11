@@ -19,7 +19,7 @@ public:
      * Since the path is constantly updated from our current position
      * we can simply overwrite the previous one.
      */
-    void set_path(const GlobalPathMessage& path_msg);
+    void set_path(const PathMessage& path_msg);
 
     /**
      * @brief Main control loop function.

@@ -34,12 +34,12 @@ void Esp_link::poll() {
       push_pos(p);
       break;
     }
-    case MSG_PATH: {
+    case MSG_PATH_GLOBAL: {
       int count = aux;
-      if (ser_.available() <  2 * sizeof(uint32_t)) return;
+      if (ser_.available() < sizeof(uint16_t) + sizeof(uint64_t)) return;
 
-      ser_.readBytes(reinterpret_cast<uint8_t*>(&gpm_.path_id), sizeof(uint32_t));
-      ser_.readBytes(reinterpret_cast<uint8_t*>(&gpm_.timestamp_ms), sizeof(uint32_t));
+      ser_.readBytes(reinterpret_cast<uint8_t*>(&gpm_.path_id), sizeof(uint16_t));
+      ser_.readBytes(reinterpret_cast<uint8_t*>(&gpm_.timestamp_ms), sizeof(uint64_t));
 
       if (ser_.available() < count * sizeof(Waypoint)) return;
       ser_.readBytes(reinterpret_cast<uint8_t*>(gpm_.path), count * sizeof(Waypoint));
@@ -48,7 +48,20 @@ void Esp_link::poll() {
       gpm_available = true;
       break;
     }
-    default: return;
+    case MSG_PATH_LOCAL: {
+      int count = aux;
+      if (ser_.available() < sizeof(uint16_t) + sizeof(uint64_t)) return;
+
+      ser_.readBytes(reinterpret_cast<uint8_t*>(&lpm_.path_id), sizeof(uint16_t));
+      ser_.readBytes(reinterpret_cast<uint8_t*>(&lpm_.timestamp_ms), sizeof(uint64_t));
+
+      if (ser_.available() < count * sizeof(Waypoint)) return;
+      ser_.readBytes(reinterpret_cast<uint8_t*>(lpm_.path), count * sizeof(Waypoint));
+      lpm_.current_length = count;
+      
+      lpm_available = true;
+      break;
+    }
   }
 }
 
@@ -57,13 +70,23 @@ void Esp_link::sendPos(const Pose2D& p) {
   ser_.write(reinterpret_cast<const uint8_t*>(&p), sizeof(Pose2D));
 }
 
-void Esp_link::sendPath(const GlobalPathMessage& gpm) {
-  uint8_t header = MSG_PATH << (BYTE_SIZE - MSG_ID_SIZE);
-  header |= gpm.current_length;
+void Esp_link::sendPath(const PathMessage& pm, PathType type) {
+  uint8_t header;
+
+  switch (type) {
+    case GLOBAL:
+      header = MSG_PATH_GLOBAL << (BYTE_SIZE - MSG_ID_SIZE);
+      break;
+    case LOCAL:
+      header = MSG_PATH_LOCAL << (BYTE_SIZE - MSG_ID_SIZE);
+      break;
+  }
+
+  header |= pm.current_length;
   ser_.write(&header, 1);
-  ser_.write(reinterpret_cast<const uint8_t*>(&gpm.path_id), sizeof(gpm.path_id));
-  ser_.write(reinterpret_cast<const uint8_t*>(&gpm.timestamp_ms), sizeof(gpm.timestamp_ms));
-  ser_.write(reinterpret_cast<const uint8_t*>(gpm.path), gpm.current_length * sizeof(Waypoint));
+  ser_.write(reinterpret_cast<const uint8_t*>(&pm.path_id), sizeof(pm.path_id));
+  ser_.write(reinterpret_cast<const uint8_t*>(&pm.timestamp_ms), sizeof(pm.timestamp_ms));
+  ser_.write(reinterpret_cast<const uint8_t*>(pm.path), pm.current_length * sizeof(Waypoint));
 }
 
 bool Esp_link::get_pos(Pose2D& out){
@@ -77,12 +100,24 @@ bool Esp_link::get_pos(Pose2D& out){
   return true;
 }
 
-bool Esp_link::get_path(GlobalPathMessage& out){
-  if (!gpm_available) return false;
+bool Esp_link::get_path(PathMessage& out, PathType type){
+  switch (type) {
+    case GLOBAL: {
+      if (!gpm_available) return false;
 
-  out = gpm_;
-  gpm_available = false;
-  return true;
+      out = gpm_;
+      gpm_available = false;
+      return true;
+    } 
+    case LOCAL: {
+      if (!lpm_available) return false;
+
+      out = lpm_;
+      lpm_available = false;
+      return true;
+    }
+    default: return false;
+  }
 }
 
 void Esp_link::push_pos(const Pose2D& p) {
