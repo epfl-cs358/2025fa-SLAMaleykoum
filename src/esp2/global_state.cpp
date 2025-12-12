@@ -46,6 +46,8 @@ bool emergencyStop = false;
 bool finishedPath = false;
 bool startSignalReceived = false;
 bool firstPathReceived = false;
+bool isCrenFinished = false;
+bool isPerformingCreneau = false;
 
 // Pose state
 float posX = 0.0f;

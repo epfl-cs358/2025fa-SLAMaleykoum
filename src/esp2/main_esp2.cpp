@@ -52,7 +52,7 @@ void setup() {
 
     Serial.println("---- Initialization complete. ----");
 
-    delay(30000);
+    // delay(50000);
 
     // --- FreeRTOS Tasks Creation ---
     xTaskCreatePinnedToCore(TaskReceivePath,            "RX_Path",      4096, NULL, 3, &receiveTask,    0);

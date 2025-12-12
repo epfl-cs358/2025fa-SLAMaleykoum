@@ -28,10 +28,12 @@ void Esp_link::poll() {
   switch (msg_id) {
     case MSG_POSE: {
       if (ser_.available() < sizeof(Pose2D)) return;
-      Pose2D p;
-      ser_.readBytes(reinterpret_cast<uint8_t*>(&p), sizeof(Pose2D));
+      // Pose2D pos_;
+      ser_.readBytes(reinterpret_cast<uint8_t*>(&pos_), sizeof(Pose2D));
 
-      push_pos(p);
+      // push_pos(pos_);
+
+      pos_available = true;
       break;
     }
     case MSG_PATH_GLOBAL: {
@@ -88,13 +90,17 @@ void Esp_link::sendPath(const PathMessage& pm, PathType type) {
 }
 
 bool Esp_link::get_pos(Pose2D& out){
-  if (count_pos == 0) return false;
+  // if (count_pos == 0) return false;
   
-  out = queue_pos[head_pos];
+  // out = queue_pos[head_pos];
 
-  head_pos = (head_pos + 1) % QUEUE_CAP;
-  count_pos--;
+  // head_pos = (head_pos + 1) % QUEUE_CAP;
+  // count_pos--;
 
+  if (!pos_available) return false;
+
+  out = pos_;
+  pos_available = false;
   return true;
 }
 
@@ -118,18 +124,18 @@ bool Esp_link::get_path(PathMessage& out, PathType type){
   }
 }
 
-void Esp_link::push_pos(const Pose2D& p) {
-  if (count_pos >= QUEUE_CAP) {
-      head_pos = (head_pos + 1) % QUEUE_CAP;
-      count_pos--;
-  }
+// void Esp_link::push_pos(const Pose2D& p) {
+//   if (count_pos >= QUEUE_CAP) {
+//       head_pos = (head_pos + 1) % QUEUE_CAP;
+//       count_pos--;
+//   }
   
-  Pose2D& slot = queue_pos[tail_pos];
-  slot.theta = p.theta;
-  slot.timestamp_ms = p.timestamp_ms;
-  slot.x = p.x;
-  slot.y = p.y;
+//   Pose2D& slot = queue_pos[tail_pos];
+//   slot.theta = p.theta;
+//   slot.timestamp_ms = p.timestamp_ms;
+//   slot.x = p.x;
+//   slot.y = p.y;
 
-  tail_pos = (tail_pos + 1) % QUEUE_CAP;
-  count_pos++;
-}
+//   tail_pos = (tail_pos + 1) % QUEUE_CAP;
+//   count_pos++;
+// }

@@ -21,7 +21,7 @@ namespace Config {
     // CONTROL PARAMETERS
     // ===================================================================
     constexpr float MOTOR_POWER_DRIVE = 0.18f;      // 18% throttle
-    constexpr float EMERGENCY_DISTANCE = 0.25f;     // meters
+    constexpr float EMERGENCY_DISTANCE = 0.30f;     // meters
     constexpr float GOAL_TOLERANCE = 0.05f;         // 5 cm
     
     // ===================================================================

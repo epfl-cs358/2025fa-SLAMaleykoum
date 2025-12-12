@@ -107,15 +107,15 @@ uint16_t Lidar::awaitStandardScan()
 
 float Lidar::calcAngle(uint8_t _lowByte,uint8_t _highByte)
 {
-	uint16_t winkel=_highByte<<7;
-	winkel|=_lowByte>>1;
+	uint16_t winkel = _highByte << 7;
+	winkel |= _lowByte >> 1;
 	return winkel/64.0;
 }
 
 float Lidar::calcDistance(uint8_t _lowByte,uint8_t _highByte)
 {
-	uint16_t distance=(_highByte)<<8;
-	distance|=_lowByte;
+	uint16_t distance = (_highByte) << 8;
+	distance |= _lowByte;
 	return distance/4.0;
 }
 
@@ -148,6 +148,64 @@ void Lidar::build_scan(LiDARScan* scan, bool &scanComplete_, float& lastAngleESP
     }
     scan->timestamp_ms = millis();
 }
+
+// uint16_t Lidar::readScanLive(LiDARScan* scan, bool &scanComplete, float &lastAngle) 
+// {
+//     scan->count = 0;
+//     rawScanDataPoint_t point;
+//     bool frameStart = false;
+
+//     uint32_t startTime = millis();
+
+//     while (millis() - startTime < 5000) {
+//         if (serial.available() < 5) continue;
+
+//         // Lire 5 bytes
+//         serial.readBytes((uint8_t*)&point, 5);
+
+//         // Détection début de frame
+//         bool isStartFlag = (point.quality & 0x01) && !(point.quality & 0x02);
+
+//         if (!frameStart) {
+//             if (isStartFlag && (point.angle_low & 0x01)) {
+//                 frameStart = true;
+//                 scan->count = 0;
+//                 lastAngle = 0;
+//             }
+//             continue;
+//         }
+
+//         // Détection FIN de frame
+//         if (isStartFlag && scan->count > 1 && (point.angle_low & 0x01)) {
+//             scanComplete = true;
+//             return scan->count;
+//         }
+
+//         // Décodage du point
+//         float dist_mm = calcDistance(point.distance_low, point.distance_high);
+//         float angle_deg = calcAngle(point.angle_low, point.angle_high);
+
+//         if (dist_mm <= 0) continue;
+
+//         // Stockage direct
+//         if (scan->count < MAX_LIDAR_POINTS) {
+//             scan->angles[scan->count] = angle_deg;
+//             scan->distances[scan->count] = dist_mm;
+//             scan->qualities[scan->count] = point.quality >> 2;
+//             scan->count++;
+//         }
+
+//         // Détection de tour complet (sécurité secondaire)
+//         if (angle_deg < lastAngle) {
+//             scanComplete = true;
+//             return scan->count;
+//         }
+
+//         lastAngle = angle_deg;
+//     }
+
+//     return scan->count;
+// }
 
 // DEBUG FUNCTIONS //
 bool Lidar::checkForTimeout(uint32_t _time,size_t _size)

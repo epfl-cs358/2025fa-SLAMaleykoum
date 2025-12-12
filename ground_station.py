@@ -18,7 +18,7 @@ PORT = 9000
 GRID_W = 25        # Width of the grid in cells
 GRID_H = 25        # Height of the grid in cells
 RESOLUTION = 0.4   # Size of one cell in meters (5cm)
-WINDOW_SCALE = 20    # Scale factor for the display window
+WINDOW_SCALE = 25    # Scale factor for the display window
 
 # Colors (RGB Tuples)
 C_BLACK  = (0, 0, 0)        # Occupied cell (Wall)
@@ -105,35 +105,81 @@ def rle_decode(rle_data, total_size):
         
     return decoded
 
+def is_frontier_cell(grid, x, y):
+    """
+    Python-equivalent of the C++ static bool is_frontier_cell(...)
+    """
+
+    # 1. Edge filter (identique au C++)
+    if x <= 1 or x >= grid.w - 2 or y <= 1 or y >= grid.h - 2:
+        return False
+
+    # 2. If occupied → not a frontier
+    if grid.prob(x, y) >= 0.5:
+        return False
+
+    # 4-neighborhood offsets
+    neighbors = [(1,0), (-1,0), (0,1), (0,-1)]
+
+    for dx, dy in neighbors:
+        nx = x + dx
+        ny = y + dy
+
+        # Bound check (sécurité)
+        if nx < 0 or ny < 0 or nx >= grid.w or ny >= grid.h:
+            continue
+
+        p = grid.prob(nx, ny)
+
+        # Unknown cell = FREE_BOUND_PROB < p < OCC_BOUND_PROB
+        if 0.35 < p < 0.6:
+            return True
+
+    return False
+
 def find_frontiers_python(grid):
-    """
-    Detects frontier points in the occupancy grid.
-    Replicates the exact logic used in the ESP32 C++ code for visual verification.
-    """
     frontiers = []
-    rows, cols = grid.shape
-    
-    # Iterate through grid, skipping the outer 2-pixel border (Edge Filter)
-    for y in range(2, rows - 2):
-        for x in range(2, cols - 2):
-            val = grid[y, x]
-            
-            # Condition 1: Cell must be Free
-            # Threshold: >= -2 is Unknown/Occupied. < -2 is Free.
-            if val >= -8: continue 
-            
-            # Condition 2: Must have at least one Unknown neighbor (LogOdds == 0)
-            is_frontier = False
-            if grid[y+1, x] == 0: is_frontier = True
-            elif grid[y-1, x] == 0: is_frontier = True
-            elif grid[y, x+1] == 0: is_frontier = True
-            elif grid[y, x-1] == 0: is_frontier = True
-            
-            if is_frontier:
-                wx, wy = index_to_world(x, y)
+
+    for y in range(grid.h):
+        for x in range(grid.w):
+
+            if is_frontier_cell(grid, x, y):
+                # Convert to world coords EXACTLY like C++
+                wx = (x - grid.w/2) * grid.res
+                wy = - (y - grid.h/2) * grid.res
                 frontiers.append((wx, wy))
-                
+
     return frontiers
+
+# def find_frontiers_python(grid):
+#     """
+#     Detects frontier points in the occupancy grid.
+#     Replicates the exact logic used in the ESP32 C++ code for visual verification.
+#     """
+#     frontiers = []
+#     rows, cols = grid.shape
+    
+#     # Iterate through grid, skipping the outer 2-pixel border (Edge Filter)
+#     for y in range(2, rows - 2):
+#         for x in range(2, cols - 2):
+#             val = grid[y, x]
+            
+#             # Condition 1: Cell must be Free
+#             # Threshold: >= -2 is Unknown/Occupied. < -2 is Free.
+#             if val >= -8: continue 
+            
+#             # Condition 2: Must have at least one Unknown neighbor (LogOdds == 0)
+#             is_frontier = False
+#             if grid[y+1, x] == 0: is_frontier = True
+#             elif grid[y-1, x] == 0: is_frontier = True
+#             elif grid[y, x+1] == 0: is_frontier = True
+#             elif grid[y, x-1] == 0: is_frontier = True
+            
+#             if is_frontier:
+#                 wx, wy = index_to_world(x, y)
+#                 frontiers.append((wx, wy))
+                
+#     return frontiers
 
 # =============================================================================
 # MAIN
@@ -212,9 +258,10 @@ def main():
                 # 3. Read Dynamic Packet Sizes
                 map_bytes_size = struct.unpack('<I', rx_buffer[2:6])[0]
                 global_len = struct.unpack('<H', rx_buffer[6:8])[0]
-                local_len  = struct.unpack('<H', rx_buffer[8:10])[0]
-                total_packet_size = HEADER_SIZE + (global_len * 8) + (local_len * 8) + map_bytes_size
-                
+                # local_len  = struct.unpack('<H', rx_buffer[8:10])[0]
+                # total_packet_size = HEADER_SIZE + (global_len * 8) + (local_len * 8) + map_bytes_size
+                total_packet_size = HEADER_SIZE + (global_len * 8) + map_bytes_size
+
                 # Wait for full packet
                 if len(rx_buffer) < total_packet_size: break 
                 
@@ -225,8 +272,8 @@ def main():
                 # --- Packet Decoding ---
                 
                 # Decode Poses
-                cx, cy, ct = struct.unpack('<fff', packet[10:22])
-                gx, gy, gt = struct.unpack('<fff', packet[22:34])
+                cx, cy, ct = struct.unpack('<fff', packet[8:20])
+                gx, gy, gt = struct.unpack('<fff', packet[20:32])
                 car_pose = {'x': cx, 'y': cy, 'theta': ct}
                 goal_pose = {'x': gx, 'y': gy, 'theta': gt}
 
@@ -248,14 +295,15 @@ def main():
                 offset += global_len * 8
 
                 # LOCAL PATH
-                local_path_payload = packet[offset : offset + (local_len * 8)]
+                # local_path_payload = packet[offset : offset + (local_len * 8)]
+                # local_path_payload = packet[offset : offset + (local_len * 8)]
 
-                local_path_points = []
-                for i in range(local_len):
-                    px, py = struct.unpack('<ff', local_path_payload[i*8 : (i+1)*8])
-                    local_path_points.append((px, py))
+                # local_path_points = []
+                # for i in range(local_len):
+                #     px, py = struct.unpack('<ff', local_path_payload[i*8 : (i+1)*8])
+                #     local_path_points.append((px, py))
 
-                offset += local_len * 8
+                # offset += local_len * 8
 
                 # Decode Map (only if present)
                 if map_bytes_size > 0:
@@ -268,7 +316,7 @@ def main():
                         # Generate RGB Surface
                         rgb_map = np.zeros((GRID_H, GRID_W, 3), dtype=np.uint8)
                         occ_mask  = grid_log_odds > 4
-                        free_mask = grid_log_odds < -8
+                        free_mask = grid_log_odds < -6
                         unk_mask  = (~free_mask) & (~occ_mask)
                         
                         rgb_map[free_mask] = C_WHITE
@@ -311,9 +359,9 @@ def main():
                 if pt: pygame.draw.circle(screen, C_YELLOW, pt, 3)
 
             # LOCAL PATH = cyan
-            for px, py in local_path_points:
-                pt = world_to_screen(px, py)
-                if pt: pygame.draw.circle(screen, C_CYAN, pt, 3)
+            # for px, py in local_path_points:
+            #     pt = world_to_screen(px, py)
+            #     if pt: pygame.draw.circle(screen, C_CYAN, pt, 3)
 
             # Layer 5: Goal (Green)
             gx_s, gy_s = world_to_screen(goal_pose['x'], goal_pose['y'])
@@ -341,7 +389,7 @@ def main():
 
             # HUD (Text Overlay)
             status_lines = [
-                f"POSITION: X {cx:5.2f} Y {cy:5.2f}",
+                f"POSITION: X{car_pose['x']:5.2f} Y{car_pose['y']:5.2f}",
                 f"FRONTIERS: {len(detected_frontiers)}",
                 f"GOAL     : X{goal_pose['x']:5.2f} Y{goal_pose['y']:5.2f}",
                 f"STATE    : {'NOTHING' if abs(goal_pose['x'])<0.01 and len(detected_frontiers)==0 else 'EXPLORING'}",

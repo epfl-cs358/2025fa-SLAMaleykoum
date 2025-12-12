@@ -27,6 +27,22 @@ BayesianOccupancyGrid::BayesianOccupancyGrid(float resolution_m, uint16_t size_x
     log_odds = (int8_t*) heap_caps_malloc(grid_size_x * grid_size_y * sizeof(int8_t), MALLOC_CAP_SPIRAM);
     memset(log_odds, 0, grid_size_x * grid_size_y);
 
+    // remplir les bord du log_odds et mettre a 1 tout ceux qui sont sur les cotés
+    // int idxg = y * grid_size_x + x;
+
+    // bords qd y = 0 et y = max grid size y
+    for (int x = 0; x < grid_size_x; ++x) {
+        log_odds[x] = L_MAX_INT;
+        log_odds[(grid_size_y-1) * grid_size_x + x] = L_MAX_INT;
+    }
+
+    // bords qd x = 0 et x = max grid size x
+    for (int y = 0; y < grid_size_y; ++y) {
+        log_odds[y * grid_size_x] = L_MAX_INT;
+        log_odds[y * grid_size_x + (grid_size_x-1)] = L_MAX_INT;
+    }
+    
+
     // Precompute sin/cos tables
     if(!trig_initialized){
         sin_table = (float*) heap_caps_malloc(3600 * sizeof(float), MALLOC_CAP_SPIRAM);
@@ -69,6 +85,10 @@ void BayesianOccupancyGrid::update_map(const SyncedScan& lidar_scan)
     for (uint16_t i = 0; i < scan.count; i++)
     {
         float rayon = scan.distances[i] * 0.001f;  // mm → m
+
+        // continue si le point atteint est hors de notre map
+        // 
+
         bool is_hit = (0 < rayon && rayon < SEARCH_BOUND_M);
         rayon = is_hit ? rayon : SEARCH_BOUND_M;
 
@@ -119,13 +139,14 @@ void BayesianOccupancyGrid::update_map(const SyncedScan& lidar_scan)
         int x = x0;
         int y = y0;
 
-        while (!(x == xhit && y == yhit)) {
-            if ((unsigned)x < grid_size_x && (unsigned)y < grid_size_y) {
-                int idxg = y * grid_size_x + x;
+        while (!(x == xhit && y == yhit) || (x == 0) || (x == grid_size_x) || (y == 0) || (y == grid_size_y)) {
+            // if (!((unsigned)x < grid_size_x && (unsigned)y < grid_size_y))
+            //     continue;
 
-                int v = log_odds[idxg] + L_FREE_INT;
-                log_odds[idxg] = (int8_t) (L_MIN_INT > v ? L_MIN_INT : v);
-            }
+            int idxg = y * grid_size_x + x;
+
+            int v = log_odds[idxg] + L_FREE_INT;
+            log_odds[idxg] = (int8_t) (L_MIN_INT > v ? L_MIN_INT : v);
 
             int e2 = 2 * err;
             if (e2 > -dy) { err -= dy; x += sx; }

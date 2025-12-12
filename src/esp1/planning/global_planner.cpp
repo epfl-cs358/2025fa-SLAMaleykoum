@@ -36,7 +36,7 @@ static inline bool robot_circle_collides(int cx, int cy, const BayesianOccupancy
 
             if (nx < 0 || nx >= sx || ny < 0 || ny >= sy) return true;
 
-            if (map.get_cell_probability(nx, ny) > 0.7f) return true;
+            if (map.get_cell_probability(nx, ny) > OCC_BOUND_PROB) return true;
         }
     }
     return false;
@@ -45,10 +45,6 @@ static inline bool robot_circle_collides(int cx, int cy, const BayesianOccupancy
 // ---------------------------------------------------------
 //                       A* PLANNER
 // ---------------------------------------------------------
-#define GP_MAX_W  50     // largeur max de la carte coarse
-#define GP_MAX_H  50     // hauteur max
-#define GP_MAX_N  (GP_MAX_W * GP_MAX_H)
-
 PathMessage GlobalPlanner::generate_path(
     const Pose2D& current_pose,
     const MissionGoal& goal,
@@ -200,8 +196,6 @@ PathMessage GlobalPlanner::generate_path(
 
         int j = 0;
         for (int i = plen - 1; i >= 0; i--) {
-            // msg.path[j].x = float((px[i] - (W/2)) * res);
-            // msg.path[j].y = float(- (py[i] - (H/2)) * res);
             grid_to_world(px[i], py[i], msg.path[j].x, msg.path[j].y, res, W, H);
             j++; 
         }
@@ -210,13 +204,9 @@ PathMessage GlobalPlanner::generate_path(
 
         // 1) Le premier waypoint = juste après notre position
         //    donc px[plen-1]
-        // msg.path[0].x = float((px[plen - 1] - (W/2)) * res);
-        // msg.path[0].y = float(- (py[plen - 1] - (H/2)) * res);
         grid_to_world(px[plen - 1], py[plen - 1], msg.path[0].x, msg.path[0].y, res, W, H);
 
         // 2) Le dernier waypoint = goal → px[0]
-        // msg.path[MAX_PATH_LENGTH - 1].x = float((px[0] - (W/2)) * res);
-        // msg.path[MAX_PATH_LENGTH - 1].y = float(- (py[0] - (H/2)) * res);
         grid_to_world(px[0], py[0], msg.path[MAX_PATH_LENGTH - 1].x, msg.path[MAX_PATH_LENGTH - 1].y, res, W, H);
 
         float ratio = float(plen - 2) / (MAX_PATH_LENGTH - 1);
@@ -224,10 +214,7 @@ PathMessage GlobalPlanner::generate_path(
         for (int k = 1; k < MAX_PATH_LENGTH - 1; k++) {
             int idx = (plen - 2) - int(k * ratio);
 
-            // msg.path[k].x = float((px[idx] - (W/2)) * res);
-            // msg.path[k].y = float(- (py[idx] - (H/2)) * res);
             grid_to_world(px[idx], py[idx], msg.path[k].x, msg.path[k].y, res, W, H);
-
         }
     }
     return msg;

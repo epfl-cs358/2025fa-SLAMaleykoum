@@ -66,7 +66,7 @@ static bool is_frontier_cell(const BayesianOccupancyGrid& grid, int x, int y)
 
         float p = grid.get_cell_probability(nx, ny);
         // if unknown
-        if (0.35f < p && p < 0.65f) return true;
+        if (FREE_BOUND_PROB < p && p < OCC_BOUND_PROB) return true;
     }
 
     return false;

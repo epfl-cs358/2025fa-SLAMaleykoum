@@ -108,17 +108,20 @@ class Esp_link {
     bool get_path(PathMessage& out, PathType type);
 
     private:
-    static constexpr size_t QUEUE_CAP = 1;
+    // static constexpr size_t QUEUE_CAP = 1;
     static constexpr uint8_t RX_ESPS = 13;
     static constexpr uint8_t TX_ESPS = 12;
     static constexpr uint32_t ESPS_BAUDRATE = 2000000;
 
     HardwareSerial& ser_;
 
-    Pose2D queue_pos[QUEUE_CAP];
-    size_t head_pos = 0;
-    size_t tail_pos = 0;
-    size_t count_pos = 0;
+    // Pose2D queue_pos[QUEUE_CAP];
+    // size_t head_pos = 0;
+    // size_t tail_pos = 0;
+    // size_t count_pos = 0;
+
+    Pose2D pos_;
+    bool pos_available = false;
 
     PathMessage gpm_;
     PathMessage lpm_;
@@ -136,5 +139,5 @@ class Esp_link {
      *
      * @param p Pose2D message to enqueue.
      */
-    void push_pos(const Pose2D& p);
+    // void push_pos(const Pose2D& p);
 };

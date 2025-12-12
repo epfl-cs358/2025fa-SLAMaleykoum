@@ -52,6 +52,8 @@ extern bool emergencyStop;
 extern bool finishedPath;
 extern bool startSignalReceived;
 extern bool firstPathReceived;
+extern bool isCrenFinished;
+extern bool isPerformingCreneau;
 
 // ===================================================================
 // POSE STATE - defined in global_state.cpp

@@ -90,6 +90,16 @@ public:
 	 */
 	void build_scan(LiDARScan* scan, bool &scanComplete_, float& lastAngleESP_);
 
+	/**
+	 * Build a scan in real time
+	 * While decoding the serial, we build the scan
+	 * 
+	 * @param scan to LiDARScan struc to fill
+	 * @param scancomplete the bool that becomes true if a full scan is complete
+	 * @param lastAngle the last angle read by ESP (to detect full rotation)
+	 */
+	uint16_t readScanLive(LiDARScan* scan, bool &scanComplete, float &lastAngle);
+
 private:
 	static constexpr uint32_t LIDAR_SERIAL_BUFFER_SIZE = 5000;
     static constexpr uint8_t LIDAR_RX_PIN = 5;

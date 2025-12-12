@@ -11,11 +11,12 @@ void TaskUltrasonic(void *pvParameters) {
             continue;
         }*/
         float dist = ultrasonic.readDistance();
-        if (dist > 0 && dist < Config::EMERGENCY_DISTANCE) {
+        if (dist > 0 && dist < Config::EMERGENCY_DISTANCE && !isPerformingCreneau) {
             motor.stop();
             motor.update();
             emergencyStop = true;
-        } 
+            isCrenFinished = false;
+        }
         vTaskDelay(pdMS_TO_TICKS(200));
     }
 }

@@ -52,7 +52,7 @@ MissionPlanner* mission_planner = nullptr;
 Pose2D last_known_pose = {0,0,0,0};
 PathMessage current_global_path = {{{0.f, 0.f}}, 1, 0, 0};
 MissionGoal current_mission_goal = {{0.0f, 0.f, 0.f, 0}, EXPLORATION_MODE};
-PathMessage current_local_path = {{}, 0, 0, 0};
+// PathMessage current_local_path = {{}, 0, 0, 0};
 bool new_goal_arrived = true;
 
 // --- TRANSMISSION BUFFERS ---
@@ -61,7 +61,7 @@ struct StateSnapshot {
     Pose2D pose;
     MissionGoal goal;
     PathMessage global_path;
-    PathMessage local_path;
+    // PathMessage local_path;
 } Tx_Snapshot;
 
 HardwareSerial& LIDAR_SERIAL = Serial2;
@@ -194,7 +194,7 @@ void TCP_Transmit_Task(void* parameter) {
         if (xSemaphoreTake(State_Mutex, pdMS_TO_TICKS(20)) == pdTRUE) {
             Tx_Snapshot.pose = last_known_pose;
             Tx_Snapshot.global_path = current_global_path;
-            Tx_Snapshot.local_path = current_local_path;
+            // Tx_Snapshot.local_path = current_local_path;
             Tx_Snapshot.goal = current_mission_goal;
             xSemaphoreGive(State_Mutex);
         }
@@ -242,26 +242,27 @@ void TCP_Transmit_Task(void* parameter) {
         // Send COMPRESSED size
         memcpy(&header[2], &payload_map_sz, 4);
         
-        uint16_t gplen = Tx_Snapshot.global_path.current_length;
+        uint8_t gplen = Tx_Snapshot.global_path.current_length;
         if(gplen > MAX_PATH_LENGTH) gplen = 0;
-        memcpy(&header[6], &gplen, 2);
+        uint16_t gplen_2bytes = (0 << 8) | gplen;
+        memcpy(&header[6], &gplen_2bytes, 2);
 
-        uint16_t lplen = Tx_Snapshot.local_path.current_length;
-        if(lplen > MAX_LOCAL_PATH_LENGTH) lplen = 0;
-        memcpy(&header[8], &lplen, 2);
+        // uint16_t lplen = Tx_Snapshot.local_path.current_length;
+        // if(lplen > MAX_LOCAL_PATH_LENGTH) lplen = 0;
+        // memcpy(&header[8], &lplen, 2);
 
-        memcpy(&header[10], &Tx_Snapshot.pose.x, 4);
-        memcpy(&header[14], &Tx_Snapshot.pose.y, 4);
-        memcpy(&header[18], &Tx_Snapshot.pose.theta, 4);
+        memcpy(&header[8], &Tx_Snapshot.pose.x, 4);
+        memcpy(&header[12], &Tx_Snapshot.pose.y, 4);
+        memcpy(&header[16], &Tx_Snapshot.pose.theta, 4);
 
-        memcpy(&header[22], &Tx_Snapshot.goal.target_pose.x, 4);
-        memcpy(&header[26], &Tx_Snapshot.goal.target_pose.y, 4);
-        memcpy(&header[30], &Tx_Snapshot.goal.target_pose.theta, 4);
+        memcpy(&header[20], &Tx_Snapshot.goal.target_pose.x, 4);
+        memcpy(&header[24], &Tx_Snapshot.goal.target_pose.y, 4);
+        memcpy(&header[28], &Tx_Snapshot.goal.target_pose.theta, 4);
 
         if (tcpClient.connected()) {
             tcpClient.write(header, 64);
             if(gplen > 0) tcpClient.write((uint8_t*)Tx_Snapshot.global_path.path, gplen * sizeof(Waypoint));
-            if(lplen > 0) tcpClient.write((uint8_t*)Tx_Snapshot.local_path.path, lplen * sizeof(Waypoint));
+            // if(lplen > 0) tcpClient.write((uint8_t*)Tx_Snapshot.local_path.path, lplen * sizeof(Waypoint));
             
             // 4. SEND COMPRESSED MAP 
             if (payload_map_sz > 0) {
@@ -296,10 +297,12 @@ void Lidar_Read_Task(void* parameter) {
     const TickType_t xDelay = pdMS_TO_TICKS(10); 
     static LiDARScan scan; 
     float lastAngleESP = 0.0f;
+    bool scanComplete = false;
 
     while (1) {
         bool scanComplete = false;
         lidar.build_scan(&scan, scanComplete, lastAngleESP);
+        // lidar.readScanLive(&scan, scanComplete, lastAngleESP);
 
         if (scanComplete) {
             if (scan.count > 10) { 
@@ -436,7 +439,7 @@ void Global_Planner_Task(void* parameter) {
         // if (xSemaphoreTake(Bayesian_Grid_Mutex, pdMS_TO_TICKS(200)) == pdTRUE) {
         
             // downsample_bayesian_grid(*coarse, factor);
-            pathMsg = planner.generate_path(local_pose, global_goal, *TheMap); 
+            pathMsg = planner.generate_path(local_pose, global_goal, *TheMap);
             
             // if (pathMsg.current_length > 0) {
             //      Serial.printf("A* Path Found! Length: %d waypoints\n", pathMsg.current_length);
@@ -567,7 +570,7 @@ void setup() {
     lidar.start(); 
     delay(1000);
 
-    delay(30000);
+    // delay(50000);
 
     // Queue Sizes: Increased Lidar buffer slightly to handle bursts
     Lidar_Buffer_Queue = xQueueCreate(2, sizeof(LiDARScan));
