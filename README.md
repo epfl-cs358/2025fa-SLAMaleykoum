@@ -6,12 +6,14 @@ Project proposal : https://www.overleaf.com/9942875199zgzbkrmgkkkj#3fbbb2
 ## Table of Contents
 1. [Set it up](#set-it-up)
 2. [Project Overview](#project-overview)
-3. [System Architecture](#system-architecture)
-4. [Hardware Platform](#hardware-platform)
-5. [Software Components](#software-components)
-6. [Data Flow and Communication](#data-flow-and-communication)
-7. [Implementation Details](#implementation-details)
-8. [Mission and Task Management](#mission-and-task-management)
+3. [Hardware Overview](#hardware-overview)
+4. [System Architecture](#system-architecture)
+5. [Hardware Platform](#hardware-platform)
+6. [Software Components](#software-components)
+7. [Data Flow and Communication](#data-flow-and-communication)
+8. [Implementation Details](#implementation-details)
+9. [Mission and Task Management](#mission-and-task-management)
+
 
 ---
 
@@ -23,7 +25,7 @@ Activate the venv (`source slamaleykoum_venv/bin/activate`) and install the requ
 ## Project Overview
 
 ### Vision
-SLAMaleykoum is an autonomous robotics project that transforms an RC car chassis into an intelligent mapping and navigation platform. The system performs **Simultaneous Localization and Mapping (SLAM)** to autonomously explore and map unknown environments while maintaining accurate position estimates.
+SLAMaleykoum is an autonomous robotics platform that transforms a standard RC car chassis into an intelligent mobile robot capable of mapping and navigating unknown environments. The system performs full Simultaneous Localization and Mapping (SLAM), enabling the robot to autonomously explore, build a map, localize itself with high accuracy in real time, navigate to target coordinates, dynamically avoid obstacles, and maintain a reliable estimate of its position throughout the mission.
 
 ### Technical Vocabulary
 - Ground Station: **GS**  _refering to the laptop or some other computer external to the car._
@@ -46,13 +48,35 @@ SLAMaleykoum is an autonomous robotics project that transforms an RC car chassis
 
 ---
 
+## Hardware Overview
+
+## Component List
+
+| Component                     |           Info                                                                                                                                                                                               |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tamiya Blitzer Beetle         | [Manual](https://www.tamiyausa.com/media/files/58502ml-829-5367.pdf)                                                                                                                               |
+| RPLIDAR C1                    | [Datasheet](https://d229kd5ey79jzj.cloudfront.net/3157/SLAMTEC_rplidar_datasheet_C1_v1.0_en.pdf), [SDK](https://github.com/Slamtec/rplidar_sdk), [Wiki](https://www.waveshare.com/wiki/RPLIDAR_C1) |
+| ESP32-S3 Microcontroller (x2) | [Datasheet](https://cdn-shop.adafruit.com/product-files/5477/esp32-s3_datasheet_en.pdf)                                                                                                            |
+| DMS15 Servo                   | [Wiki](https://wiki.dfrobot.com/DSS-M15S_270%C2%B0_15KG_DF_Metal_Servo_with_Analog_Feedback_SKU__SER0044)                                                                                          |
+| BNO086 IMU                    | [Datasheet](https://docs.sparkfun.com/SparkFun_VR_IMU_Breakout_BNO086_QWIIC/assets/component_documentation/BNO080_085-Datasheet_v1.16.pdf)                                                         |
+| AS5600 Encoder                | [Datasheet](https://files.seeedstudio.com/wiki/Grove-12-bit-Magnetic-Rotary-Position-Sensor-AS5600/res/Magnetic%20Rotary%20Position%20Sensor%20AS5600%20Datasheet.pdf)                             |
+| HC-SR04 Ultrasonic sensor     | [Datasheet](https://handsontec.com/dataspecs/sensor/SR-04-Ultrasonic.pdf)                                                                                                                          |
+| NEO-6M-V2 GPS                 | [Datasheet](https://content.u-blox.com/sites/default/files/products/documents/NEO-6_DataSheet_%28GPS.G6-HW-09005%29.pdf)                                                                           |
+| 540J Motor                    | [Datasheet](https://asset.conrad.com/media10/add/160267/c1/-/en/001385115DS01/adatlap-1385115-540-es-motor-reely-532114c.pdf)                                                                      |
+| THW-1060-RTR ESC              | [Datasheet](https://www.hobbywing.com/en/uploads/file/20221015/f60b7ebe160a7b283927ae8916d36763.pdf)                                                                                               |
+| LM2596 Buck converter         | [Datasheet](https://www.ti.com/lit/ds/symlink/lm2596.pdf)                                                                                                                                          |
+| 7.2V Battery                  | [Product Page](https://www.galaxus.ch/fr/s5/product/gens-ace-modelisme-dune-batterie-720-v-5000-mah-batterie-rc-9459930)                                                                           |
+
+
 ## System Architecture
 
 ### High-Level Design Philosophy
 
 The project employs a **distributed computing architecture** that divides computational load across two ESP32-S3 microcontrollers. SLAM and path planning are computationally intensive; distributing tasks prevents processor saturation.
 
-### ESP-1: Mapping & Global Planning
+### ESP-1: Mapping & Planning
+
+  👉 [Open ESP-1 README](include/esp1/README.md)
 
 **Primary Mission**: Create and maintain a global understanding of the environment and plan high-level navigation strategies.
 
@@ -72,6 +96,8 @@ The project employs a **distributed computing architecture** that divides comput
 - Provides correction signals to ESP-2 when loop closures are detected
 
 ### ESP-2: Localization & Control
+
+  👉 [Open ESP-2 README](include/esp2/README.md)
 
 **Primary Mission**: Execute precise vehicle control and maintain high-frequency local pose tracking.
 
