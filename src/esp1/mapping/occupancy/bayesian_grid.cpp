@@ -181,29 +181,6 @@ float BayesianOccupancyGrid::get_cell_probability(int x,
     return prob_table[ log_odds[idx] + 40 ];
 }
 
-// // ------------------------------------------------------
-// // Export grayscale map
-// // ------------------------------------------------------
-// const uint8_t* BayesianOccupancyGrid::get_map_data_color() const
-// {
-//     // static uint8_t export_data[GRID_MAX_SIZE];
-
-//     // for (int y = 0; y < grid_size_y; y++)
-//     // {
-//     //     for (int x = 0; x < grid_size_x; x++)
-//     //     {
-//     //         float p = get_cell_probability(x, y);
-
-//     //         float v = 255.0f * (1.0f - p);
-//     //         if (v < 0) v = 0;
-//     //         if (v > 255) v = 255;
-
-//     //         export_data[y * grid_size_x + x] = (uint8_t)v;
-//     //     }
-//     // }
-//     return (const uint8_t*)log_odds;
-// }
-
 // ------------------------------------------------------
 // Return raw int8 grid
 // ------------------------------------------------------

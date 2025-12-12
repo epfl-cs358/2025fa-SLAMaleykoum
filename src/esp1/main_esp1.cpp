@@ -50,7 +50,7 @@ const uint32_t RLE_BUFFER_SIZE = 10000;
 
 BayesianOccupancyGrid* TheMap = nullptr;
 MissionPlanner* mission_planner = nullptr; 
-// BayesianOccupancyGrid* coarse = nullptr;
+GlobalPlannerWorkspace* gp_workspace = nullptr;
 
 // --- DOUBLE BUFFERING POOL ---
 // We allocate these ONCE on the Heap. They never move.
@@ -381,8 +381,8 @@ void Global_Planner_Task(void* parameter) {
                 vTaskDelay(pdMS_TO_TICKS(100));
                 continue;
             }
-            
-            pathMsg = planner.generate_path(local_pose, global_goal, *TheMap); 
+
+            pathMsg = planner.generate_path(local_pose, global_goal, *TheMap, gp_workspace);
 
             if (pathMsg.current_length == 0) {
                  // Path planning failed!
@@ -420,6 +420,11 @@ void setup() {
     // if (!Scan_Buffer_1 || !Scan_Buffer_2) {
     //     Serial.println("FATAL: Heap alloc failed!"); while(1);
     // }
+    gp_workspace = new GlobalPlannerWorkspace();
+    if (!gp_workspace) {
+        Serial.println("FATAL: Not enough RAM for Planner!");
+        while(1);
+    }
 
 
     // --- QUEUES ---

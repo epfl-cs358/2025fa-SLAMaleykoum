@@ -6,6 +6,20 @@
 #include "../../../include/common/data_types.h"
 #include "../../../include/esp1/mapping/occupancy/bayesian_grid.h"
 
+struct GlobalPlannerWorkspace {
+    float g_cost[GP_MAX_H][GP_MAX_W];
+    
+    int16_t parent_x[GP_MAX_H][GP_MAX_W];
+    int16_t parent_y[GP_MAX_H][GP_MAX_W];
+    
+    bool closed[GP_MAX_H][GP_MAX_W];
+    
+    struct Node { int16_t x; int16_t y; float f; } pq[GP_MAX_N];
+    
+    int16_t px[GP_MAX_N];
+    int16_t py[GP_MAX_N];
+};
+
 /**
  * @brief Global Planner implementing an (coarse) A* search on the full grid.
  * 
@@ -21,14 +35,14 @@ public:
      *
      * @param current_pose  Current pose from localization.
      * @param goal          Mission goal
-     * @param map           Bayesian occupancy grid (coarse). 
+     * @param map           Bayesian occupancy grid (coarse).
+     * @param ws            Workspace for A* (to avoid reallocation).
      *
      * @return GlobalPathMessage containing a few waypoints in world coordinates.
      */
-    PathMessage generate_path(
-        const Pose2D& current_pose,
-        const MissionGoal& goal,
-        const BayesianOccupancyGrid& map
-    );
+    PathMessage generate_path(const Pose2D& current_pose,
+                              const MissionGoal& goal,
+                              const BayesianOccupancyGrid& map,
+                              GlobalPlannerWorkspace* ws);
 
 };
