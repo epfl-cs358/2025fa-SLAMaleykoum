@@ -8,9 +8,9 @@
 // =============================================================
 // TUNING & MEMORY LIMITS
 // =============================================================
-#define MAX_FRONTIER_CANDIDATES 20  
-#define BFS_QUEUE_SIZE 400          
-#define MIN_CLUSTER_SIZE 6          
+#define MAX_FRONTIER_CANDIDATES 20
+#define BFS_QUEUE_SIZE 400
+#define MIN_CLUSTER_SIZE 5
 
 class MissionPlanner {
 public:
@@ -19,7 +19,7 @@ public:
      */
     MissionPlanner(const Pose2D& initial_home_pose);
 
-    MissionGoal update_goal(const Pose2D& current_pose, const BayesianOccupancyGrid& grid);
+    MissionGoal update_goal(const Pose2D& pose, const BayesianOccupancyGrid& grid, bool global_planner_failed);
 
     void set_mission_state(MissionGoalType new_state);
     void add_user_waypoint(const Pose2D& waypoint);
@@ -28,7 +28,7 @@ public:
     MissionGoalType get_current_state() const { return current_state_; }
 
 private:
-void search_for_candidates(const BayesianOccupancyGrid& grid, 
+    void search_for_candidates(const BayesianOccupancyGrid& grid, 
                                int x_min, int x_max, int y_min, int y_max, 
                                int& candidate_count);
 
@@ -44,5 +44,8 @@ void search_for_candidates(const BayesianOccupancyGrid& grid,
     };
 
     ClusterCandidate candidates[MAX_FRONTIER_CANDIDATES];
-    uint8_t visited_mask[200][25];
+
+    uint8_t visited_mask[GP_MAX_H][GP_MAX_W / 8 + 1]; // Bitmask for visited cells during BFS
+
+    bool is_current_goal_valid(const Pose2D& robot_pose, const BayesianOccupancyGrid& grid);
 };

@@ -37,9 +37,9 @@ SemaphoreHandle_t Pose_Mutex;
 SemaphoreHandle_t State_Mutex; 
 
 // --- GLOBAL OBJECTS ---
-const int GRID_SIZE_X = 25;
-const int GRID_SIZE_Y = 25;
-const float RESOLUTION = 0.4f;
+const int GRID_SIZE_X = 50;
+const int GRID_SIZE_Y = 50;
+const float RESOLUTION = 0.2f;
 // const int factor = 4;
 
 const uint32_t RLE_BUFFER_SIZE = 10000;
@@ -54,6 +54,7 @@ PathMessage current_global_path = {{{0.f, 0.f}}, 1, 0, 0};
 MissionGoal current_mission_goal = {{0.0f, 0.f, 0.f, 0}, EXPLORATION_MODE};
 // PathMessage current_local_path = {{}, 0, 0, 0};
 bool new_goal_arrived = true;
+bool global_path_invalid = false; // Set by Global Planner, read by Mission Planner
 
 // --- TRANSMISSION BUFFERS ---
 uint8_t* Tx_Map_Buffer = nullptr; 
@@ -61,6 +62,7 @@ struct StateSnapshot {
     Pose2D pose;
     MissionGoal goal;
     PathMessage global_path;
+    uint8_t state;
     // PathMessage local_path;
 } Tx_Snapshot;
 
@@ -70,93 +72,27 @@ Lidar lidar(LIDAR_SERIAL);
 HardwareSerial& IPC_Serial = Serial1; 
 Esp_link esp_link(IPC_Serial);
 
-// uint8_t* rle_buffer = nullptr;
+// bool goal_need_to_change(Pose2D pos, MissionGoal goal, const BayesianOccupancyGrid& TheMap) {
+//     float distance = sqrtf((pos.x-goal.target_pose.x)*(pos.x-goal.target_pose.x) 
+//             + (pos.y-goal.target_pose.y)*(pos.y-goal.target_pose.y));
+//     if (distance < 1) return true;
 
-// float pathA_X[] = {
-//     0.00, 0.00, 2.00, 4.00, 6.00, 8.00,
-//     8.50, 8.50, 8.50, 4.50, 2.50, 0.50,
-//     -2.50, -3.50, -3.50
-// };
-// float pathA_Y[] = {
-//     0.00, 0.30, 0.30, 0.30, 0.30, 0.30,
-//     0.30, -3.70, -5.40, -5.40, -5.40, -5.40,
-//     -5.40, -5.40, 0.30
-// };
-// const int pathA_size = 5;
+//     int px, py, gx, gy;
+//     world_to_grid(pos.x, pos.y, px, py, TheMap.grid_resolution, TheMap.grid_size_x, TheMap.grid_size_y);
+//     world_to_grid(goal.target_pose.x, goal.target_pose.y, gx, gy, TheMap.grid_resolution, TheMap.grid_size_x, TheMap.grid_size_y);
 
-// int i;
+//     // int radius = 0.5 / TheMap.grid_resolution; // 1 for 1m
+//     int radius = 1;
 
-/*
-bool downsample_bayesian_grid(BayesianOccupancyGrid& coarse, int factor) {
-    const int Wc = GRID_SIZE_X / factor;
-    const int Hc = GRID_SIZE_Y / factor;
+//     for (int x = gx - radius ; x < gx + radius; ++x) {
+//         for (int y = gy - radius ; y < gy + radius ; ++y) {
+//             float point = TheMap.get_cell_probability(x, y);
+//             if (point == 0.5) return false;
+//         }
+//     }
 
-    // On suppose que coarse a déjà été créé ou possède un buffer assez grand.
-    coarse.grid_size_x = Wc;
-    coarse.grid_size_y = Hc;
-    coarse.grid_resolution = RESOLUTION * factor;
-
-    const int8_t* fine_data = TheMap->get_map_data();
-    int8_t* coarse_data = coarse.get_map_data();  // mémoire déjà allouée par toi
-
-    // Parcours de la coarse map
-    for (int cy = 0; cy < Hc; cy++) {
-        for (int cx = 0; cx < Wc; cx++) {
-
-            int occ_count = 0;
-            int unk_count = 0;
-            int total = 0;
-
-            // Bloc dans la fine map
-            for (int dy = 0; dy < factor; dy++) {
-                for (int dx = 0; dx < factor; dx++) {
-                    int fx = cx * factor + dx;
-                    int fy = cy * factor + dy;
-
-                    float lo = fine_data[fy * GRID_SIZE_X + fx];
-                    if (lo > 0.4) occ_count++;
-                    else if (lo > -0.2) unk_count++;
-                    total++;
-                }
-            }
-
-            float result_lo;
-            if (occ_count > total * 0.2f)
-                result_lo = 4.f;        // occupé
-            else if (unk_count > total * 0.7f)
-                result_lo = 0.f;        // inconnu
-            else
-                result_lo = -4.f;        // libre
-
-            coarse_data[cy * Wc + cx] = result_lo;
-        }
-    }
-
-    return true;
-}
-*/
-
-bool goal_need_to_change(Pose2D pos, MissionGoal goal, const BayesianOccupancyGrid& TheMap) {
-    float distance = sqrtf((pos.x-goal.target_pose.x)*(pos.x-goal.target_pose.x) 
-            + (pos.y-goal.target_pose.y)*(pos.y-goal.target_pose.y));
-    if (distance < 1) return true;
-
-    int px, py, gx, gy;
-    world_to_grid(pos.x, pos.y, px, py, TheMap.grid_resolution, TheMap.grid_size_x, TheMap.grid_size_y);
-    world_to_grid(goal.target_pose.x, goal.target_pose.y, gx, gy, TheMap.grid_resolution, TheMap.grid_size_x, TheMap.grid_size_y);
-
-    // int radius = 0.5 / TheMap.grid_resolution; // 1 for 1m
-    int radius = 1;
-
-    for (int x = gx - radius ; x < gx + radius; ++x) {
-        for (int y = gy - radius ; y < gy + radius ; ++y) {
-            float point = TheMap.get_cell_probability(x, y);
-            if (point == 0.5) return false;
-        }
-    }
-
-    return true;
-}
+//     return true;
+// }
 
 // =============================================================
 // TASK 5: TCP TRANSMIT
@@ -196,6 +132,7 @@ void TCP_Transmit_Task(void* parameter) {
             Tx_Snapshot.global_path = current_global_path;
             // Tx_Snapshot.local_path = current_local_path;
             Tx_Snapshot.goal = current_mission_goal;
+            Tx_Snapshot.state = (uint8_t)current_mission_goal.type;
             xSemaphoreGive(State_Mutex);
         }
 
@@ -258,6 +195,8 @@ void TCP_Transmit_Task(void* parameter) {
         memcpy(&header[20], &Tx_Snapshot.goal.target_pose.x, 4);
         memcpy(&header[24], &Tx_Snapshot.goal.target_pose.y, 4);
         memcpy(&header[28], &Tx_Snapshot.goal.target_pose.theta, 4);
+
+        header[32] = Tx_Snapshot.state;
 
         if (tcpClient.connected()) {
             tcpClient.write(header, 64);
@@ -371,44 +310,44 @@ void Bayesian_Grid_Task(void* parameter) {
 // MISSION PLANNER TASK
 // =============================================================
 void Mission_Planner_Task(void* parameter) {
-    // Serial.println("[Task] Mission Planner Started");
-    
-    // Set initial state
     mission_planner->set_mission_state(MissionGoalType::EXPLORATION_MODE);
     
     while (1) {
         Pose2D current_p;
         
-        // 1. Get Current Pose safely
+        // Securely read pose
         if(xSemaphoreTake(Pose_Mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
             current_p = last_known_pose;
             xSemaphoreGive(Pose_Mutex);
         } else {
-            vTaskDelay(pdMS_TO_TICKS(10)); 
-            continue;
+            vTaskDelay(pdMS_TO_TICKS(10)); continue;
         }
 
-        // 2. Compute New Goal
-        // OPTIMIZATION: REMOVED MUTEX LOCK!
-        // We read the map "dirty" (without lock). The map is a fixed array of int8.
-        // Reading a byte while it is being written is atomic on ESP32.
-        // This prevents the heavy Mission Planner from blocking TCP or Lidar tasks.
-        if (mission_planner->get_current_state() != RETURN_HOME 
-            && goal_need_to_change(current_p, current_mission_goal, *TheMap)) {
-            
-            MissionGoal new_goal = mission_planner->update_goal(current_p, *TheMap);
-            new_goal_arrived = true;
-            
-            // 3. Publish Goal to Global State (for TCP & Global Planner)
+        // Securely read Planner Status
+        bool planner_fail = false;
+        if(xSemaphoreTake(State_Mutex, pdMS_TO_TICKS(20)) == pdTRUE) {
+            planner_fail = global_path_invalid;
+            xSemaphoreGive(State_Mutex);
+        }
+
+        // --- THE OPTIMIZED CALL ---
+        // Pass the planner failure flag directly
+        MissionGoal new_goal = mission_planner->update_goal(current_p, *TheMap, planner_fail);
+        new_goal_arrived = true;       // Notify Global Planner
+
+
+        // Check if goal actually changed before taking Mutex
+        if (new_goal.target_pose.x != current_mission_goal.target_pose.x || 
+            new_goal.target_pose.y != current_mission_goal.target_pose.y ||
+            new_goal.type != current_mission_goal.type) 
+        {
             if (xSemaphoreTake(State_Mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
                 current_mission_goal = new_goal;
+                global_path_invalid = false;   // Reset failure flag since we have a new goal
                 xSemaphoreGive(State_Mutex);
             }
-            
-            xSemaphoreGive(Bayesian_Grid_Mutex);
-        } 
+        }
 
-        // Run at 2Hz (every 500ms)
         vTaskDelay(pdMS_TO_TICKS(500));
     }
 }
@@ -417,14 +356,13 @@ void Mission_Planner_Task(void* parameter) {
 // GLOBAL PLANNER TASK
 // =============================================================
 void Global_Planner_Task(void* parameter) {
-    // Serial.println("[Task] Global Planner Started (A*)");
     GlobalPlanner planner; 
-    
     Pose2D local_pose;
     MissionGoal global_goal;
 
     while (1) {
-        PathMessage pathMsg;        
+        // Initialize explicitly to ensure length is 0 if not updated
+        PathMessage pathMsg = {{{0}}, 0, 0, 0};      
         
         if (new_goal_arrived) {
             if(xSemaphoreTake(State_Mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
@@ -435,98 +373,27 @@ void Global_Planner_Task(void* parameter) {
                 vTaskDelay(pdMS_TO_TICKS(100));
                 continue;
             }
-        
-        // if (xSemaphoreTake(Bayesian_Grid_Mutex, pdMS_TO_TICKS(200)) == pdTRUE) {
-        
-            // downsample_bayesian_grid(*coarse, factor);
-            pathMsg = planner.generate_path(local_pose, global_goal, *TheMap);
             
-            // if (pathMsg.current_length > 0) {
-            //      Serial.printf("A* Path Found! Length: %d waypoints\n", pathMsg.current_length);
-                 
-            //      Serial.printf("Start: (%.2f, %.2f) | Goal: (%.2f, %.2f)\n", 
-            //                    pathMsg.path[0].x, pathMsg.path[0].y, 
-            //                    pathMsg.path[pathMsg.current_length-1].x, 
-            //                    pathMsg.path[pathMsg.current_length-1].y);
-            // } else {
-            //      Serial.println("A* Path NOT Found or length is zero.");
-            // }
-            
-            //     xSemaphoreGive(Bayesian_Grid_Mutex);
-            // } else {
-            //     vTaskDelay(pdMS_TO_TICKS(100));
-            //     continue; 
-            // }
-            
-            // pathMsg.current_length = pathA_size;
-            // pathMsg.timestamp_ms = millis();
-            // pathMsg.path_id = 0;
-            
-            // for (int i = 0; i < 5; i++) {
-            //     pathMsg.path[i].x = pathA_X[i];
-            //     pathMsg.path[i].y = pathA_Y[i];
-            // }
-            
-            // Also update the global state for TCP
-            current_global_path = pathMsg;
-            // i = 0;
-            
-            // if(xSemaphoreTake(State_Mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
-            //     current_global_path = pathMsg; 
-            //     i = 0;
-            //     xSemaphoreGive(State_Mutex);
-            // }
-            
-            esp_link.sendPath(current_global_path, GLOBAL);
-            new_goal_arrived = false;
+            pathMsg = planner.generate_path(local_pose, global_goal, *TheMap); 
+
+            if (pathMsg.current_length == 0) {
+                 // Path planning failed!
+                 if(xSemaphoreTake(State_Mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+                    global_path_invalid = true;
+                    current_global_path.current_length = 0; 
+                    xSemaphoreGive(State_Mutex);
+                }
+                 Serial.println("GP: A* Failed or Empty.");
+            } else {
+                // Success
+                current_global_path = pathMsg;
+                esp_link.sendPath(current_global_path, GLOBAL);
+                new_goal_arrived = false; 
+            }
         }
-        
-        vTaskDelay(pdMS_TO_TICKS(800));
+        vTaskDelay(pdMS_TO_TICKS(500));
     }
 }
-
-/*
-void Local_Planner_Task(void* parameter) {
-    vTaskDelay(pdMS_TO_TICKS(10000));
-
-    Serial.println("[Task] Local Planner Started (A*)");
-    LocalPlanner local_planner(SEARCH_BOUND_M); 
-    
-    Pose2D local_pose;
-    Waypoint local_goal;
-
-    while (1) {
-    //     PathMessage local_pathMsg;
-        
-        if(xSemaphoreTake(State_Mutex, pdMS_TO_TICKS(50)) == pdTRUE && i < current_global_path.current_length) {
-    //         local_pose = last_known_pose;
-    //         local_goal = current_global_path.path[i++];
-            xSemaphoreGive(State_Mutex); 
-        } else {
-            vTaskDelay(pdMS_TO_TICKS(100)); 
-            continue;
-        }
-
-    //     if (xSemaphoreTake(Bayesian_Grid_Mutex, pdMS_TO_TICKS(200)) == pdTRUE) {
-            
-    //         local_pathMsg = local_planner.compute_local_path(local_pose, local_goal, *TheMap);
-            
-    //         xSemaphoreGive(Bayesian_Grid_Mutex);
-    //     } else {
-    //         vTaskDelay(pdMS_TO_TICKS(100));
-    //         continue; 
-    //     }
-        
-    //     if(xSemaphoreTake(State_Mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
-    //         current_local_path = local_pathMsg; 
-    //         xSemaphoreGive(State_Mutex);
-    //     }
-        
-    //     esp_link.sendPath(local_pathMsg, LOCAL); 
-        
-        vTaskDelay(pdMS_TO_TICKS(1000));
-    }
-}*/
 
 // =============================================================
 // SETUP

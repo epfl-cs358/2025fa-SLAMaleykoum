@@ -189,30 +189,47 @@ PathMessage GlobalPlanner::generate_path(
 
     // position 0 dans tableau = goal
     // -------------------------------------------
-    // 4) ÉCHANTILLONNER pour max 5 points
+    // 4) SAMPLE PATH (Max 5 points)
     // -------------------------------------------
-    if (plen <= MAX_PATH_LENGTH && plen >= 1) {
-        msg.current_length = plen;
+    
+    // CASE 0: Path is empty (Robot is already at goal)
+    // This prevents the buffer underflow (px[-1])
+    if (plen == 0) {
+        msg.current_length = 1;
+        msg.path[0].x = goal.target_pose.x;
+        msg.path[0].y = goal.target_pose.y;
+        return msg;
+    }
 
+    // CASE 1: Path fits in message (1 to 5 points)
+    if (plen <= MAX_PATH_LENGTH) {
+        msg.current_length = plen;
         int j = 0;
         for (int i = plen - 1; i >= 0; i--) {
             grid_to_world(px[i], py[i], msg.path[j].x, msg.path[j].y, res, W, H);
             j++; 
         }
-    } else {
+    } 
+    // CASE 2: Path is too long, we must downsample ( > 5 points)
+    else {
         msg.current_length = MAX_PATH_LENGTH;
 
-        // 1) Le premier waypoint = juste après notre position
-        //    donc px[plen-1]
+        // 1) First point (Immediate target) -> px[plen-1]
         grid_to_world(px[plen - 1], py[plen - 1], msg.path[0].x, msg.path[0].y, res, W, H);
 
-        // 2) Le dernier waypoint = goal → px[0]
+        // 2) Last point (Final Goal) -> px[0]
         grid_to_world(px[0], py[0], msg.path[MAX_PATH_LENGTH - 1].x, msg.path[MAX_PATH_LENGTH - 1].y, res, W, H);
 
-        float ratio = float(plen - 2) / (MAX_PATH_LENGTH - 1);
+        // 3) Intermediate points
+        float ratio = float(plen - 1) / (MAX_PATH_LENGTH - 1); 
 
         for (int k = 1; k < MAX_PATH_LENGTH - 1; k++) {
-            int idx = (plen - 2) - int(k * ratio);
+            // px array is Start->Goal backwards. We want points closer to start first.
+            int idx = (plen - 1) - int(k * ratio);
+            
+            // Safety Clamp
+            if (idx < 0) idx = 0;
+            if (idx >= plen) idx = plen - 1;
 
             grid_to_world(px[idx], py[idx], msg.path[k].x, msg.path[k].y, res, W, H);
         }

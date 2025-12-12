@@ -3,21 +3,6 @@
 #include "../../include/common/utils.h"
 
 // ============================================================
-// HELPERS : LOGODDS + FRONTIER CHECK
-// ============================================================
-
-// static inline float proba(const BayesianOccupancyGrid& grid, int x, int y)
-// {
-//     return grid.get_map_data()[y * grid.grid_size_x + x];
-// }
-
-// static inline bool is_unknown(float lo)
-// {
-//     float p = 1.f / (1.f + std::exp(-lo));
-//     return (0.35f < p) && (p < 0.6f);
-// }
-
-// ============================================================
 // SAFETY CHECK FOR ROBOT RADIUS
 // ============================================================
 // constantes center a remettre au propre + fonctions c'est la meme utilise dans global planner et d'autre endroits ----------------
@@ -35,7 +20,7 @@ static bool is_point_safe(const BayesianOccupancyGrid& grid, int gx, int gy)
             int nx = gx + dx;
             int ny = gy + dy;
             if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
-            if (grid.get_cell_probability(nx, ny) > 0.60f) return false;
+            if (grid.get_cell_probability(nx, ny) > OCC_BOUND_PROB) return false;
         }
     }
     return true;
@@ -47,29 +32,64 @@ static bool is_point_safe(const BayesianOccupancyGrid& grid, int gx, int gy)
 // ============================================================
 static bool is_frontier_cell(const BayesianOccupancyGrid& grid, int x, int y)
 {
-    // 1. FILTER: MAP EDGES ARE NOT FRONTIERS
-    // We ignore the 2 outer layers of pixels to avoid "leaking" out of the map.
-    if (x <= 1 || x >= grid.grid_size_x - 2 || y <= 1 || y >= grid.grid_size_y - 2)
-        return false;
-
-    // if occupied 
-    if (grid.get_cell_probability(x, y) >= 0.5f) return false;
+    // // 1. Boundary Checks: If this cell is on the edge of the map, it cannot be a frontier.
+    // if (x <= 1 || x >= grid.grid_size_x - 2 || y <= 1 || y >= grid.grid_size_y - 2) return false;
     
+    // 2. Must be Free (explored) space to be the "edge" of a frontier
+    // If it's occupied (wall) or unknown, it's not a reachable frontier point.
+    if (grid.get_cell_probability(x, y) > FREE_BOUND_PROB) return false; 
+    
+    // 3. Check Neighbors for Unknowns
     static int dx[4] = {1, -1, 0, 0};
     static int dy[4] = {0, 0, 1, -1};
 
     for (int i = 0; i < 4; i++) {
         int nx = x + dx[i];
         int ny = y + dy[i];
-        // Bounds check included in edge filter above, but safety first:
-        if (nx < 0 || ny < 0 || nx >= grid.grid_size_x || ny >= grid.grid_size_y) continue;
-
-        float p = grid.get_cell_probability(nx, ny);
-        // if unknown
-        if (FREE_BOUND_PROB < p && p < OCC_BOUND_PROB) return true;
+        float np = grid.get_cell_probability(nx, ny);
+        
+        // If neighbor is Unknown (between free and occ), this cell is a frontier
+        if (np > FREE_BOUND_PROB && np < OCC_BOUND_PROB) return true;
     }
 
     return false;
+}
+
+// --- CHEAP CHECK FUNCTION ---
+bool MissionPlanner::is_current_goal_valid(const Pose2D& robot_pose, const BayesianOccupancyGrid& grid) {
+
+    // 0. Proximity Check: If we are very close to the goal, consider it achieved.
+    float dx = robot_pose.x - current_target_.target_pose.x;
+    float dy = robot_pose.y - current_target_.target_pose.y;
+    if ((dx*dx + dy*dy) < 0.4f * 0.4f) { // Within 40cm
+        return false; // Arrived, need new goal
+    }
+    
+    // 1. Check Map Integrity
+    int gx, gy;
+    world_to_grid(current_target_.target_pose.x, current_target_.target_pose.y, 
+                  gx, gy, grid.grid_resolution, grid.grid_size_x, grid.grid_size_y);
+
+    // Is the goal now inside a wall? (Dynamic obstacle appeared)
+    if (grid.get_cell_probability(gx, gy) > OCC_BOUND_PROB) {
+        return false; // Goal invalid
+    }
+
+    // 2. Check Frontier Integrity
+    // If the area around the goal is fully explored (all free), 
+    // the "frontier" has disappeared. We should move on.
+    // We check a small 3x3 box around the goal.
+    bool still_frontier = false;
+    for(int y = -1; y <= 1; y++) {
+        for(int x = -1; x <= 1; x++) {
+             if(is_frontier_cell(grid, gx+x, gy+y)) {
+                 still_frontier = true;
+                 break;
+             }
+        }
+    }
+    
+    return still_frontier;
 }
 
 /**
@@ -186,129 +206,102 @@ void MissionPlanner::add_user_waypoint(const Pose2D& wp) {}
 // ============================================================
 // MAIN LOGIC
 // ============================================================
-MissionGoal MissionPlanner::update_goal(const Pose2D& pose, const BayesianOccupancyGrid& grid)
+// --- MAIN UPDATE LOOP ---
+MissionGoal MissionPlanner::update_goal(const Pose2D& pose, const BayesianOccupancyGrid& grid, bool global_planner_failed)
 {
-    const int PATIENCE_LIMIT = 10; // 5 Seconds (assuming 2Hz update rate)
+    const int PATIENCE_LIMIT = 20; 
 
-    switch (current_state_)
-    {
-        case IDLE: 
+    // STATE: RETURN HOME
+    if (current_state_ == RETURN_HOME) {
+        current_target_.target_pose = home_pose_;
+        current_target_.type = RETURN_HOME;
+        return current_target_;
+    }
+
+    // STATE: EXPLORATION
+    if (current_state_ == EXPLORATION_MODE) {
+        
+        // 1. Define Search Area (Start local, expand if needed)
+        int rx, ry;
+        world_to_grid(pose.x, pose.y, rx, ry, grid.grid_resolution, grid.grid_size_x, grid.grid_size_y);
+        
+        // If the cell under the robot is still "Unknown" (or occupied), 
+        // it means the Lidar hasn't updated the map around us yet.
+        // Don't count this as a failure. Just wait.
+        if (grid.get_cell_probability(rx, ry) > FREE_BOUND_PROB) {
+            // Serial.println("Mission: Map not ready (Robot in Unknown). Waiting...");
             return current_target_;
-            
-        case RETURN_HOME:
-            current_target_.target_pose = home_pose_;
-            // current_target_.target_pose.x = 10.f;
-            // current_target_.target_pose.y = 10.f;
-            current_target_.type = RETURN_HOME;
+        }
+
+        // OPTIMIZATION: STICK TO GOAL
+        // Only search if:
+        // 1. Global Planner explicitly failed
+        // 2. OR The current goal is no longer valid (Reached, Occupied, or Disappeared)
+        if (!global_planner_failed && is_current_goal_valid(pose, grid)) {
+            // Keep the same target!
             return current_target_;
+        }
 
-        case EXPLORATION_MODE:
-        {
-            static int patience_counter = 0; 
+        // --- IF WE REACH HERE, WE NEED A NEW GOAL (HEAVY CALCULATION) ---
+        
+        // Reset Memory (Using memset on the member array, not stack)
+        memset(visited_mask, 0, sizeof(visited_mask));
+        int candidate_count = 0;
+        
+        // Local Search (Optimization)
+        int range = (int)(SEARCH_BOUND_M / grid.grid_resolution);
+        search_for_candidates(grid, 
+            std::max(0, rx-range), std::min((int)grid.grid_size_x-1, rx+range),
+            std::max(0, ry-range), std::min((int)grid.grid_size_y-1, ry+range),
+            candidate_count);
 
-            // --------------------------------------------------------
-            // STEP 0: PREPARE MEMORY
-            // --------------------------------------------------------
-            // Reset the visited mask (0 = not visited)
-            memset(visited_mask, 0, sizeof(visited_mask)); 
-            
-            // Reset candidate list
-            int candidate_count = 0;
-            for(int k=0; k<MAX_FRONTIER_CANDIDATES; k++) candidates[k].valid = false;
+        // Global Search (Fallback)
+        if (candidate_count == 0) {
+            // Note: We don't reset visited_mask to avoid re-scanning local area
+            search_for_candidates(grid, 2, grid.grid_size_x - 3, 2, grid.grid_size_y - 3, candidate_count);
+        }
 
-            // --------------------------------------------------------
-            // STEP 1: DEFINE SEARCH BOUNDS
-            // --------------------------------------------------------
-            int rx, ry;
-            world_to_grid(pose.x, pose.y, rx, ry, grid.grid_resolution, grid.grid_size_x, grid.grid_size_y);
-            
-            // Calculate Local Bounding Box (+/- SEARCH_BOUND_M)
-            int range_cells = (int)(SEARCH_BOUND_M / grid.grid_resolution); 
-            int local_x_min = std::max(0, rx - range_cells);
-            int local_x_max = std::min((int)grid.grid_size_x - 1, rx + range_cells);
-            int local_y_min = std::max(0, ry - range_cells);
-            int local_y_max = std::min((int)grid.grid_size_y - 1, ry + range_cells);
+        // 2. Select Best
+        int best_idx = -1;
+        int max_size = -1;
+        float min_dist_sq = 100000.0f;
 
-            // --------------------------------------------------------
-            // STEP 2: LOCAL SEARCH (Optimization)
-            // --------------------------------------------------------
-            // First, look only in the immediate vicinity of the robot.
-            search_for_candidates(grid, local_x_min, local_x_max, local_y_min, local_y_max, candidate_count);
+        for(int i=0; i<candidate_count; i++){
+            if(candidates[i].valid) {
+                // Heuristic: Pick the closest one that is big enough
+                // to avoid jumping across the map.
+                float dx = (candidates[i].center_x - rx);
+                float dy = (candidates[i].center_y - ry);
+                float d_sq = dx*dx + dy*dy;
 
-            // --------------------------------------------------------
-            // STEP 3: GLOBAL SEARCH (Fallback)
-            // --------------------------------------------------------
-            // If local search found nothing, scan the ENTIRE map.
-            // Note: We intentionally do NOT reset visited_mask, so we don't re-scan the local area.
-            
-            // @silcazesam TODO: This might be an error, consider resetting visited_mask before global search.
-            if (candidate_count == 0) {
-                // Bounds = Whole Map (minus edges handled by is_frontier_cell filter)
-                int global_x_min = 2; 
-                int global_x_max = grid.grid_size_x - 3;
-                int global_y_min = 2; 
-                int global_y_max = grid.grid_size_y - 3;
-
-                search_for_candidates(grid, global_x_min, global_x_max, global_y_min, global_y_max, candidate_count);
-            }
-
-            // --------------------------------------------------------
-            // STEP 4: SELECT BEST CANDIDATE
-            // --------------------------------------------------------
-            int best_idx = -1;
-            int max_size = -1;
-
-            // Heuristic: Prefer the largest cluster found
-            for(int i=0; i<candidate_count; i++){
-                if(candidates[i].valid && candidates[i].size > max_size){
-                    max_size = candidates[i].size;
+                if (candidates[i].size > 5 && d_sq < min_dist_sq) {
+                    min_dist_sq = d_sq;
                     best_idx = i;
                 }
             }
+        }
 
-            // --------------------------------------------------------
-            // STEP 5: VALIDATE AND RETURN
-            // --------------------------------------------------------
-            if (best_idx != -1)
-            {
-                // Safety check: Ensure the chosen centroid is not inside a wall
-                if (is_point_safe(grid, candidates[best_idx].center_x, candidates[best_idx].center_y)) {
-                    
-                    patience_counter = 0; // Success! Reset failure counter.
-
-                    grid_to_world(candidates[best_idx].center_x, 
-                                   candidates[best_idx].center_y, 
-                                   current_target_.target_pose.x, current_target_.target_pose.y,
-                                   grid.grid_resolution, grid.grid_size_x, grid.grid_size_y);
-                    
-                    current_target_.type = MissionGoalType::EXPLORATION_MODE;
-                    return current_target_;
-                }
-            }
-
-            // --------------------------------------------------------
-            // STEP 6: HANDLING FAILURE (No Frontiers Found)
-            // --------------------------------------------------------
-            patience_counter++; 
-
-            if (patience_counter > PATIENCE_LIMIT)
-            {
-                // Global search failed for 5 consecutive seconds.
-                // Assumption: Map is fully explored.
+        if (best_idx != -1) {
+            // SUCCESS
+            grid_to_world(candidates[best_idx].center_x, candidates[best_idx].center_y, 
+                          current_target_.target_pose.x, current_target_.target_pose.y,
+                          grid.grid_resolution, grid.grid_size_x, grid.grid_size_y);
+            return current_target_;
+        } else {
+            // FAILURE - No frontiers left
+            static int fail_count = 0;
+            fail_count++;
+            if(fail_count > PATIENCE_LIMIT) {
                 current_state_ = RETURN_HOME;
                 current_target_.target_pose = home_pose_;
-                current_target_.type = RETURN_HOME;
-                return current_target_;
             }
-            else
-            {
-                // Temporary failure (lidar noise, occlusion).
-                // Wait in IDLE state for map to update.
+            else {
+                // If we haven't timed out yet, just stay put.
+                // Do NOT return (0,0) which causes the robot to drive to origin.
                 current_target_.target_pose = pose; 
-                current_target_.type = MissionGoalType::EXPLORATION_MODE; 
-                return current_target_;
             }
         }
     }
     return current_target_;
 }
+

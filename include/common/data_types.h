@@ -17,11 +17,12 @@
 #define ROBOT_RADIUS 0.3f
 #define SEARCH_BOUND_M 3.0f
 
-#define FREE_BOUND_PROB 0.35 // = -6 en log_odds
+// Free and Occupied probability thresholds
+#define FREE_BOUND_PROB 0.45 // = -6 en log_odds
 #define OCC_BOUND_PROB 0.6  // = 4 en log_odds
 
-#define GP_MAX_W  25     // largeur max de la carte coarse (utilisé dans generate path)
-#define GP_MAX_H  25     // hauteur max
+#define GP_MAX_W  50     // largeur max de la carte coarse (utilisé dans generate path)
+#define GP_MAX_H  50     // hauteur max
 #define GP_MAX_N  (GP_MAX_W * GP_MAX_H)
 
 // --- Core Geometric Structures ---
