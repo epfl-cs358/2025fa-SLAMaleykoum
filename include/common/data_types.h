@@ -21,8 +21,8 @@
 #define FREE_BOUND_PROB 0.45 // = -6 en log_odds
 #define OCC_BOUND_PROB 0.6  // = 4 en log_odds
 
-#define GP_MAX_W  50     // largeur max de la carte coarse (utilisé dans generate path)
-#define GP_MAX_H  50     // hauteur max
+#define GP_MAX_W  70     // largeur max de la carte coarse (utilisé dans generate path)
+#define GP_MAX_H  70     // hauteur max
 #define GP_MAX_N  (GP_MAX_W * GP_MAX_H)
 
 // --- Core Geometric Structures ---

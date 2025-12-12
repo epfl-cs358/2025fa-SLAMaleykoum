@@ -8,8 +8,8 @@
 // =============================================================
 // TUNING & MEMORY LIMITS
 // =============================================================
-#define MAX_FRONTIER_CANDIDATES 20
-#define BFS_QUEUE_SIZE 400
+#define MAX_FRONTIER_CANDIDATES 10
+#define BFS_QUEUE_SIZE 200
 #define MIN_CLUSTER_SIZE 5
 
 class MissionPlanner {

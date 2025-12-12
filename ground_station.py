@@ -15,10 +15,10 @@ ESP_IP = "192.168.4.1"
 PORT = 9000
 
 # Map & Rendering Settings
-GRID_W = 50        # Width of the grid in cells
-GRID_H = 50        # Height of the grid in cells
+GRID_W = 70        # Width of the grid in cells
+GRID_H = 70        # Height of the grid in cells
 RESOLUTION = 0.2   # Size of one cell in meters (5cm)
-WINDOW_SCALE = 25  # Scale factor for the display window
+WINDOW_SCALE = 15  # Scale factor for the display window
 
 # Colors (RGB Tuples)
 C_BLACK  = (0, 0, 0)        # Occupied cell (Wall)
@@ -137,36 +137,6 @@ def find_frontiers_python(grid):
                 wy = - (y - rows/2) * RESOLUTION
                 frontiers.append((wx, wy))
     return frontiers
-
-# def find_frontiers_python(grid):
-#     """
-#     Detects frontier points in the occupancy grid.
-#     Replicates the exact logic used in the ESP32 C++ code for visual verification.
-#     """
-#     frontiers = []
-#     rows, cols = grid.shape
-    
-#     # Iterate through grid, skipping the outer 2-pixel border (Edge Filter)
-#     for y in range(2, rows - 2):
-#         for x in range(2, cols - 2):
-#             val = grid[y, x]
-            
-#             # Condition 1: Cell must be Free
-#             # Threshold: >= -2 is Unknown/Occupied. < -2 is Free.
-#             if val >= -8: continue 
-            
-#             # Condition 2: Must have at least one Unknown neighbor (LogOdds == 0)
-#             is_frontier = False
-#             if grid[y+1, x] == 0: is_frontier = True
-#             elif grid[y-1, x] == 0: is_frontier = True
-#             elif grid[y, x+1] == 0: is_frontier = True
-#             elif grid[y, x-1] == 0: is_frontier = True
-            
-#             if is_frontier:
-#                 wx, wy = index_to_world(x, y)
-#                 frontiers.append((wx, wy))
-                
-#     return frontiers
 
 # =============================================================================
 # MAIN

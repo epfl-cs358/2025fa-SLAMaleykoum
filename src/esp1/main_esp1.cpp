@@ -27,8 +27,12 @@ WiFiServer tcpServer(TCP_PORT);
 
 // --- RTOS HANDLES ---
 QueueHandle_t Lidar_Buffer_Queue;
-QueueHandle_t Lidar_Pose_Queue;
 QueueHandle_t Path_Send_Queue;
+
+// Double Buffering Queues
+QueueHandle_t Lidar_Pose_Queue_Ready; // Holds pointers to FULL buffers (Sync -> Map)
+QueueHandle_t Lidar_Pose_Queue_Free;  // Holds pointers to EMPTY buffers (Map -> Sync)
+
 TaskHandle_t  TCP_Task_Handle = NULL;
 
 // MUTEXES
@@ -37,8 +41,8 @@ SemaphoreHandle_t Pose_Mutex;
 SemaphoreHandle_t State_Mutex; 
 
 // --- GLOBAL OBJECTS ---
-const int GRID_SIZE_X = 50;
-const int GRID_SIZE_Y = 50;
+const int GRID_SIZE_X = 70;
+const int GRID_SIZE_Y = 70;
 const float RESOLUTION = 0.2f;
 // const int factor = 4;
 
@@ -47,6 +51,11 @@ const uint32_t RLE_BUFFER_SIZE = 10000;
 BayesianOccupancyGrid* TheMap = nullptr;
 MissionPlanner* mission_planner = nullptr; 
 // BayesianOccupancyGrid* coarse = nullptr;
+
+// --- DOUBLE BUFFERING POOL ---
+// We allocate these ONCE on the Heap. They never move.
+SyncedScan* Scan_Buffer_1 = nullptr;
+SyncedScan* Scan_Buffer_2 = nullptr;
 
 // --- STATE VARIABLES ---
 Pose2D last_known_pose = {0,0,0,0};
@@ -72,27 +81,6 @@ Lidar lidar(LIDAR_SERIAL);
 HardwareSerial& IPC_Serial = Serial1; 
 Esp_link esp_link(IPC_Serial);
 
-// bool goal_need_to_change(Pose2D pos, MissionGoal goal, const BayesianOccupancyGrid& TheMap) {
-//     float distance = sqrtf((pos.x-goal.target_pose.x)*(pos.x-goal.target_pose.x) 
-//             + (pos.y-goal.target_pose.y)*(pos.y-goal.target_pose.y));
-//     if (distance < 1) return true;
-
-//     int px, py, gx, gy;
-//     world_to_grid(pos.x, pos.y, px, py, TheMap.grid_resolution, TheMap.grid_size_x, TheMap.grid_size_y);
-//     world_to_grid(goal.target_pose.x, goal.target_pose.y, gx, gy, TheMap.grid_resolution, TheMap.grid_size_x, TheMap.grid_size_y);
-
-//     // int radius = 0.5 / TheMap.grid_resolution; // 1 for 1m
-//     int radius = 1;
-
-//     for (int x = gx - radius ; x < gx + radius; ++x) {
-//         for (int y = gy - radius ; y < gy + radius ; ++y) {
-//             float point = TheMap.get_cell_probability(x, y);
-//             if (point == 0.5) return false;
-//         }
-//     }
-
-//     return true;
-// }
 
 // =============================================================
 // TASK 5: TCP TRANSMIT
@@ -258,23 +246,38 @@ void Lidar_Read_Task(void* parameter) {
 // TASK 3: SYNC FUSION
 // =============================================================
 void Lidar_Sync_Map_Task(void* parameter) {
-    SyncedScan* synced_data = new SyncedScan();
-    LiDARScan* scan_buffer = new LiDARScan();
+    LiDARScan* scan_buffer = new LiDARScan(); // Heap alloc for temp storage
+    SyncedScan* current_work_buffer = nullptr;
     int local_counter = 0;
 
-    // TODO: SYNC DATA FROM TIMESTAMPS !!!
-    
     while (1) {
+        // 1. Get raw Lidar data (Copy from ISR/Serial task)
+        // We still copy here because LiDARScan is "only" ~1-2KB and it's safer for serial reading
         if (xQueueReceive(Lidar_Buffer_Queue, scan_buffer, portMAX_DELAY) == pdPASS) {
+            
+            // Downsample: Only process every 3rd scan to save CPU
             local_counter++;
             if (local_counter % 3 != 0) continue;
 
-            synced_data->scan = *scan_buffer;
-            if (xSemaphoreTake(Pose_Mutex, portMAX_DELAY) == pdTRUE) {
-                synced_data->pose = last_known_pose;
-                xSemaphoreGive(Pose_Mutex);
+            // 2. Get a FREE buffer from the pool
+            // If the queue is empty, it means the Map task is too slow. 
+            // We wait 0ms (drop the frame) or small delay.
+            if (xQueueReceive(Lidar_Pose_Queue_Free, &current_work_buffer, 0) == pdPASS) {
+                
+                // 3. Fill the buffer (Direct write to Heap, NO STACK usage)
+                current_work_buffer->scan = *scan_buffer;
+                
+                if (xSemaphoreTake(Pose_Mutex, portMAX_DELAY) == pdTRUE) {
+                    current_work_buffer->pose = last_known_pose;
+                    xSemaphoreGive(Pose_Mutex);
+                }
+
+                // 4. Send the POINTER to the consumer
+                // This copies 4 bytes (address), not 4500 bytes.
+                xQueueSend(Lidar_Pose_Queue_Ready, &current_work_buffer, 0);
+            } else {
+                // Serial.println("DROP: Map task too slow, no free buffers!");
             }
-            xQueueSend(Lidar_Pose_Queue, synced_data, 0);
         }
     }
 }
@@ -283,25 +286,30 @@ void Lidar_Sync_Map_Task(void* parameter) {
 // TASK 4: BAYESIAN MAPPING
 // =============================================================
 void Bayesian_Grid_Task(void* parameter) {
-    static SyncedScan synced_data; 
+    SyncedScan* incoming_data_ptr = nullptr;
     
     while (1) {
-        if (xQueueReceive(Lidar_Pose_Queue, &synced_data, pdMS_TO_TICKS(100)) == pdPASS) {
+        // 1. Wait for a pointer to a FULL buffer
+        if (xQueueReceive(Lidar_Pose_Queue_Ready, &incoming_data_ptr, pdMS_TO_TICKS(100)) == pdPASS) {
             
-            // 1. Update Map
+            // 2. Update Map (Read directly from Heap)
             if (xSemaphoreTake(Bayesian_Grid_Mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
-                TheMap->update_map(synced_data); 
+                // Dereference pointer: *incoming_data_ptr
+                TheMap->update_map(*incoming_data_ptr); 
                 xSemaphoreGive(Bayesian_Grid_Mutex);
 
-                // 2. Notify TCP Task
                 if (TCP_Task_Handle != NULL) xTaskNotifyGive(TCP_Task_Handle);
             }
             
             // Update Pose Snapshot
             if(xSemaphoreTake(State_Mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
-                last_known_pose = synced_data.pose;
+                last_known_pose = incoming_data_ptr->pose;
                 xSemaphoreGive(State_Mutex);
             }
+
+            // 3. RECYCLE: Return the pointer to the Free Queue
+            // The Producer can now use this memory again.
+            xQueueSend(Lidar_Pose_Queue_Free, &incoming_data_ptr, 0);
         } 
     }
 }
@@ -383,7 +391,7 @@ void Global_Planner_Task(void* parameter) {
                     current_global_path.current_length = 0; 
                     xSemaphoreGive(State_Mutex);
                 }
-                 Serial.println("GP: A* Failed or Empty.");
+                //  Serial.println("GP: A* Failed or Empty.");
             } else {
                 // Success
                 current_global_path = pathMsg;
@@ -401,31 +409,46 @@ void Global_Planner_Task(void* parameter) {
 void setup() {
     Serial.begin(115200);
     delay(1000);
-    // Serial.println("\n--- ESP1 FULL NODE ---");
 
-    // rle_buffer = (uint8_t*) heap_caps_malloc(10000, MALLOC_CAP_SPIRAM);
 
+    // --- MEMORY ALLOCATION ---
+    // Allocate the two ping-pong buffers on the HEAP (SPIRAM if available, or internal RAM)
+    // Using heap_caps_malloc ensures we don't use Stack.
+    Scan_Buffer_1 = new SyncedScan();
+    Scan_Buffer_2 = new SyncedScan();
+    
+    // if (!Scan_Buffer_1 || !Scan_Buffer_2) {
+    //     Serial.println("FATAL: Heap alloc failed!"); while(1);
+    // }
+
+
+    // --- QUEUES ---
+    Lidar_Buffer_Queue = xQueueCreate(2, sizeof(LiDARScan));
+    
+    // NEW: Create queues that hold POINTERS (SyncedScan*)
+    // Size is number of items * sizeof(pointer) -> 2 * 4 bytes = 8 bytes total on stack. Tiny!
+    Lidar_Pose_Queue_Ready = xQueueCreate(2, sizeof(SyncedScan*));
+    Lidar_Pose_Queue_Free  = xQueueCreate(2, sizeof(SyncedScan*));
+    
+    // Prime the Free Queue with our two buffers
+    xQueueSend(Lidar_Pose_Queue_Free, &Scan_Buffer_1, 0);
+    xQueueSend(Lidar_Pose_Queue_Free, &Scan_Buffer_2, 0);
+
+    Path_Send_Queue = xQueueCreate(1, sizeof(PathMessage));
+
+
+// --- MUTEXES & OBJECTS ---
     Bayesian_Grid_Mutex = xSemaphoreCreateMutex();
     Pose_Mutex = xSemaphoreCreateMutex();
     State_Mutex = xSemaphoreCreateMutex();
 
     TheMap = new BayesianOccupancyGrid(RESOLUTION, GRID_SIZE_X, GRID_SIZE_Y);
-    // TheMap = (BayesianOccupancyGrid*) heap_caps_malloc(sizeof(BayesianOccupancyGrid), MALLOC_CAP_SPIRAM);
-    // new (TheMap) BayesianOccupancyGrid(RESOLUTION, GRID_SIZE_X, GRID_SIZE_Y);
-
     mission_planner = new MissionPlanner({0.0f, 0.0f, 0.0f, 0});
-    // current_mission_goal.target_pose = {0.0f, 0.f, 0.f, 0};
-    // current_mission_goal.type = EXPLORATION_MODE;
-
-    // coarse = new BayesianOccupancyGrid(RESOLUTION * factor, GRID_SIZE_X / factor, 
-    //     GRID_SIZE_Y / factor);
-    // coarse = (BayesianOccupancyGrid*) heap_caps_malloc(sizeof(BayesianOccupancyGrid), MALLOC_CAP_SPIRAM);
-    // new (coarse) BayesianOccupancyGrid(RESOLUTION * factor, GRID_SIZE_X / factor, GRID_SIZE_Y / factor);
     
-    if (!TheMap || !mission_planner) { 
-        // Serial.println("MEMORY ALLOC FAILED"); 
-        while(1); 
-    }
+    // if (!TheMap || !mission_planner) { 
+    //     // Serial.println("MEMORY ALLOC FAILED"); 
+    //     while(1); 
+    // }
 
     WiFi.mode(WIFI_AP);
     WiFi.softAP(ssid, password);
@@ -439,11 +462,6 @@ void setup() {
 
     // delay(50000);
 
-    // Queue Sizes: Increased Lidar buffer slightly to handle bursts
-    Lidar_Buffer_Queue = xQueueCreate(2, sizeof(LiDARScan));
-    Lidar_Pose_Queue   = xQueueCreate(2, sizeof(SyncedScan));
-    Path_Send_Queue    = xQueueCreate(1, sizeof(PathMessage));
-
     // --- TASK PRIORITIES & CORE ASSIGNMENT ---
     // Rule: Higher number = Higher Priority.
     // Core 0: System & Comm | Core 1: Math & Sensors
@@ -456,7 +474,7 @@ void setup() {
     
     // Mission Planner (OPTIMIZATION: LOWERED PRIORITY)
     // Was 2, now 1. It runs in background and shouldn't starve TCP.
-    xTaskCreatePinnedToCore(Mission_Planner_Task, "Mission", 2048, NULL, 1, NULL, 0);
+    xTaskCreatePinnedToCore(Mission_Planner_Task, "Mission", 4096, NULL, 1, NULL, 0);
 
     // -- Core 1 (Heavy Lifting) --
     xTaskCreatePinnedToCore(Lidar_Read_Task, "Lidar_Read", 3072, NULL, 4, NULL, 1);
