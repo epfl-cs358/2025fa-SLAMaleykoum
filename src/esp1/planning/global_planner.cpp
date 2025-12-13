@@ -1,18 +1,7 @@
 #include "../../../include/esp1/planning/global_planner.h"
 #include "esp_wifi.h"
 #include "../../include/common/utils.h"
-
-// ---------------------------------------------------------
-//                    A* NODE
-// ---------------------------------------------------------
-struct Node {
-    int x, y;
-    float g, h;
-
-    bool operator>(const Node& o) const {
-        return g + h > o.g + o.h;
-    }
-};
+#include <cmath>
 
 GlobalPlanner::GlobalPlanner() {}
 
@@ -25,7 +14,7 @@ PathMessage GlobalPlanner::generate_path(
     const BayesianOccupancyGrid& map,
     GlobalPlannerWorkspace* ws
 )
-{
+{  
     PathMessage msg{};
     msg.current_length = 0;
     msg.path_id = 0;
@@ -48,71 +37,55 @@ PathMessage GlobalPlanner::generate_path(
     world_to_grid(current_pose.x, current_pose.y, sx, sy, res, W, H);
     world_to_grid(goal.target_pose.x, goal.target_pose.y, gx, gy, res, W, H);
 
-    if (sx<0||sx>=W||sy<0||sy>=H) return msg;
-    if (gx<0||gx>=W||gy<0||gy>=H) return msg;
+    if (sx < 0 || sx >= W || sy < 0 || sy >= H) return msg;
+    if (gx < 0 || gx >= W || gy < 0 || gy >= H) return msg;
 
     int start_idx = sy * W + sx;
     int goal_idx  = gy * W + gx;
 
     // -------------------------------------------
-    // Reset Workspace Memory (Fast Reset)
+    // Reset workspace
     // -------------------------------------------
-    for(int i=0; i < MAX_CELLS; i++) {
+    for (int i = 0; i < MAX_CELLS; i++) {
         ws->g_cost[i] = 1e9f;
         ws->closed[i] = 0;
     }
-    
+
     // -------------------------------------------
-    // BINARY HEAP IMPLEMENTATION (Min-Heap)
+    // Binary heap (MIN-HEAP)
     // -------------------------------------------
     ws->pq_size = 0;
 
     auto pq_push = [&](int16_t idx, float f) {
-        if (ws->pq_size >= GP_PQ_SIZE) return; // Overflow protection
-        
-        // Add to end
+        if (ws->pq_size >= GP_PQ_SIZE) return;
+
         int i = ws->pq_size++;
         ws->pq[i] = {idx, f};
 
-        // Bubble Up
         while (i > 0) {
             int p = (i - 1) / 2;
-            if (ws->pq[p].f <= ws->pq[i].f) break; // Parent is smaller, heap property satisfied
-            
-            // Swap
-            GlobalPlannerWorkspace::Node temp = ws->pq[i];
-            ws->pq[i] = ws->pq[p];
-            ws->pq[p] = temp;
+            if (ws->pq[p].f <= ws->pq[i].f) break;
+            std::swap(ws->pq[p], ws->pq[i]);
             i = p;
         }
     };
 
     auto pq_pop = [&]() {
         GlobalPlannerWorkspace::Node ret = ws->pq[0];
-        
-        // Move last to root
         ws->pq_size--;
         if (ws->pq_size > 0) {
             ws->pq[0] = ws->pq[ws->pq_size];
-            
-            // Sink Down
             int i = 0;
             while (true) {
-                int left = 2 * i + 1;
-                int right = 2 * i + 2;
-                int smallest = i;
+                int l = 2 * i + 1;
+                int r = 2 * i + 2;
+                int s = i;
 
-                if (left < ws->pq_size && ws->pq[left].f < ws->pq[smallest].f)
-                    smallest = left;
-                if (right < ws->pq_size && ws->pq[right].f < ws->pq[smallest].f)
-                    smallest = right;
-
-                if (smallest == i) break;
-
-                GlobalPlannerWorkspace::Node temp = ws->pq[i];
-                ws->pq[i] = ws->pq[smallest];
-                ws->pq[smallest] = temp;
-                i = smallest;
+                if (l < ws->pq_size && ws->pq[l].f < ws->pq[s].f) s = l;
+                if (r < ws->pq_size && ws->pq[r].f < ws->pq[s].f) s = r;
+                if (s == i) break;
+                std::swap(ws->pq[i], ws->pq[s]);
+                i = s;
             }
         }
         return ret;
@@ -122,20 +95,18 @@ PathMessage GlobalPlanner::generate_path(
     // Start A*
     // -------------------------------------------
     ws->g_cost[start_idx] = 0.f;
-    float h0 = sqrtf((gx-sx)*(gx-sx) + (gy-sy)*(gy-sy));
+    float h0 = sqrtf((gx - sx)*(gx - sx) + (gy - sy)*(gy - sy));
     pq_push((int16_t)start_idx, h0);
 
-    const int MOVES[4] = {1, -1, W, -W}; // Right, Left, Down, Up (1D offsets)
-    // Corresponding coordinates check to handle wrapping
-    const int DX[4] = {1, -1, 0, 0};
-    const int DY[4] = {0, 0, 1, -1};
+    const int MOVES[4] = { 1, -1, W, -W };
+    const int DX[4]    = { 1, -1, 0, 0 };
+    const int DY[4]    = { 0, 0, 1, -1 };
 
     bool found = false;
-    int loop_counter = 0; // counter to yeild periodically
+    int loop_counter = 0;
 
-    while(ws->pq_size > 0){
-        
-        // >>> YIELD EVERY 50 ITERATIONS <<<
+    while (ws->pq_size > 0) {
+
         loop_counter++;
         if (loop_counter % 50 == 0) {
             vTaskDelay(1); // Sleep for 1 tick (allows OS to breathe)
@@ -143,8 +114,6 @@ PathMessage GlobalPlanner::generate_path(
 
         GlobalPlannerWorkspace::Node cur = pq_pop();
         int c_idx = cur.idx;
-        int cx = c_idx % W;
-        int cy = c_idx / W;
 
         if (ws->closed[c_idx]) continue;
         ws->closed[c_idx] = 1;
@@ -154,49 +123,43 @@ PathMessage GlobalPlanner::generate_path(
             break;
         }
 
+        int cx = c_idx % W;
+        int cy = c_idx / W;
         float gc = ws->g_cost[c_idx];
 
-        for (int i=0; i<4; i++){
-            // Calculate Neighbor
+        for (int i = 0; i < 4; i++) {
             int nx = cx + DX[i];
             int ny = cy + DY[i];
-            int n_idx = c_idx + MOVES[i]; // Fast offset
+            int n_idx = c_idx + MOVES[i];
 
-            // Bounds Check
             if (nx < 0 || nx >= W || ny < 0 || ny >= H) continue;
             if (ws->closed[n_idx]) continue;
 
-            // --- SAFETY MARGIN CHECK ---
+            // Obstacle check
             if (map.get_cell_probability(nx, ny) > FREE_BOUND_PROB) continue;
 
-            // Wall Buffering (Simplified for 1D)
-            bool too_close = false;
-            // Check 8 neighbors of (nx, ny)
-            for (int buf_y = -1; buf_y <= 1; buf_y++) {
-                for (int buf_x = -1; buf_x <= 1; buf_x++) {
-                    if (buf_x == 0 && buf_y == 0) continue;
-                    int bx = nx + buf_x;
-                    int by = ny + buf_y;
-                    if (bx >= 0 && bx < W && by >= 0 && by < H) {
-                         // Note: get_cell_probability handles 1D conversion internally usually, 
-                         // but here we use (x,y) API of the map class.
-                         if (map.get_cell_probability(bx, by) > FREE_BOUND_PROB) {
-                             too_close = true; buf_y = 2; break; // Break outer loop
-                         }
+            // -----------------------------
+            // 🔴 SAFETY COST (KEY FIX)
+            // -----------------------------
+            float obstacle_penalty = 0.0f;
+            for (int oy = -1; oy <= 1; oy++) {
+                for (int ox = -1; ox <= 1; ox++) {
+                    int tx = nx + ox;
+                    int ty = ny + oy;
+                    if (map.get_cell_probability(tx, ty) > FREE_BOUND_PROB) {
+                        obstacle_penalty += 5.0f;
                     }
                 }
             }
-            if (too_close) continue;
 
-            // Update Path
-            float new_g = gc + 1.0f;
-            if(new_g < ws->g_cost[n_idx]){
+            float new_g = gc + 1.0f + obstacle_penalty;
+
+            if (new_g < ws->g_cost[n_idx]) {
                 ws->g_cost[n_idx] = new_g;
-                ws->parent_index[n_idx] = (int16_t)c_idx; // Store 1D index
-                
-                // Euclidean Heuristic
-                float dist = 2 * (abs(gx - nx) + abs(gy - ny)); // Weighted to favor straight paths
-                pq_push((int16_t)n_idx, new_g + dist);
+                ws->parent_index[n_idx] = (int16_t)c_idx;
+
+                float h = sqrtf((gx - nx)*(gx - nx) + (gy - ny)*(gy - ny));
+                pq_push((int16_t)n_idx, new_g + h);
             }
         }
     }
@@ -204,58 +167,33 @@ PathMessage GlobalPlanner::generate_path(
     if (!found) return msg;
 
     // -------------------------------------------
-    // Reconstruction (Using 1D indices)
+    // Reconstruction (SAFE)
     // -------------------------------------------
     int plen = 0;
     int curr = goal_idx;
 
-    // We use px/py arrays to store grid coords, derived from 1D curr
-    while (curr != start_idx && plen < GP_MAX_CELLS) {
+    while (curr != start_idx && plen < GP_MAX_CELLS - 1) {
         ws->px[plen] = curr % W;
         ws->py[plen] = curr / W;
         plen++;
-        
         curr = ws->parent_index[curr];
     }
-    // Add start node (loop stops before adding start)
+
     ws->px[plen] = sx;
     ws->py[plen] = sy;
     plen++;
 
     // -------------------------------------------
-    // 7. Sampling & Output
+    // Output
     // -------------------------------------------
-    if (plen == 0) {
-        msg.current_length = 1;
-        msg.path[0].x = goal.target_pose.x;
-        msg.path[0].y = goal.target_pose.y;
-        return msg;
+    msg.current_length = std::min(plen, MAX_PATH_LENGTH);
+
+    for (int i = 0; i < msg.current_length; i++) {
+        int idx = plen - 1 - i;
+        grid_to_world(ws->px[idx], ws->py[idx],
+                      msg.path[i].x, msg.path[i].y,
+                      res, W, H);
     }
 
-    if (plen <= MAX_PATH_LENGTH) {
-        msg.current_length = plen;
-        int j = 0;
-        for (int i = plen - 1; i >= 0; i--) {
-            grid_to_world(ws->px[i], ws->py[i], msg.path[j].x, msg.path[j].y, res, W, H);
-            j++; 
-        }
-    } else {
-        msg.current_length = MAX_PATH_LENGTH;
-
-        // Start
-        grid_to_world(ws->px[plen - 1], ws->py[plen - 1], msg.path[0].x, msg.path[0].y, res, W, H);
-        
-        // End
-        grid_to_world(ws->px[0], ws->py[0], msg.path[MAX_PATH_LENGTH - 1].x, msg.path[MAX_PATH_LENGTH - 1].y, res, W, H);
-
-        // Middle
-        float ratio = float(plen - 1) / (MAX_PATH_LENGTH - 1);
-        for (int k = 1; k < MAX_PATH_LENGTH - 1; k++) {
-            int idx = (plen - 1) - int(k * ratio);
-            if (idx < 0) idx = 0; 
-            if (idx >= plen) idx = plen - 1;
-            grid_to_world(ws->px[idx], ws->py[idx], msg.path[k].x, msg.path[k].y, res, W, H);
-        }
-    }
     return msg;
 }
