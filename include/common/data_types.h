@@ -42,6 +42,8 @@ struct SystemHealth {
     uint16_t stack_min_gplan;
     uint16_t stack_min_mplan;
     uint16_t stack_min_lidar;
+    uint16_t stack_min_map;
+    uint16_t stack_min_sync;
     
     // Connectivity
     uint32_t last_esp2_packet_ms; // Time since last packet from ESP2

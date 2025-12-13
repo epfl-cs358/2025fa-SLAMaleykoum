@@ -162,7 +162,8 @@ def main():
         return
 
     rx_buffer = b''
-    HEADER_SIZE = 96
+    # UPDATED: Increased header size to accommodate extra stack info
+    HEADER_SIZE = 100 
     
     # Robot State
     car_pose = {'x': 0, 'y': 0, 'theta': 0}
@@ -178,6 +179,12 @@ def main():
     grid_log_odds = np.zeros((GRID_H, GRID_W), dtype=np.int8)
     map_surface = None
     detected_frontiers = [] 
+
+    # --- LOGGER VARIABLES (Init to 0 for safety) ---
+    t_map, t_gplan, t_mplan = 0, 0, 0
+    h_min = 0
+    s_tcp, s_gplan, s_mplan, s_lidar, s_map, s_sync = 0, 0, 0, 0, 0, 0
+    t_esp2 = 0
 
     running = True
     while running:
@@ -223,11 +230,14 @@ def main():
                 
                 robot_state_idx = packet[32] 
                 
+                # UPDATED UNPACKING: Now reads 36 bytes (extra 4 bytes for Map/Sync stack)
                 try:
-                    health_data = packet[33:33+32]
-                    h_free, h_min, t_map, t_gplan, t_mplan, s_tcp, s_gplan, s_mplan, s_lidar, t_esp2 = struct.unpack('<IIIIIHHHHI', health_data)
-                except:
-                    print("Packet size mismatch")
+                    # Health offset starts at 33. We read 36 bytes.
+                    health_data = packet[33:33+36]
+                    # Format: 5 uint32, 6 uint16, 1 uint32
+                    h_free, h_min, t_map, t_gplan, t_mplan, s_tcp, s_gplan, s_mplan, s_lidar, s_map, s_sync, t_esp2 = struct.unpack('<IIIIIHHHHHHI', health_data)
+                except Exception as e:
+                    print(f"Packet size mismatch: {e}")
                     continue
 
                 car_pose = {'x': cx, 'y': cy, 'theta': ct}
@@ -309,15 +319,13 @@ def main():
                 f"GOAL  : X{goal_pose['x']:5.2f} Y{goal_pose['y']:5.2f}",
                 f"STATE : {state_str}",
                 f"--- PERF (us) ---",
-                f"MAP UPDATE : {t_map}",
-                f"GLOB PLAN  : {t_gplan}",
-                f"MISS PLAN  : {t_mplan}",
-                f"--- MEM (KB) ---",
-                f"FREE HEAP  : {h_free / 1024:.1f} KB",
-                f"MIN HEAP   : {h_min / 1024:.1f} KB",
+                f"MAP : {t_map}  GPL: {t_gplan}",
+                f"MPL : {t_mplan}",
+                f"--- MEM ---",
+                f"MIN HEAP: {h_min / 1024:.1f} KB",
                 f"--- STACKS (Bytes) ---",
-                f"TCP : {s_tcp}  GPL : {s_gplan}",
-                f"MPL : {s_mplan}  LID : {s_lidar}",
+                f"TCP:{s_tcp} GPL:{s_gplan} MPL:{s_mplan}",
+                f"LID:{s_lidar} MAP:{s_map} SYN:{s_sync}",
                 f"ESP2 LINK: {t_esp2} ms ago"
             ]
 
@@ -330,12 +338,11 @@ def main():
             WARN_MPLAN, CRIT_MPLAN = 5000, 20000
 
             # Heap Memory (Bytes) - Low is Bad
-            # Note: 10KB is dangerously low for ESP32 with WiFi
             WARN_HEAP, CRIT_HEAP   = 20000, 10000  
 
             # Stack High Water Mark (Bytes) - Low is Bad
-            # If this hits < 200, a stack overflow is imminent
-            WARN_STACK, CRIT_STACK = 1000, 300 
+            # Increased Crit to 500 because 200 is basically one printf away from crashing
+            WARN_STACK, CRIT_STACK = 1500, 500 
 
             # ESP2 Link Latency (ms) - High is Bad
             WARN_LINK, CRIT_LINK   = 200, 2000
@@ -357,47 +364,43 @@ def main():
 
             # --- 3. FORMATTING DATA ---
 
-            # A. State & Position (Cyan/Grey)
-            # Shorten state to 3 chars to save space: EXP, RET, IDL
+            # A. State & Position
             st_short = state_str[:3].upper() 
             pos_str = f"{C_CYN_l}[{st_short}]{C_RST_l} {car_pose['x']:>5.1f},{car_pose['y']:>5.1f}"
 
-            # B. Performance (us)
+            # B. Performance (us) - Map, Global, Mission
             c_map = col(t_map, WARN_MAP, CRIT_MAP)
             c_gpl = col(t_gplan, WARN_GPLAN, CRIT_GPLAN)
             c_mpl = col(t_mplan, WARN_MPLAN, CRIT_MPLAN)
             perf_str = f"M{c_map}{t_map:>5}{C_RST_l} G{c_gpl}{t_gplan:>5}{C_RST_l} P{c_mpl}{t_mplan:>5}{C_RST_l}"
 
-            # C. Heap (KB) - Using Min Heap is often more useful for leak detection
+            # C. Heap (KB)
             h_min_kb = h_min / 1024.0
             c_heap = col(h_min, WARN_HEAP, CRIT_HEAP, inverse=True)
             mem_str = f"H_Min{c_heap}{h_min_kb:>5.1f}k{C_RST_l}"
 
-            # D. Stacks (Bytes) - The "Canary in the coal mine"
-            # We abbreviate: TCP, GPL (Global), MPL (Mission), LID (Lidar)
+            # D. Stacks (Bytes) - Updated for 6 tasks
+            # TCP, Global, Mission, Lidar, Map, Sync
             c_stcp = col(s_tcp, WARN_STACK, CRIT_STACK, inverse=True)
             c_sgpl = col(s_gplan, WARN_STACK, CRIT_STACK, inverse=True)
             c_smpl = col(s_mplan, WARN_STACK, CRIT_STACK, inverse=True)
             c_slid = col(s_lidar, WARN_STACK, CRIT_STACK, inverse=True)
+            c_smap = col(s_map, WARN_STACK, CRIT_STACK, inverse=True)
+            c_ssyn = col(s_sync, WARN_STACK, CRIT_STACK, inverse=True)
             
+            # Formatted in two groups: Logic (T,G,M) and Sensors (L,m,S)
             stk_str = (f"Stk:{C_GRY_l}T{C_RST_l}{c_stcp}{s_tcp:>4}{C_RST_l} "
                        f"{C_GRY_l}G{C_RST_l}{c_sgpl}{s_gplan:>4}{C_RST_l} "
-                       f"{C_GRY_l}M{C_RST_l}{c_smpl}{s_mplan:>4}{C_RST_l} "
-                       f"{C_GRY_l}L{C_RST_l}{c_slid}{s_lidar:>4}{C_RST_l}")
+                       f"{C_GRY_l}M{C_RST_l}{c_smpl}{s_mplan:>4}{C_RST_l} | "
+                       f"{C_GRY_l}L{C_RST_l}{c_slid}{s_lidar:>4}{C_RST_l} "
+                       f"{C_GRY_l}m{C_RST_l}{c_smap}{s_map:>4}{C_RST_l} "
+                       f"{C_GRY_l}S{C_RST_l}{c_ssyn}{s_sync:>4}{C_RST_l}")
 
             # E. Link Age (ms)
-            # Assuming t_esp2 is a timestamp from ESP. 
-            # If t_esp2 represents "ms since boot when packet arrived", 
-            # we might just want to display the raw value to see if it freezes.
-            # OR if t_esp2 is "ms ago", use that. 
-            # Based on your previous code, let's assume t_esp2 is "Time since last packet"
-            # If t_esp2 is actually a timestamp, you need: age = current_esp_time - t_esp2
-            # Let's just print the raw value you sent for now.
             c_link = col(t_esp2, WARN_LINK, CRIT_LINK)
             link_str = f"Lnk{c_link}{t_esp2:>4}ms{C_RST_l}"
 
             # --- 4. FINAL PRINT ---
-            # Using | separators for clarity
             print(f"{pos_str} | {perf_str} | {mem_str} | {stk_str} | {link_str}")
             # --- END LOGGING SECTION ---
 
