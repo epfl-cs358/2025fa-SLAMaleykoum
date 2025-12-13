@@ -14,8 +14,8 @@
 
 // TODO: For now we could use a 4bit value per cell to keep it lightweitgt ?
 //      Could always change later ?
-#define GRID_MAX_X 100
-#define GRID_MAX_Y 100
+#define GRID_MAX_X 70
+#define GRID_MAX_Y 70
 #define GRID_MAX_SIZE (GRID_MAX_X * GRID_MAX_Y)
 /**
  * @brief Manages the coarse occupancy map using Bayesian filtering.

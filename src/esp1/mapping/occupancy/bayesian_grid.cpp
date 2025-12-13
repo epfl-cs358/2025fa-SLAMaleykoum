@@ -139,7 +139,7 @@ void BayesianOccupancyGrid::update_map(const SyncedScan& lidar_scan)
         int x = x0;
         int y = y0;
 
-        while (!(x == xhit && y == yhit) || (x == 0) || (x == grid_size_x) || (y == 0) || (y == grid_size_y)) {
+        while ((x == 0) || (x == grid_size_x) || (y == 0) || (y == grid_size_y) || !(x == xhit && y == yhit)) {
             // if (!((unsigned)x < grid_size_x && (unsigned)y < grid_size_y))
             //     continue;
 

@@ -26,6 +26,27 @@
 #define GP_MAX_CELLS (GP_MAX_W * GP_MAX_H)
 #define GP_PQ_SIZE   (GP_MAX_CELLS / 3) // Queue doesn't need to hold the whole map, just the frontier
 
+// --- Debugging & Profiling ---
+struct SystemHealth {
+    uint32_t free_heap;
+    uint32_t min_free_heap;
+    
+    // Execution Times
+    uint32_t map_update_time_us;
+    uint32_t global_plan_time_us;
+    uint32_t mission_plan_time_us;
+    
+    // Stack Monitoring (Lowest amount of bytes ever left in the stack)
+    // If these get near 0, the CPU will reset.
+    uint16_t stack_min_tcp;
+    uint16_t stack_min_gplan;
+    uint16_t stack_min_mplan;
+    uint16_t stack_min_lidar;
+    
+    // Connectivity
+    uint32_t last_esp2_packet_ms; // Time since last packet from ESP2
+};
+
 // --- Core Geometric Structures ---
 /**
  * @brief 2D pose structure (Position and Orientation).

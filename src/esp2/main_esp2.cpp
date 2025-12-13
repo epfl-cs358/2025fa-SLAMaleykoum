@@ -29,6 +29,9 @@ void setup() {
     Serial.begin(115200);
     delay(2000);
 
+    pinMode(LED_BUILTIN, OUTPUT);
+    digitalWrite(LED_BUILTIN, HIGH); // Turn off built-in LED
+
     // --- Hardware Init ---
     I2C_wire.begin(Config::SDA_PIN, Config::SCL_PIN);
     i2cMutexInit();
@@ -52,7 +55,8 @@ void setup() {
 
     Serial.println("---- Initialization complete. ----");
 
-    // delay(50000);
+    // delay(500);
+    // digitalWrite(LED_BUILTIN, LOW); // Turn off built-in LED
 
     // --- FreeRTOS Tasks Creation ---
     xTaskCreatePinnedToCore(TaskReceivePath,            "RX_Path",      4096, NULL, 3, &receiveTask,    0);
@@ -60,6 +64,17 @@ void setup() {
     xTaskCreatePinnedToCore(TaskMotor,                  "Motor",        4096, NULL, 2, &motorTask,      1); 
     xTaskCreatePinnedToCore(TaskUltrasonic,             "Ultrasonic",   4096, NULL, 2, &ultrasonicTask, 1); 
     xTaskCreatePinnedToCore(TaskPurePursuit,            "PurePursuit",  4096, NULL, 1, &pursuitTask,    1); 
+
+
+    digitalWrite(LED_BUILTIN, LOW); // Turn off built-in LED
+    delay(200);
+    digitalWrite(LED_BUILTIN, HIGH); // Turn off built-in LED
+    delay(200);
+    digitalWrite(LED_BUILTIN, LOW); // Turn off built-in LED
+    delay(200);
+    digitalWrite(LED_BUILTIN, HIGH); // Turn off built-in LED
+    delay(200);
+    digitalWrite(LED_BUILTIN, LOW); // Turn off built-in LED
 }
 
 void loop() { 

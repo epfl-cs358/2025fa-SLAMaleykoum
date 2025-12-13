@@ -16,32 +16,6 @@ struct Node {
 
 GlobalPlanner::GlobalPlanner() {}
 
-// // ---------------------------------------------------------
-// //              COLLISION CHECK WITH ROBOT RADIUS
-// // ---------------------------------------------------------
-
-// static inline bool robot_circle_collides(int cx, int cy, const BayesianOccupancyGrid& map) {
-//     const int sx = map.grid_size_x;
-//     const int sy = map.grid_size_y;
-
-//     int radius_cells = int(std::ceil(ROBOT_RADIUS / map.grid_resolution));
-
-//     for (int dy = -radius_cells; dy <= radius_cells; dy++) {
-//         for (int dx = -radius_cells; dx <= radius_cells; dx++) {
-
-//             if (dx*dx + dy*dy > radius_cells*radius_cells) continue;
-
-//             int nx = cx + dx;
-//             int ny = cy + dy;
-
-//             if (nx < 0 || nx >= sx || ny < 0 || ny >= sy) return true;
-
-//             if (map.get_cell_probability(nx, ny) > FREE_BOUND_PROB) return true;
-//         }
-//     }
-//     return false;
-// }
-
 // ---------------------------------------------------------
 //                       A* PLANNER
 // ---------------------------------------------------------
@@ -166,7 +140,7 @@ PathMessage GlobalPlanner::generate_path(
         if (loop_counter % 50 == 0) {
             vTaskDelay(1); // Sleep for 1 tick (allows OS to breathe)
         }
-        
+
         GlobalPlannerWorkspace::Node cur = pq_pop();
         int c_idx = cur.idx;
         int cx = c_idx % W;
@@ -221,7 +195,7 @@ PathMessage GlobalPlanner::generate_path(
                 ws->parent_index[n_idx] = (int16_t)c_idx; // Store 1D index
                 
                 // Euclidean Heuristic
-                float dist = 3* sqrtf((gx-nx)*(gx-nx) + (gy-ny)*(gy-ny));
+                float dist = 2 * (abs(gx - nx) + abs(gy - ny)); // Weighted to favor straight paths
                 pq_push((int16_t)n_idx, new_g + dist);
             }
         }
