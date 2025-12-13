@@ -18,7 +18,7 @@
 #include <WiFiClient.h>
 #include <WiFiServer.h>
 
-#define TCP_HEADER_SIZE 128
+#define TCP_HEADER_SIZE 96
 
 // --- NETWORK CONFIG ---
 const char* ssid = "LIDAR_AP";
@@ -39,8 +39,6 @@ TaskHandle_t GPlan_Task_Handle = NULL;
 TaskHandle_t MPlan_Task_Handle = NULL;
 TaskHandle_t Lidar_Task_Handle = NULL;
 TaskHandle_t  TCP_Task_Handle = NULL;
-TaskHandle_t Sync_Task_Handle = NULL;
-TaskHandle_t Map_Task_Handle = NULL;
 
 // MUTEXES
 SemaphoreHandle_t Bayesian_Grid_Mutex;
@@ -204,8 +202,6 @@ void TCP_Transmit_Task(void* parameter) {
         sys_health.stack_min_tcp   = uxTaskGetStackHighWaterMark(NULL) * 4;
         if(GPlan_Task_Handle) sys_health.stack_min_gplan = uxTaskGetStackHighWaterMark(GPlan_Task_Handle) * 4;
         if(MPlan_Task_Handle) sys_health.stack_min_mplan = uxTaskGetStackHighWaterMark(MPlan_Task_Handle) * 4;
-        if(Map_Task_Handle) sys_health.stack_min_map = uxTaskGetStackHighWaterMark(Map_Task_Handle) * 4;
-        if(Sync_Task_Handle) sys_health.stack_min_sync = uxTaskGetStackHighWaterMark(Sync_Task_Handle) * 4;
         // Lidar task handle needs to be captured in setup
         
         // COPY HEALTH DATA INTO HEADER (Append at index 33, after 'state')
@@ -510,31 +506,19 @@ void setup() {
     digitalWrite(LED_BUILTIN, HIGH); // Turn off built-in LED
     delay(500);
 
-    // --- CORE 0: COMMS & PLANNING ---
+    // -- Core 0 (Comms) --
+    xTaskCreatePinnedToCore(IPC_Receive_Task, "IPC_Rx", 2048, NULL, 4, NULL, 0);
+    xTaskCreatePinnedToCore(TCP_Transmit_Task, "TCP_Tx", 4096, NULL, 3, &TCP_Task_Handle, 0); 
     
-    // IPC (Serial): Critical, Prio 5. Increased Stack to 4096.
-    xTaskCreatePinnedToCore(IPC_Receive_Task, "IPC_Rx", 4096, NULL, 5, NULL, 0);
-    
-    // TCP (WiFi): Medium, Prio 2. 
-    xTaskCreatePinnedToCore(TCP_Transmit_Task, "TCP_Tx", 4096, NULL, 2, &TCP_Task_Handle, 0); 
-    
-    // Global Planner: Heavy, Prio 1. MOVED TO CORE 0.
-    xTaskCreatePinnedToCore(Global_Planner_Task, "Global_Plan", 8192, NULL, 1, &GPlan_Task_Handle, 0);
-    
-    // Mission Planner: Heavy, Prio 1. Stack increased to 6144.
-    xTaskCreatePinnedToCore(Mission_Planner_Task, "Mission", 6144, NULL, 1, &MPlan_Task_Handle, 0);
+    // -- Core 1 --
+    // NOTE: Passing &MPlan_Task_Handle captures the task ID for monitoring
+    xTaskCreatePinnedToCore(Mission_Planner_Task, "Mission", 4096, NULL, 1, &MPlan_Task_Handle, 0);
 
-
-    // --- CORE 1: SENSORS & MAPPING ---
-
-    // Lidar Driver: Critical, Prio 5. Stack increased to 6144.
-    xTaskCreatePinnedToCore(Lidar_Read_Task, "Lidar_Read", 6144, NULL, 5, &Lidar_Task_Handle, 1);
+    xTaskCreatePinnedToCore(Lidar_Read_Task, "Lidar_Read", 3072, NULL, 4, &Lidar_Task_Handle, 1);
+    xTaskCreatePinnedToCore(Lidar_Sync_Map_Task, "Lidar_Sync", 4096, NULL, 4, NULL, 1);
+    xTaskCreatePinnedToCore(Bayesian_Grid_Task, "Map_Comp", 4096, NULL, 2, NULL, 1);
     
-    // Sync: High, Prio 4.
-    xTaskCreatePinnedToCore(Lidar_Sync_Map_Task, "Lidar_Sync", 4096, NULL, 4, &Sync_Task_Handle, 1);
-    
-    // Mapping: Medium, Prio 3. Stack increased to 8192.
-    xTaskCreatePinnedToCore(Bayesian_Grid_Task, "Map_Comp", 8192, NULL, 3, &Map_Task_Handle, 1);
+    xTaskCreatePinnedToCore(Global_Planner_Task, "Global_Plan", 8192, NULL, 1, &GPlan_Task_Handle, 1);
 
 
     digitalWrite(LED_BUILTIN, LOW); // Turn off built-in LED
