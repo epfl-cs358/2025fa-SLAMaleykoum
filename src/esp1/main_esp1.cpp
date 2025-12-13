@@ -422,7 +422,7 @@ void setup() {
     // }
     gp_workspace = new GlobalPlannerWorkspace();
     if (!gp_workspace) {
-        Serial.println("FATAL: Not enough RAM for Planner!");
+        // Serial.println("FATAL: Not enough RAM for Planner!");
         while(1);
     }
 

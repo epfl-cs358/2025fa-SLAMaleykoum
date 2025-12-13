@@ -23,7 +23,8 @@
 
 #define GP_MAX_W  70     // largeur max de la carte coarse (utilisé dans generate path)
 #define GP_MAX_H  70     // hauteur max
-#define GP_MAX_N  (GP_MAX_W * GP_MAX_H)
+#define GP_MAX_CELLS (GP_MAX_W * GP_MAX_H)
+#define GP_PQ_SIZE   (GP_MAX_CELLS / 3) // Queue doesn't need to hold the whole map, just the frontier
 
 // --- Core Geometric Structures ---
 /**

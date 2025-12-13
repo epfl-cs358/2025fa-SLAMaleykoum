@@ -16,31 +16,31 @@ struct Node {
 
 GlobalPlanner::GlobalPlanner() {}
 
-// ---------------------------------------------------------
-//              COLLISION CHECK WITH ROBOT RADIUS
-// ---------------------------------------------------------
+// // ---------------------------------------------------------
+// //              COLLISION CHECK WITH ROBOT RADIUS
+// // ---------------------------------------------------------
 
-static inline bool robot_circle_collides(int cx, int cy, const BayesianOccupancyGrid& map) {
-    const int sx = map.grid_size_x;
-    const int sy = map.grid_size_y;
+// static inline bool robot_circle_collides(int cx, int cy, const BayesianOccupancyGrid& map) {
+//     const int sx = map.grid_size_x;
+//     const int sy = map.grid_size_y;
 
-    int radius_cells = int(std::ceil(ROBOT_RADIUS / map.grid_resolution));
+//     int radius_cells = int(std::ceil(ROBOT_RADIUS / map.grid_resolution));
 
-    for (int dy = -radius_cells; dy <= radius_cells; dy++) {
-        for (int dx = -radius_cells; dx <= radius_cells; dx++) {
+//     for (int dy = -radius_cells; dy <= radius_cells; dy++) {
+//         for (int dx = -radius_cells; dx <= radius_cells; dx++) {
 
-            if (dx*dx + dy*dy > radius_cells*radius_cells) continue;
+//             if (dx*dx + dy*dy > radius_cells*radius_cells) continue;
 
-            int nx = cx + dx;
-            int ny = cy + dy;
+//             int nx = cx + dx;
+//             int ny = cy + dy;
 
-            if (nx < 0 || nx >= sx || ny < 0 || ny >= sy) return true;
+//             if (nx < 0 || nx >= sx || ny < 0 || ny >= sy) return true;
 
-            if (map.get_cell_probability(nx, ny) > OCC_BOUND_PROB) return true;
-        }
-    }
-    return false;
-}
+//             if (map.get_cell_probability(nx, ny) > FREE_BOUND_PROB) return true;
+//         }
+//     }
+//     return false;
+// }
 
 // ---------------------------------------------------------
 //                       A* PLANNER
@@ -57,14 +57,14 @@ PathMessage GlobalPlanner::generate_path(
     msg.path_id = 0;
     msg.timestamp_ms = esp_wifi_get_tsf_time(WIFI_IF_AP);
 
-    // Safety check
     if (!ws) return msg;
 
     const int W = map.grid_size_x;
     const int H = map.grid_size_y;
     const float res = map.grid_resolution;
+    const int MAX_CELLS = W * H;
 
-    if (W <= 0 || H <= 0 || W > GP_MAX_W || H > GP_MAX_H)
+    if (W <= 0 || H <= 0 || MAX_CELLS > GP_MAX_CELLS)
         return msg;
 
     // -------------------------------------------
@@ -77,109 +77,144 @@ PathMessage GlobalPlanner::generate_path(
     if (sx<0||sx>=W||sy<0||sy>=H) return msg;
     if (gx<0||gx>=W||gy<0||gy>=H) return msg;
 
+    int start_idx = sy * W + sx;
+    int goal_idx  = gy * W + gx;
+
     // -------------------------------------------
     // Reset Workspace Memory (Fast Reset)
     // -------------------------------------------
-    // We only need to reset the arrays we use. 
-    // memset is safer and faster than nested loops.
-    for(int y=0; y<H; y++) {
-        for(int x=0; x<W; x++) {
-            ws->g_cost[y][x] = 1e9f;
-            ws->closed[y][x] = false;
-        }
+    for(int i=0; i < MAX_CELLS; i++) {
+        ws->g_cost[i] = 1e9f;
+        ws->closed[i] = 0;
     }
     
     // -------------------------------------------
-    // 4. Priority Queue Setup
+    // BINARY HEAP IMPLEMENTATION (Min-Heap)
     // -------------------------------------------
-    int pq_size = 0;
-    
-    // Update lambda to take int16_t
-    auto pq_push = [&](int16_t x, int16_t y, float f) {
-        if (pq_size < GP_MAX_N) {
-            ws->pq[pq_size] = {x, y, f};
-            pq_size++;
+    ws->pq_size = 0;
+
+    auto pq_push = [&](int16_t idx, float f) {
+        if (ws->pq_size >= GP_PQ_SIZE) return; // Overflow protection
+        
+        // Add to end
+        int i = ws->pq_size++;
+        ws->pq[i] = {idx, f};
+
+        // Bubble Up
+        while (i > 0) {
+            int p = (i - 1) / 2;
+            if (ws->pq[p].f <= ws->pq[i].f) break; // Parent is smaller, heap property satisfied
+            
+            // Swap
+            GlobalPlannerWorkspace::Node temp = ws->pq[i];
+            ws->pq[i] = ws->pq[p];
+            ws->pq[p] = temp;
+            i = p;
         }
     };
 
     auto pq_pop = [&]() {
-        int best = 0;
-        for(int i=1; i<pq_size; i++){
-            if(ws->pq[i].f < ws->pq[best].f) best = i;
+        GlobalPlannerWorkspace::Node ret = ws->pq[0];
+        
+        // Move last to root
+        ws->pq_size--;
+        if (ws->pq_size > 0) {
+            ws->pq[0] = ws->pq[ws->pq_size];
+            
+            // Sink Down
+            int i = 0;
+            while (true) {
+                int left = 2 * i + 1;
+                int right = 2 * i + 2;
+                int smallest = i;
+
+                if (left < ws->pq_size && ws->pq[left].f < ws->pq[smallest].f)
+                    smallest = left;
+                if (right < ws->pq_size && ws->pq[right].f < ws->pq[smallest].f)
+                    smallest = right;
+
+                if (smallest == i) break;
+
+                GlobalPlannerWorkspace::Node temp = ws->pq[i];
+                ws->pq[i] = ws->pq[smallest];
+                ws->pq[smallest] = temp;
+                i = smallest;
+            }
         }
-        GlobalPlannerWorkspace::Node r = ws->pq[best];
-        ws->pq[best] = ws->pq[--pq_size];
-        return r;
+        return ret;
     };
 
     // -------------------------------------------
-    // 5. A* Algorithm
+    // Start A*
     // -------------------------------------------
-    ws->g_cost[sy][sx] = 0.f;
+    ws->g_cost[start_idx] = 0.f;
     float h0 = sqrtf((gx-sx)*(gx-sx) + (gy-sy)*(gy-sy));
-    pq_push(sx, sy, h0);
+    pq_push((int16_t)start_idx, h0);
 
-    const int MOVES[4][2] = {{1,0},{-1,0},{0,1},{0,-1}};
+    const int MOVES[4] = {1, -1, W, -W}; // Right, Left, Down, Up (1D offsets)
+    // Corresponding coordinates check to handle wrapping
+    const int DX[4] = {1, -1, 0, 0};
+    const int DY[4] = {0, 0, 1, -1};
+
     bool found = false;
 
-    while(pq_size > 0){
+    while(ws->pq_size > 0){
         GlobalPlannerWorkspace::Node cur = pq_pop();
-        int cx = cur.x, cy = cur.y;
+        int c_idx = cur.idx;
+        int cx = c_idx % W;
+        int cy = c_idx / W;
 
-        if (ws->closed[cy][cx]) continue;
-        ws->closed[cy][cx] = true;
+        if (ws->closed[c_idx]) continue;
+        ws->closed[c_idx] = 1;
 
-        if (cx == gx && cy == gy) {
+        if (c_idx == goal_idx) {
             found = true;
             break;
         }
 
-        float gc = ws->g_cost[cy][cx];
+        float gc = ws->g_cost[c_idx];
 
-        for (int i=0;i<4;i++){
-            int nx = cx + MOVES[i][0];
-            int ny = cy + MOVES[i][1];
+        for (int i=0; i<4; i++){
+            // Calculate Neighbor
+            int nx = cx + DX[i];
+            int ny = cy + DY[i];
+            int n_idx = c_idx + MOVES[i]; // Fast offset
 
-            if (nx<0||ny<0||nx>=W||ny>=H) continue;
-            if (ws->closed[ny][nx]) continue;
-            
+            // Bounds Check
+            if (nx < 0 || nx >= W || ny < 0 || ny >= H) continue;
+            if (ws->closed[n_idx]) continue;
+
             // --- SAFETY MARGIN CHECK ---
-            // 1. Is the cell itself occupied?
-            if (map.get_cell_probability(nx, ny) > 0.55f) continue;
+            if (map.get_cell_probability(nx, ny) > FREE_BOUND_PROB) continue;
 
-            // 2. Are any neighbors occupied? (The "Buffer Zone")
-            bool too_close_to_wall = false;
-            
-            // Check the 8 cells surrounding the target node (nx, ny)
+            // Wall Buffering (Simplified for 1D)
+            bool too_close = false;
+            // Check 8 neighbors of (nx, ny)
             for (int buf_y = -1; buf_y <= 1; buf_y++) {
                 for (int buf_x = -1; buf_x <= 1; buf_x++) {
-                    if (buf_x == 0 && buf_y == 0) continue; // Skip center
-
+                    if (buf_x == 0 && buf_y == 0) continue;
                     int bx = nx + buf_x;
                     int by = ny + buf_y;
-
-                    // If neighbor is out of bounds or occupied, this node is unsafe
                     if (bx >= 0 && bx < W && by >= 0 && by < H) {
-                        if (map.get_cell_probability(bx, by) > OCC_BOUND_PROB) {
-                            too_close_to_wall = true;
-                            break; // Stop checking, we found a wall
-                        }
+                         // Note: get_cell_probability handles 1D conversion internally usually, 
+                         // but here we use (x,y) API of the map class.
+                         if (map.get_cell_probability(bx, by) > FREE_BOUND_PROB) {
+                             too_close = true; buf_y = 2; break; // Break outer loop
+                         }
                     }
                 }
-                if (too_close_to_wall) break;
             }
+            if (too_close) continue;
 
-            if (too_close_to_wall) continue; // Treat this cell as a wall
-
+            // Update Path
             float new_g = gc + 1.0f;
-
-            if(new_g < ws->g_cost[ny][nx]){
-                ws->g_cost[ny][nx] = new_g;
-                ws->parent_x[ny][nx] = cx;
-                ws->parent_y[ny][nx] = cy;
-
-                float h = sqrtf((gx-nx)*(gx-nx) + (gy-ny)*(gy-ny));
-                pq_push(nx, ny, new_g + h);
+            if(new_g < ws->g_cost[n_idx]){
+                ws->g_cost[n_idx] = new_g;
+                ws->parent_index[n_idx] = (int16_t)c_idx; // Store 1D index
+                
+                // Euclidean Heuristic
+                float dist = sqrtf((gx-nx)*(gx-nx) + (gy-ny)*(gy-ny));
+                pq_push((int16_t)n_idx, new_g + dist);
             }
         }
     }
@@ -187,22 +222,23 @@ PathMessage GlobalPlanner::generate_path(
     if (!found) return msg;
 
     // -------------------------------------------
-    // 6. Reconstruction
+    // Reconstruction (Using 1D indices)
     // -------------------------------------------
     int plen = 0;
-    
-    // Safety check on max path length (using GP_MAX_N)
-    while(!(gx==sx && gy==sy) && plen < GP_MAX_N) {
-        ws->px[plen] = gx;
-        ws->py[plen] = gy;
+    int curr = goal_idx;
+
+    // We use px/py arrays to store grid coords, derived from 1D curr
+    while (curr != start_idx && plen < GP_MAX_CELLS) {
+        ws->px[plen] = curr % W;
+        ws->py[plen] = curr / W;
         plen++;
-
-        int px2 = ws->parent_x[gy][gx];
-        int py2 = ws->parent_y[gy][gx];
-
-        gx = px2;
-        gy = py2;
+        
+        curr = ws->parent_index[curr];
     }
+    // Add start node (loop stops before adding start)
+    ws->px[plen] = sx;
+    ws->py[plen] = sy;
+    plen++;
 
     // -------------------------------------------
     // 7. Sampling & Output

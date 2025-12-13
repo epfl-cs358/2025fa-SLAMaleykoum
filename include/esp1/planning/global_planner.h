@@ -7,17 +7,21 @@
 #include "../../../include/esp1/mapping/occupancy/bayesian_grid.h"
 
 struct GlobalPlannerWorkspace {
-    float g_cost[GP_MAX_H][GP_MAX_W];
+    float g_cost[GP_MAX_CELLS];
     
-    int16_t parent_x[GP_MAX_H][GP_MAX_W];
-    int16_t parent_y[GP_MAX_H][GP_MAX_W];
+    // Stores the INDEX of the parent (idx = y*W + x). -1 if no parent.
+    int16_t parent_index[GP_MAX_CELLS]; 
     
-    bool closed[GP_MAX_H][GP_MAX_W];
+    // We use uint8_t for boolean flags (closed set)
+    uint8_t closed[GP_MAX_CELLS];
     
-    struct Node { int16_t x; int16_t y; float f; } pq[GP_MAX_N];
+    // Binary Heap Node
+    struct Node { int16_t idx; float f; } pq[GP_PQ_SIZE];
+    int pq_size;
     
-    int16_t px[GP_MAX_N];
-    int16_t py[GP_MAX_N];
+    // Output Path Buffers
+    int16_t px[GP_MAX_CELLS];
+    int16_t py[GP_MAX_CELLS];
 };
 
 /**
