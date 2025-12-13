@@ -157,8 +157,16 @@ PathMessage GlobalPlanner::generate_path(
     const int DY[4] = {0, 0, 1, -1};
 
     bool found = false;
+    int loop_counter = 0; // counter to yeild periodically
 
     while(ws->pq_size > 0){
+        
+        // >>> YIELD EVERY 50 ITERATIONS <<<
+        loop_counter++;
+        if (loop_counter % 50 == 0) {
+            vTaskDelay(1); // Sleep for 1 tick (allows OS to breathe)
+        }
+        
         GlobalPlannerWorkspace::Node cur = pq_pop();
         int c_idx = cur.idx;
         int cx = c_idx % W;
@@ -213,7 +221,7 @@ PathMessage GlobalPlanner::generate_path(
                 ws->parent_index[n_idx] = (int16_t)c_idx; // Store 1D index
                 
                 // Euclidean Heuristic
-                float dist = sqrtf((gx-nx)*(gx-nx) + (gy-ny)*(gy-ny));
+                float dist = 3* sqrtf((gx-nx)*(gx-nx) + (gy-ny)*(gy-ny));
                 pq_push((int16_t)n_idx, new_g + dist);
             }
         }
