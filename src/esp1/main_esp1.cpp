@@ -372,16 +372,14 @@ void Mission_Planner_Task(void* parameter) {
         MissionGoal new_goal = mission_planner->update_goal(current_p, *TheMap, planner_fail);
         sys_health.mission_plan_time_us = micros() - t0;
 
-
-        // Calculate distance between new and old goal
-        float dist = sqrt(pow(new_goal.target_pose.x - current_mission_goal.target_pose.x, 2) + 
-                        pow(new_goal.target_pose.y - current_mission_goal.target_pose.y, 2));
-
-        // ONLY update if the goal moved by > 50cm (or changed type)
-        if (dist > 0.5f || new_goal.type != current_mission_goal.type) {
+        // Check if goal actually changed before taking Mutex
+        if (new_goal.target_pose.x != current_mission_goal.target_pose.x || 
+            new_goal.target_pose.y != current_mission_goal.target_pose.y ||
+            new_goal.type != current_mission_goal.type) 
+        {
             if (xSemaphoreTake(State_Mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
                 current_mission_goal = new_goal;
-                new_goal_arrived = true; 
+                new_goal_arrived = true;       // Notify Global Planner
                 xSemaphoreGive(State_Mutex);
             }
         }
