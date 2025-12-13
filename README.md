@@ -1,31 +1,27 @@
 
 # SLAMaleykoum
----
-Project proposal : https://www.overleaf.com/9942875199zgzbkrmgkkkj#3fbbb2
 
 ## Table of Contents
-1. [Set it up](#set-it-up)
-2. [Project Overview](#project-overview)
-3. [Hardware Overview](#hardware-overview)
-4. [System Architecture](#system-architecture)
-5. [Hardware Platform](#hardware-platform)
-6. [Software Components](#software-components)
-7. [Data Flow and Communication](#data-flow-and-communication)
-8. [Implementation Details](#implementation-details)
-9. [Mission and Task Management](#mission-and-task-management)
+1. [Project Overview](#project-overview)
+2. [Hardware Overview](#hardware-overview)
+3. [System Architecture](#system-architecture)
+4. [Hardware Platform](#hardware-platform)
+5. [Software Components](#software-components)
+6. [Data Flow and Communication](#data-flow-and-communication)
+7. [Implementation Details](#implementation-details)
+8. [Mission and Task Management](#mission-and-task-management)
+9. [Set it up](#set-it-up)
 
 
 ---
-
-## Set it up
-We recommend you create a python [virtual environment](https://docs.python.org/3/library/venv.html) (venv) for the project (e.g. `python3 -m venv slamaleykoum_venv`).
-Activate the venv (`source slamaleykoum_venv/bin/activate`) and install the requirements from our "requirements.txt" file: `pip install -r requirements.txt`
-*You could alternatively manually install every requirement (which you might already have).* 
 
 ## Project Overview
 
 ### Vision
 SLAMaleykoum is an autonomous robotics platform that transforms a standard RC car chassis into an intelligent mobile robot capable of mapping and navigating unknown environments. The system performs full Simultaneous Localization and Mapping (SLAM), enabling the robot to autonomously explore, build a map, localize itself with high accuracy in real time, navigate to target coordinates, dynamically avoid obstacles, and maintain a reliable estimate of its position throughout the mission.
+
+Here is our original [Project proposal](https://www.overleaf.com/9942875199zgzbkrmgkkkj#3fbbb2) for our SLAM Car. Please note that it represents the initial version of the project. Since then, many aspects have evolved and changed throughout development, so the proposal should be considered an early-stage reference rather than the final design.
+
 
 ### Technical Vocabulary
 - Ground Station: **GS**  _refering to the laptop or some other computer external to the car._
@@ -237,6 +233,11 @@ The computational load will be devided over the two ESP32-S3 microcontrollers. T
 #### Diagram
 ![alt text](/docs/global-architecture-2.png)
 
+
+## Set it up
+We recommend you create a python [virtual environment](https://docs.python.org/3/library/venv.html) (venv) for the project (e.g. `python3 -m venv slamaleykoum_venv`).
+Activate the venv (`source slamaleykoum_venv/bin/activate`) and install the requirements from our "requirements.txt" file: `pip install -r requirements.txt`
+*You could alternatively manually install every requirement (which you might already have).* 
 
 // TODO: FINISH README
 
