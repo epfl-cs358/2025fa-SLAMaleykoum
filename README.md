@@ -240,6 +240,24 @@ Both the encoder and the IMU are powered by the **3V3 pin of ESP2**, using two c
 
 ### CAD files
 
+
+This folder contains STL files for all custom 3D‑printed parts used in the car build.  
+Each part has its STL file and a reference photo of the real‑life assembly.
+
+- **Front Bumper & Ultrasonic Sensor Case**  
+  <p align="center"><img src="/assets/Images/cad_images/bumper_ultrasonic_real.jpg" width="300"/></p>
+
+- **Encoder Mount**  
+  <p align="center"><img src="/assets/Images/cad_images/encoder_real.jpg" width="300"/></p>
+
+- **Car Body Platform**  
+  <p align="center"><img src="/assets/Images/cad_images/body_real.jpg" width="300"/></p>
+
+- **Roof Cover**  
+  <p align="center"><img src="/assets/Images/cad_images/roof_real.jpg" width="300"/></p>
+
+Note: The CAD files for the **front bumper**, **ultrasonic sensor case**, and **encoder mount** were originally designed by the group from whom we inherited the car, **TurboSLAM**.
+
 ### Challenged & Recommendations
 
 ## System Architecture
