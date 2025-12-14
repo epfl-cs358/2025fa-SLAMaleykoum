@@ -48,23 +48,215 @@ Here is our original [Project proposal](https://www.overleaf.com/9942875199zgzbk
 
 ### Component List
 
-| Component                     |           Info                                                                                                                                                                                               |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Tamiya Blitzer Beetle         | [Manual](https://www.tamiyausa.com/media/files/58502ml-829-5367.pdf)                                                                                                                               |
-| RPLIDAR C1                    | [Datasheet](https://d229kd5ey79jzj.cloudfront.net/3157/SLAMTEC_rplidar_datasheet_C1_v1.0_en.pdf), [SDK](https://github.com/Slamtec/rplidar_sdk), [Wiki](https://www.waveshare.com/wiki/RPLIDAR_C1) |
-| ESP32-S3-WROOM-1 Microcontroller (x2) | [Datasheet](https://cdn-shop.adafruit.com/product-files/5477/esp32-s3_datasheet_en.pdf)                                                                                                            |
-| DMS15 Servo                   | [Wiki](https://wiki.dfrobot.com/DSS-M15S_270%C2%B0_15KG_DF_Metal_Servo_with_Analog_Feedback_SKU__SER0044)                                                                                          |
-| BNO086 IMU                    | [Datasheet](https://docs.sparkfun.com/SparkFun_VR_IMU_Breakout_BNO086_QWIIC/assets/component_documentation/BNO080_085-Datasheet_v1.16.pdf)                                                         |
-| AS5600 Encoder                | [Datasheet](https://files.seeedstudio.com/wiki/Grove-12-bit-Magnetic-Rotary-Position-Sensor-AS5600/res/Magnetic%20Rotary%20Position%20Sensor%20AS5600%20Datasheet.pdf)                             |
-| HC-SR04 Ultrasonic sensor     | [Datasheet](https://handsontec.com/dataspecs/sensor/SR-04-Ultrasonic.pdf)                                                                                                                          |
-| 540J Motor                    | [Datasheet](https://asset.conrad.com/media10/add/160267/c1/-/en/001385115DS01/adatlap-1385115-540-es-motor-reely-532114c.pdf)                                                                      |
-| THW-1060-RTR ESC              | [Datasheet](https://www.hobbywing.com/en/uploads/file/20221015/f60b7ebe160a7b283927ae8916d36763.pdf)                                                                                               |
-| LM2596 Buck converter         | [Datasheet](https://www.ti.com/lit/ds/symlink/lm2596.pdf)                                                                                                                                          |
-| 7.2V Battery                  | [Product Page](https://www.galaxus.ch/fr/s5/product/gens-ace-modelisme-dune-batterie-720-v-5000-mah-batterie-rc-9459930)                                                                           |
+| Component                     | Reference Links                                                                                                                                                                                                 | Buy Link                                                                                                                                                                                                 | Price (CHF) |
+|-------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------|
+| Tamiya Blitzer Beetle         | [Manual](https://www.tamiyausa.com/media/files/58502ml-829-5367.pdf)                                                                                                                                             | [Galaxus](https://www.galaxus.ch/fr/s5/product/tamiya-blitzer-beetle-kit-rc-vehicle-12900000)                                                                                                           | 129.00      |
+| RPLIDAR C1                    | [Datasheet](https://d229kd5ey79jzj.cloudfront.net/3157/SLAMTEC_rplidar_datasheet_C1_v1.0_en.pdf), [SDK](https://github.com/Slamtec/rplidar_sdk), [Wiki](https://www.waveshare.com/wiki/RPLIDAR_C1)              | [Bastelgarage](https://www.bastelgarage.ch/rplidar-c1-12m-scanner-lidar-laser-360-degres)                                                                                                               | 79.90       |
+| ESP32-S3-WROOM-1 Microcontroller (x2) | [Datasheet](https://cdn-shop.adafruit.com/product-files/5477/esp32-s3_datasheet_en.pdf)                                                                                                                        | [Galaxus](https://www.galaxus.ch/en/s1/product/espressif-esp32-s3-devkitm-1-n8-development-board-development-boards-kits-24505914)                                                                     | 25.45 ×2    |
+| DMS15 Servo                   | [Wiki](https://wiki.dfrobot.com/DSS-M15S_270%C2%B0_15KG_DF_Metal_Servo_with_Analog_Feedback_SKU__SER0044)                                                                                                      | —                                                                                                                                                                                                       | 5.00           |
+| BNO086 IMU                    | [Datasheet](https://docs.sparkfun.com/SparkFun_VR_IMU_Breakout_BNO086_QWIIC/assets/component_documentation/BNO080_085-Datasheet_v1.16.pdf)                                                                     | [Bastelgarage](https://www.bastelgarage.ch/bno055-capteur-intelligent-a-9-axes?search=9dof)                                                                                                             | 19.90       |
+| AS5600 Encoder                | [Datasheet](https://files.seeedstudio.com/wiki/Grove-12-bit-Magnetic-Rotary-Position-Sensor-AS5600/res/Magnetic%20Rotary%20Position%20Sensor%20AS5600%20Datasheet.pdf)                                         | —                                                                                                                                                                                                       | 2.00       |
+| HC-SR04 Ultrasonic sensor     | [Datasheet](https://handsontec.com/dataspecs/sensor/SR-04-Ultrasonic.pdf)                                                                                                                                    | —                                                                                                                                                                                                       | 2.00           |
+| 540J Motor                    | [Datasheet](https://asset.conrad.com/media10/add/160267/c1/-/en/001385115DS01/adatlap-1385115-540-es-motor-reely-532114c.pdf)                                                                                  | —                                                                                                                                                                                                       | —           |
+| THW-1060-RTR ESC              | [Datasheet](https://www.hobbywing.com/en/uploads/file/20221015/f60b7ebe160a7b283927ae8916d36763.pdf)                                                                                                           | —                                                                                                                                                                                                       | —           |
+| LM2596 Buck converter         | [Datasheet](https://www.ti.com/lit/ds/symlink/lm2596.pdf)                                                                                                                                                      | —                                                                                                                                                                                                       | —           |
+| 7.2V Battery                  | [Product Page](https://www.galaxus.ch/fr/s5/product/gens-ace-modelisme-dune-batterie-720-v-5000-mah-batterie-rc-9459930)                                                                                       | [Galaxus](https://www.galaxus.ch/fr/s5/product/gens-ace-modelisme-dune-batterie-720-v-5000-mah-batterie-rc-9459930)                                                                                      | 32.90       |
+| **Total Cost**                |                                                                                                                                                                                                                |                                                                                                                                                                                                         | **321.6**   |
+
+
+Alongside the listed components, you will also need:
+- 3 × 1 kΩ resistors (for the ultrasonic sensor voltage divider)
+- Assorted jumper cables and connectors (male/female)
+- Heat‑shrink tubing or insulation sleeves
+- Soldering kit (soldering iron, solder wire)
+- Hot air/heat gun (for shrinking tubing)
+- Screw set (M3 and M6 as used in mounts)
+### How to Assemble
+
+
+To begin, assemble the mechanical base of the car following the official [Tamiya Blitzer Beetle manual](https://www.tamiyausa.com/media/files/58502ml-829-5367.pdf).
+We only need the minimal mechanical build so the car can drive, skip the decorative carcass.
+
+**Step 1: Build the Car**  
+- Assemble the chassis according to the manual.  
+- Mount the steering servo inside the chassis.  
+- Ensure the servo cables are routed through the rectangular opening so they can later connect to the ESP.  
+
+**Step 2: Encoder Mount + Magnet**  
+- 3D‑print the encoder mount (CAD file available in /assets/CAD/).  
+- Attach the mount in front of the motor.  
+- Fix the encoder magnet directly onto the motor shaft as shown in the provided image.  
+- This ensures accurate rotation measurement.  
+- Then screw down the encoder on its mount.
+
+**Step 3: Layer Platform (ESP + Lidar Holder)**  
+- Place the 3D‑printed platform on the chassis.  
+- This platform integrates holders for both ESP boards and the lidar.  
+- Screw the lidar onto its holder first (space is tight, so it’s easier to mount before other components).  
+- Then screw down the buck converter and IMU onto their designated spots.  
+
+**Step 4: Mount the ESP Boards**  
+- Place ESP1 and ESP2 onto the platform.  
+- ⚠️ Important: mount both facing **upwards** so their LEDs are visible; this makes debugging much easier.  
+- Our current ESP1 faces down, which hides the LEDs and complicates troubleshooting.  
+
+**Step 5: Ultrasonic Sensor Mount**  
+- Attach the front 3D‑printed piece designed for the ultrasonic sensor at the front of the car.  
+- Screw the sensor securely into the mount.  
+
+**Step 6: Final Assembly**  
+- Place the hood/top of the car back on.  
+- Insert the battery into its dedicated slot the hood design holds it firmly and stabilizes it during motion.  
+- Double‑check that all mounts are secure and cables are routed cleanly for wiring.  
+
+**Step 7: Wiring**  
+- Once the mechanical build is complete, proceed to the [Soldering & Wiring](#soldering--wiring) section.  
+- Follow the circuit [diagram](/assets/circuit/slamaleykoum_electrical_circuit.drawio.png) for all connections.  
+
+*TODO: For each step, insert assembly photos so readers can clearly see component placement and orientation.*
+---
 
 ### Soldering & Wiring
 
+To build the robot from scratch, each component must be soldered and wired according to the electrical diagram.  
+Use heat shrink tubing to insulate exposed connections and ensure long-term reliability.
+
+**Electrical Diagram**
+
+<p align="center">
+  <img src="/assets/circuit/slamaleykoum_electrical_circuit.drawio.png" alt="Electrical Circuit" width="1100"/>
+</p>
+
+
+**Power Connections**
+
+- **Battery Power Split**:  
+  Solder a 2‑PIN JST male connector to the 7.2V battery.  
+  This battery powers the ESC and also supplies input to the buck converter.  
+  Connect the black wire to the converter’s VIN (–) and the red wire to VIN (+).
+
+<p align="center">
+  <img src="\assets\Images\circuit_images\battery_buck_esc_soldering.jpeg" alt="Battery power split" width="200"/>
+</p>
+
+- **Motor Driver / ESC**:  
+  Connect the battery to the ESC only after the hardware and software setup is complete.  
+  Attach the red wire (+) from the battery to **BAT+** on the ESC, and the black wire (–) to **BAT–**.
+
+- **Motor Wiring**:  
+  - Connect the **yellow wire** from the ESC (M3) to the **+ terminal** of the motor (yellow).  
+  - Connect the **blue wire** from the ESC (M1) to the **– terminal** of the motor (green).  
+
+- **Buck Converter (5V Power Split):**  
+  Connect the buck converter to the battery (as described above).  
+  Create a single 5V harness by soldering all red 5V leads together from **OUT +**, and a ground harness by soldering all black leads together from **OUT –**.  
+
+  From this split:
+  - **5V bus (red):** one male connector (main feed), plus branches to both ESP32 boards (two female connectors), the ultrasonic sensor (male), the lidar (male), and the servo (male).  
+  - **Ground bus (black):** common ground returning to **OUT –** for all the same devices. The ground from the buck converter is taken from **OUT –** via a male connector, then soldered to multiple cables that connect to the GND pins of different components:  
+    - Servo (male)  
+    - ESP32 board 1 (female)  
+    - ESP32 board 2 (female)  
+    - ESC (GND)  
+    - Lidar (male)  
+    - IMU (male)  
+    - Encoder (male)  
+
+- **ESP32 board (ESP1)**: Connect V5 and GND to the Buck converter as describes above.
+- **ESP32 board (ESP2)**: Connect V5 and GND to the Buck converter as describes above.
+- **Ultrasonic sensor**:  Connect V5 to the Buck converter as describes above. GND  connected to ground of ESP2 as digram, more soldering and modifications related to Data connection to be viewed later on. 
+- **Lidar**: Connect V5 and GND to the Buck converter as describes above.
+
+Both the encoder and the IMU are powered by the **3V3 pin of ESP2**, using two cables soldered together on the same 3V3 pin to provide a shared supply.
+
+- **Encoder**:  
+  - Use 3‑pin and 4‑pin screw terminal blocks soldered to the encoder.  
+  - Power the encoder through its **VCC** pin using a cable screwed into the terminal block and connected to the **3V3 pin of ESP2** via a female connector (see [diagram](/assets/circuit/slamaleykoum_electrical_circuit.drawio.png)).  
+  - Ground (GND) is connected to the buck converter’s ground harness as described above.
+
+<p align="center">
+  <img src="/assets/Images/circuit_images/encoder_connector_mount.jpg" alt="Encoder screw terminal blocks" width="200"/>
+</p>
+
+- **IMU**:  
+  - Powered from the **3V3 pin of ESP2**, using a male connector on the IMU side and a female connector to ESP2 (see [diagram](/assets/circuit/slamaleykoum_electrical_circuit.drawio.png)).  
+  - Ground (GND) is connected via a male connector on the IMU and a female connector on ESP2, both tied into the buck converter’s ground harness as described above.
+
+#### Data Connections
+
+- **Both ESPs**  
+  - Communication via UART: connect pin 12 of ESP1 to pin 13 of ESP2, and pin 13 of ESP1 to pin 12 of ESP2 (light pink and blue cables on the [diagram](/assets/circuit/slamaleykoum_electrical_circuit.drawio.png)).
+
+- **ESP1**  
+  - **Lidar**  
+    - **TX**: male‑to‑female cable connected to pin 4 on ESP2 (green cable on [diagram](/assets/circuit/slamaleykoum_electrical_circuit.drawio.png)).  
+    - **RX**: male‑to‑female cable connected to pin 5 on ESP2 (yellow cable on [diagram](/assets/circuit/slamaleykoum_electrical_circuit.drawio.png)).
+
+- **ESP2**  
+  - **Motor Driver**  
+    - **PWM**: male‑to‑female cable connected to pin 15 on ESP2 (grey cable on [diagram](/assets/circuit/slamaleykoum_electrical_circuit.drawio.png)).  
+
+  - **Servo**  
+    - **Pulse**: male‑to‑female cable connected to pin 6 on ESP2 (orange cable on [diagram](/assets/circuit/slamaleykoum_electrical_circuit.drawio.png)).  
+
+  - **Encoder**  
+    - **DIR**: male‑to‑female cable connected to GND on ESP2 (yellow cable on [diagram](/assets/circuit/slamaleykoum_electrical_circuit.drawio.png)).  
+
+  - **IMU**  
+    - **INT**: male‑to‑female cable connected to pin 4 on ESP2 (black cable on [diagram](/assets/circuit/slamaleykoum_electrical_circuit.drawio.png)).  
+
+  - **I²C Bus (shared between Encoder & IMU)**  
+    - **SDA**: two male cables (encoder + IMU) soldered together into a female connector, attached to pin 8 on ESP2 (purple cable on [diagram](/assets/circuit/slamaleykoum_electrical_circuit.drawio.png)).  
+    - **SCL**: two male cables (encoder + IMU) soldered together into a female connector, attached to pin 9 on ESP2 (green cable on [diagram](/assets/circuit/slamaleykoum_electrical_circuit.drawio.png)).
+  - **Ultrasonic Sensor (HC‑SR04) — Voltage Divider on Echo Pin**  
+    - The HC‑SR04 must be powered at **5V** (from the buck converter).  
+    - Its **ECHO pin outputs 5V**, which is too high for the ESP32’s 3.3V GPIO.  
+    - To reduce this safely, we use a **resistor voltage divider**.
+
+    - ***Circuit Description:***  
+      - **Resistors used**: three resistors, each 1 kΩ.  
+      - **Ground reference**: a black cable from the sensor’s GND is soldered to two resistors in series.  
+      - **Divider branch**: these two resistors connect to a blue cable, which then passes through a third 1 kΩ resistor.  
+      - **Echo connection**: the third resistor is connected to the sensor’s **ECHO pin** (via male connector).  
+      - **ESP32 input**: the other end of the blue cable is connected to **ESP2 pin 19** (via female connector).  
+      - **Result**: the divider steps the 5V ECHO signal down to ~3.3V, safe for the ESP32.
+
+    - ***Summary:***  
+      - **Trig**: male‑to‑female cable connected directly to **ESP2 pin 5** (green cable on [diagram](/assets/circuit/slamaleykoum_electrical_circuit.drawio.png)).  
+      - **Echo**: routed through the resistor voltage divider before reaching **ESP2 pin 19** (female connector).
+
+#### Example Layout
+
+<p align="center">
+  <img src="/assets/circuit/soldering_step1_placeholder.png" alt="Soldering Step 1" width="300"/><br>
+  <b>Soldering Step 1</b>
+</p>
+
+<p align="center">
+  <img src="/assets/circuit/soldering_step2_placeholder.png" alt="Soldering Step 2" width="300"/><br>
+  <b>Soldering Step 2</b>
+</p>
+---
+
 ### CAD files
+
+
+This folder contains STL files for all custom 3D‑printed parts used in the car build.  
+Each part has its STL file and a reference photo of the real‑life assembly.
+
+- **Front Bumper & Ultrasonic Sensor Case**  
+  <p align="center"><img src="/assets/Images/cad_images/bumper_ultrasonic_real.jpg" width="300"/></p>
+
+- **Encoder Mount**  
+  <p align="center"><img src="/assets/Images/cad_images/encoder_real.jpg" width="300"/></p>
+
+- **Car Body Platform**  
+  <p align="center"><img src="/assets/Images/cad_images/body_real.jpg" width="300"/></p>
+
+- **Roof Cover**  
+  <p align="center"><img src="/assets/Images/cad_images/roof_real.jpg" width="300"/></p>
+
+Note: The CAD files for the **front bumper**, **ultrasonic sensor case**, and **encoder mount** were originally designed by the group from whom we inherited the car, **TurboSLAM**.
 
 ### Challenged & Recommendations
 
@@ -240,11 +432,80 @@ The computational load will be devided over the two ESP32-S3 microcontrollers. T
 
 
 ## Set it up
-We recommend you create a python [virtual environment](https://docs.python.org/3/library/venv.html) (venv) for the project (e.g. `python3 -m venv slamaleykoum_venv`).
-Activate the venv (`source slamaleykoum_venv/bin/activate`) and install the requirements from our "requirements.txt" file: `pip install -r requirements.txt`
-*You could alternatively manually install every requirement (which you might already have).* 
+### Software
+#### Prerequisites
+* [Python 3.8+](https://www.python.org/downloads/)
+* [PlatformIO Core](https://docs.platformio.org/en/latest/core/index.html) or VS Code extension.
 
-// TODO: FINISH README
+#### Ground Station (PC)
+The ground station script runs on your computer to visualize telemetry.
+*Note: We recommend using a virtual environment.*
+Install the dependencies from our `requirements.txt` file.
+
+```bash
+# Create virtual environment
+python3 -m venv slamaleykoum_venv
+
+# Activate environment
+source slamaleykoum_venv/bin/activate # On Windows: slamaleykoum_venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+### Firmware (ESP32s)
+This project uses two ESP32s. You must flash them individually.
+
+Open in PlatformIO: Open the project folder in VS Code.
+
+**Upload Code:**
+Connect to the ESP1 via USB. Open the *platformio* extension in vscode (the alien logo). Click on `/esp2/General/Upload`. Repete for the ESP2.
+
+---
+
+## Usage / Operation
+
+### 1. Power Up Sequence
+1.  Connect the NiMH battery to the ESC.
+2.  Turn on the ESC switch.
+>WARNING: When disconnecting, first turn the ESC off, then disconnect the battery.
+
+### 2. WiFi Connection
+The car acts as an Access Point. Connect your computer to the following network:
+* **SSID:** `LIDAR_AP`
+* **Password:** `l1darpass`
+
+> *Dev Note: To change these credentials, modify `include/wifi_config.h` (or your specific path) before flashing.*
+
+### 3. Launch Ground Station
+Once connected to the WiFi, launch the Python interface:
+
+```bash
+# Ensure your venv is active
+source slamaleykoum_venv/bin/activate
+
+# Run the interface
+python ground_station.py
+```
+A *Pygame* window will appear. Press START to begin logging data and visualizing the real-time LIDAR feed.
+
+## Troubleshooting
+If you encounter issues, check the list below before reaching out.
+
+| Problem | Possible Cause | Solution |
+| :--- | :--- | :--- |
+| **Map has "fuzzy" walls** | The environment might contain windows, or reflective surfaces, maybe even the obstacles are too thin or the walls have wholes in them (mesh / fence) | Since the lidar can't correctly detect those kinds of objects, try mapping something else |
+| **Wifi doesn't appear** | You can not flasht the ESP32 from the left port, hence the code was never uploaded OR you might have uploaded the code of the ESP2 on the ESP1, it happens way too often | Flash the ESPs again, with their respective code on their RIGHT port (In our setup, it's the center ports, since the esp1 is upside-down) |
+| **Wheels turn, car doesn't moove** | The motor doesn't get any power | The ESC must be switched on imidiatly after connecting the battery |
+| **ESP doesn't initialize or crashes often** | Cables might have come loose | Double check the pin connections |
+| **ESP keeps crashing** | Battery might be to low | Check the battery level, charge it |
+| **Map is not displaying but python code is up** | Incoherent map sizes | Double check the values in the `ground_station.py` file and the rest of the code, for the size of the map (grid size) and their max bounds are the same |
+| **ESP1 crashes imidiately** | The map size is too big | Reduce the map size. Note: The max nb of cells we managed to run with is 70x70 but if the real world size is not enough, you can increase the `RESOLUTION` value which will increase what each cell represents in the real world |
+
+
+
+## Archives
+//TODO: Talk about the problems
 
 #### File structure:
 For now the file structure is still in development.
