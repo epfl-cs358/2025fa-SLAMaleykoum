@@ -61,6 +61,50 @@ Here is our original [Project proposal](https://www.overleaf.com/9942875199zgzbk
 | THW-1060-RTR ESC              | [Datasheet](https://www.hobbywing.com/en/uploads/file/20221015/f60b7ebe160a7b283927ae8916d36763.pdf)                                                                                               |
 | LM2596 Buck converter         | [Datasheet](https://www.ti.com/lit/ds/symlink/lm2596.pdf)                                                                                                                                          |
 | 7.2V Battery                  | [Product Page](https://www.galaxus.ch/fr/s5/product/gens-ace-modelisme-dune-batterie-720-v-5000-mah-batterie-rc-9459930)                                                                           |
+### How to Assemble
+
+
+To begin, assemble the mechanical base of the car following the official [Tamiya Blitzer Beetle manual](assets/docs/tamiyamanual). (//TODO fix the link ) 
+We only need the minimal mechanical build so the car can drive, skip the decorative carcass.
+
+**Step 1: Build the Car**  
+- Assemble the chassis according to the manual.  
+- Mount the steering servo inside the chassis.  
+- Ensure the servo cables are routed through the rectangular opening so they can later connect to the ESP.  
+
+**Step 2: Encoder Mount + Magnet**  
+- 3D‑print the encoder mount (CAD file available in /assets/CAD/).  
+- Attach the mount in front of the motor.  
+- Fix the encoder magnet directly onto the motor shaft as shown in the provided image.  
+- This ensures accurate rotation measurement.  
+- Then screw down the encoder on its mount.
+
+**Step 3: Layer Platform (ESP + Lidar Holder)**  
+- Place the 3D‑printed platform on the chassis.  
+- This platform integrates holders for both ESP boards and the lidar.  
+- Screw the lidar onto its holder first (space is tight, so it’s easier to mount before other components).  
+- Then screw down the buck converter and IMU onto their designated spots.  
+
+**Step 4: Mount the ESP Boards**  
+- Place ESP1 and ESP2 onto the platform.  
+- ⚠️ Important: mount both facing **upwards** so their LEDs are visible — this makes debugging much easier.  
+- Our current ESP1 faces down, which hides the LEDs and complicates troubleshooting.  
+
+**Step 5: Ultrasonic Sensor Mount**  
+- Attach the front 3D‑printed piece designed for the ultrasonic sensor at the front of the car.  
+- Screw the sensor securely into the mount.  
+
+**Step 6: Final Assembly**  
+- Place the hood/top of the car back on.  
+- Insert the battery into its dedicated slot the hood design holds it firmly and stabilizes it during motion.  
+- Double‑check that all mounts are secure and cables are routed cleanly for wiring.  
+
+**Step 7: Wiring**  
+- Once the mechanical build is complete, proceed to the [Soldering & Wiring](#soldering--wiring) section.  
+- Follow the circuit [diagram](/assets/circuit/slamaleykoum_electrical_circuit.drawio.png) for all connections.  
+
+*TODO: For each step, insert assembly photos so readers can clearly see component placement and orientation.*
+---
 
 ### Soldering & Wiring
 
