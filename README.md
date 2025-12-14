@@ -46,7 +46,7 @@ Here is our original [Project proposal](https://www.overleaf.com/9942875199zgzbk
 
 ## Hardware Overview
 
-## Component List
+### Component List
 
 | Component                     |           Info                                                                                                                                                                                               |
 | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -62,11 +62,11 @@ Here is our original [Project proposal](https://www.overleaf.com/9942875199zgzbk
 | LM2596 Buck converter         | [Datasheet](https://www.ti.com/lit/ds/symlink/lm2596.pdf)                                                                                                                                          |
 | 7.2V Battery                  | [Product Page](https://www.galaxus.ch/fr/s5/product/gens-ace-modelisme-dune-batterie-720-v-5000-mah-batterie-rc-9459930)                                                                           |
 
-## Soldering & Wiring
+### Soldering & Wiring
 
-## CAD files
+### CAD files
 
-## Challenged & Recommendations
+### Challenged & Recommendations
 
 ## System Architecture
 
