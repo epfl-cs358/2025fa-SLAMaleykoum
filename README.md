@@ -48,23 +48,33 @@ Here is our original [Project proposal](https://www.overleaf.com/9942875199zgzbk
 
 ### Component List
 
-| Component                     |           Info                                                                                                                                                                                               |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Tamiya Blitzer Beetle         | [Manual](https://www.tamiyausa.com/media/files/58502ml-829-5367.pdf)                                                                                                                               |
-| RPLIDAR C1                    | [Datasheet](https://d229kd5ey79jzj.cloudfront.net/3157/SLAMTEC_rplidar_datasheet_C1_v1.0_en.pdf), [SDK](https://github.com/Slamtec/rplidar_sdk), [Wiki](https://www.waveshare.com/wiki/RPLIDAR_C1) |
-| ESP32-S3-WROOM-1 Microcontroller (x2) | [Datasheet](https://cdn-shop.adafruit.com/product-files/5477/esp32-s3_datasheet_en.pdf)                                                                                                            |
-| DMS15 Servo                   | [Wiki](https://wiki.dfrobot.com/DSS-M15S_270%C2%B0_15KG_DF_Metal_Servo_with_Analog_Feedback_SKU__SER0044)                                                                                          |
-| BNO086 IMU                    | [Datasheet](https://docs.sparkfun.com/SparkFun_VR_IMU_Breakout_BNO086_QWIIC/assets/component_documentation/BNO080_085-Datasheet_v1.16.pdf)                                                         |
-| AS5600 Encoder                | [Datasheet](https://files.seeedstudio.com/wiki/Grove-12-bit-Magnetic-Rotary-Position-Sensor-AS5600/res/Magnetic%20Rotary%20Position%20Sensor%20AS5600%20Datasheet.pdf)                             |
-| HC-SR04 Ultrasonic sensor     | [Datasheet](https://handsontec.com/dataspecs/sensor/SR-04-Ultrasonic.pdf)                                                                                                                          |
-| 540J Motor                    | [Datasheet](https://asset.conrad.com/media10/add/160267/c1/-/en/001385115DS01/adatlap-1385115-540-es-motor-reely-532114c.pdf)                                                                      |
-| THW-1060-RTR ESC              | [Datasheet](https://www.hobbywing.com/en/uploads/file/20221015/f60b7ebe160a7b283927ae8916d36763.pdf)                                                                                               |
-| LM2596 Buck converter         | [Datasheet](https://www.ti.com/lit/ds/symlink/lm2596.pdf)                                                                                                                                          |
-| 7.2V Battery                  | [Product Page](https://www.galaxus.ch/fr/s5/product/gens-ace-modelisme-dune-batterie-720-v-5000-mah-batterie-rc-9459930)                                                                           |
+| Component                     | Reference Links                                                                                                                                                                                                 | Buy Link                                                                                                                                                                                                 | Price (CHF) |
+|-------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------|
+| Tamiya Blitzer Beetle         | [Manual](https://www.tamiyausa.com/media/files/58502ml-829-5367.pdf)                                                                                                                                             | [Galaxus](https://www.galaxus.ch/fr/s5/product/tamiya-blitzer-beetle-kit-rc-vehicle-12900000)                                                                                                           | 129.00      |
+| RPLIDAR C1                    | [Datasheet](https://d229kd5ey79jzj.cloudfront.net/3157/SLAMTEC_rplidar_datasheet_C1_v1.0_en.pdf), [SDK](https://github.com/Slamtec/rplidar_sdk), [Wiki](https://www.waveshare.com/wiki/RPLIDAR_C1)              | [Bastelgarage](https://www.bastelgarage.ch/rplidar-c1-12m-scanner-lidar-laser-360-degres)                                                                                                               | 79.90       |
+| ESP32-S3-WROOM-1 Microcontroller (x2) | [Datasheet](https://cdn-shop.adafruit.com/product-files/5477/esp32-s3_datasheet_en.pdf)                                                                                                                        | [Galaxus](https://www.galaxus.ch/en/s1/product/espressif-esp32-s3-devkitm-1-n8-development-board-development-boards-kits-24505914)                                                                     | 25.45 ×2    |
+| DMS15 Servo                   | [Wiki](https://wiki.dfrobot.com/DSS-M15S_270%C2%B0_15KG_DF_Metal_Servo_with_Analog_Feedback_SKU__SER0044)                                                                                                      | —                                                                                                                                                                                                       | 5.00           |
+| BNO086 IMU                    | [Datasheet](https://docs.sparkfun.com/SparkFun_VR_IMU_Breakout_BNO086_QWIIC/assets/component_documentation/BNO080_085-Datasheet_v1.16.pdf)                                                                     | [Bastelgarage](https://www.bastelgarage.ch/bno055-capteur-intelligent-a-9-axes?search=9dof)                                                                                                             | 19.90       |
+| AS5600 Encoder                | [Datasheet](https://files.seeedstudio.com/wiki/Grove-12-bit-Magnetic-Rotary-Position-Sensor-AS5600/res/Magnetic%20Rotary%20Position%20Sensor%20AS5600%20Datasheet.pdf)                                         | —                                                                                                                                                                                                       | 2.00       |
+| HC-SR04 Ultrasonic sensor     | [Datasheet](https://handsontec.com/dataspecs/sensor/SR-04-Ultrasonic.pdf)                                                                                                                                    | —                                                                                                                                                                                                       | 2.00           |
+| 540J Motor                    | [Datasheet](https://asset.conrad.com/media10/add/160267/c1/-/en/001385115DS01/adatlap-1385115-540-es-motor-reely-532114c.pdf)                                                                                  | —                                                                                                                                                                                                       | —           |
+| THW-1060-RTR ESC              | [Datasheet](https://www.hobbywing.com/en/uploads/file/20221015/f60b7ebe160a7b283927ae8916d36763.pdf)                                                                                                           | —                                                                                                                                                                                                       | —           |
+| LM2596 Buck converter         | [Datasheet](https://www.ti.com/lit/ds/symlink/lm2596.pdf)                                                                                                                                                      | —                                                                                                                                                                                                       | —           |
+| 7.2V Battery                  | [Product Page](https://www.galaxus.ch/fr/s5/product/gens-ace-modelisme-dune-batterie-720-v-5000-mah-batterie-rc-9459930)                                                                                       | [Galaxus](https://www.galaxus.ch/fr/s5/product/gens-ace-modelisme-dune-batterie-720-v-5000-mah-batterie-rc-9459930)                                                                                      | 32.90       |
+| **Total Cost**                |                                                                                                                                                                                                                |                                                                                                                                                                                                         | **321.6**   |
+
+
+Alongside the listed components, you will also need:
+- 3 × 1 kΩ resistors (for the ultrasonic sensor voltage divider)
+- Assorted jumper cables and connectors (male/female)
+- Heat‑shrink tubing or insulation sleeves
+- Soldering kit (soldering iron, solder wire)
+- Hot air/heat gun (for shrinking tubing)
+- Screw set (M3 and M6 as used in mounts)
 ### How to Assemble
 
 
-To begin, assemble the mechanical base of the car following the official [Tamiya Blitzer Beetle manual](assets/docs/tamiyamanual). (//TODO fix the link ) 
+To begin, assemble the mechanical base of the car following the official [Tamiya Blitzer Beetle manual](https://www.tamiyausa.com/media/files/58502ml-829-5367.pdf).
 We only need the minimal mechanical build so the car can drive, skip the decorative carcass.
 
 **Step 1: Build the Car**  
@@ -87,7 +97,7 @@ We only need the minimal mechanical build so the car can drive, skip the decorat
 
 **Step 4: Mount the ESP Boards**  
 - Place ESP1 and ESP2 onto the platform.  
-- ⚠️ Important: mount both facing **upwards** so their LEDs are visible — this makes debugging much easier.  
+- ⚠️ Important: mount both facing **upwards** so their LEDs are visible; this makes debugging much easier.  
 - Our current ESP1 faces down, which hides the LEDs and complicates troubleshooting.  
 
 **Step 5: Ultrasonic Sensor Mount**  
