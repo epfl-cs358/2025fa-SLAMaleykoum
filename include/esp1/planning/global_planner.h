@@ -1,10 +1,14 @@
 // Filename: esp1/planning/global_planner.h
 // Description: Global path planning using A* on the Bayesian Occupancy Grid.
-
+/** @filename: esp1/hardware/bayesian_grid.h
+ *  @description: Contract for the coarse Bayesian Occupancy Grid map.
+ * 
+ *  @job: Manages the occupancy map using Bayesian filtering.
+ */
 #pragma once
 
 #include "../../../include/common/data_types.h"
-#include "../../../include/esp1/mapping/occupancy/bayesian_grid.h"
+#include "../../../include/esp1/mapping/bayesian_grid.h"
 
 struct GlobalPlannerWorkspace {
     float g_cost[GP_MAX_CELLS];
@@ -48,5 +52,4 @@ public:
                               const MissionGoal& goal,
                               const BayesianOccupancyGrid& map,
                               GlobalPlannerWorkspace* ws);
-
 };

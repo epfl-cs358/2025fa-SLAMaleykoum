@@ -1,24 +1,21 @@
-// Filename: esp1/mapping/occupancy/bayesian_grid.h
-// Description: Contract for the coarse Bayesian Occupancy Grid map.
+/** @filename: esp1/mapping/bayesian_grid.h
+ *  @description: Contract for the coarse Bayesian Occupancy Grid map.
+ * 
+ *  @job: Manages the occupancy map using Bayesian filtering.
+ */
 
 #pragma once
 
-#include "../../../common/data_types.h"
+#include "../../common/data_types.h"
 #include <stdint.h>
-
 
 // TODO: UPGRADE -> using a Hash Map (or a fast custom hash table)
 //      could be a V2/V3 upgrade to achieve virtually unlimited map size,
 //      as we would only pay for the explored space.
 // However, for now, keep it as a fixed-size map.
 
-// TODO: For now we could use a 4bit value per cell to keep it lightweitgt ?
-//      Could always change later ?
-#define GRID_MAX_X 70
-#define GRID_MAX_Y 70
-#define GRID_MAX_SIZE (GRID_MAX_X * GRID_MAX_Y)
 /**
- * @brief Manages the coarse occupancy map using Bayesian filtering.
+ * @brief Manages the occupancy map using Bayesian filtering.
  */
 class BayesianOccupancyGrid {
 public:
@@ -29,8 +26,8 @@ public:
 
     /**
      * @brief Updates the occupancy grid based on a new LiDAR scan and the robot's pose.
-     * @param scan The new LiDAR observation.
-     * @param pose The robot's estimated pose during the scan (from ESP2).
+     * 
+     * @param lidar_scan Synchronized LiDAR scan and robot pose.
      */
     void update_map(const SyncedScan& lidar_scan);
 
@@ -39,12 +36,6 @@ public:
      * @return Probability (0.0 to 1.0).
      */
     float get_cell_probability(int x, int y) const;
-
-    // /**
-    //  * @brief Exports the map data for use by the Global Planner.
-    //  */
-    // // Returns a simplified map representation (e.g. pointer or some light compressed array).
-    // const uint8_t* get_map_data_color() const;
 
     /**
      * @brief Exports the map data for use by the Global Planner.
@@ -71,6 +62,7 @@ private:
     
     static bool trig_initialized;
 
+    // Probability lookup table
     static float* prob_table;
     static bool prob_table_initialized;
 };

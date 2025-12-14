@@ -9,11 +9,10 @@
 #endif
   
 
-
 // Define the maximum number of waypoints the controller can handle.
 #define MAX_PATH_LENGTH 5
 #define MAX_LOCAL_PATH_LENGTH 10
-#define MAX_LIDAR_POINTS 500
+#define MAX_LIDAR_POINTS 100
 #define ROBOT_RADIUS 0.3f
 #define SEARCH_BOUND_M 3.0f
 
@@ -164,8 +163,7 @@ struct SyncedScan {
 /**
  * @brief Represents a single raw point from the LiDAR sensor in standard mode.
  */
-typedef struct rawScanDataPoint
-{
+typedef struct rawScanDataPoint {
 	uint8_t quality;
 	uint8_t angle_low;
 	uint8_t angle_high;
@@ -175,25 +173,21 @@ typedef struct rawScanDataPoint
 
 // Descriptor and packet types for LiDAR communication
 typedef uint8_t rp_descriptor_t[7];
-typedef uint8_t rq_Packet_t[9];
 typedef uint8_t rq_message_t[2];
 
 // --- LiDAR Communication Enums ---
-enum enDescriptor
-{
-		legacyVersion,  ///< Legacy scan version
-		extendedVersion, ///< Extendet scan version
-		denseVersion,	 ///< Dense scan version
-		startScan		 ///< start scan
+enum enDescriptor {
+		legacyVersion,   // Legacy scan version
+		extendedVersion, // Extendet scan version
+		denseVersion,	 // Dense scan version
+		startScan		 // start scan
 };
 
 // --- LiDAR Request Enums ---
-enum enRequest
-{
+enum enRequest {
 	rq_stop,
 	rq_reset,
-	rq_scan,
-	rq_scanExpress
+	rq_scan
 };
 
 /**

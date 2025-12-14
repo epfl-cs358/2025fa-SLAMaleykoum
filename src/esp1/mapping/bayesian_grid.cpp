@@ -1,11 +1,11 @@
-#include "../../../../include/esp1/mapping/occupancy/bayesian_grid.h"
+#include "../../../include/esp1/mapping/bayesian_grid.h"
 #include <cmath>
 #include "../../include/common/utils.h"
 
-#define L_FREE_INT      -6     // -0.4  * 10
-#define L_OCC_INT       +15    // +0.4  * 10
-#define L_MIN_INT      -40     // -4.0  * 10
-#define L_MAX_INT       40     // +4.0  * 10
+#define L_FREE_INT      -6
+#define L_OCC_INT      +15
+#define L_MIN_INT      -40
+#define L_MAX_INT       40
 
 float* BayesianOccupancyGrid::sin_table = nullptr;
 float* BayesianOccupancyGrid::cos_table = nullptr;
@@ -14,9 +14,6 @@ bool   BayesianOccupancyGrid::trig_initialized = false;
 float* BayesianOccupancyGrid::prob_table = nullptr;
 bool   BayesianOccupancyGrid::prob_table_initialized = false;
 
-// ------------------------------------------------------
-// Constructor
-// ------------------------------------------------------
 BayesianOccupancyGrid::BayesianOccupancyGrid(float resolution_m,
                                              uint16_t size_x,
                                              uint16_t size_y)
@@ -29,8 +26,6 @@ BayesianOccupancyGrid::BayesianOccupancyGrid(float resolution_m,
         MALLOC_CAP_SPIRAM
     );
     memset(log_odds, 0, grid_size_x * grid_size_y);
-
-   
 
     // Mark borders as occupied
     for (int x = 0; x < grid_size_x; ++x) {
@@ -68,9 +63,6 @@ BayesianOccupancyGrid::BayesianOccupancyGrid(float resolution_m,
     }
 }
 
-// ------------------------------------------------------
-// Update log occupancy grid
-// ------------------------------------------------------
 void BayesianOccupancyGrid::update_map(const SyncedScan& lidar_scan)
 {
     const LiDARScan& scan = lidar_scan.scan;
@@ -79,14 +71,18 @@ void BayesianOccupancyGrid::update_map(const SyncedScan& lidar_scan)
     float pose_deg = pose.theta * (180.0f / M_PI) + 90.0f;
 
     for (uint16_t i = 0; i < scan.count; i++) {
-
+        // Convert distance to meters
         float rayon = scan.distances[i] * 0.001f;
+
+        // Ignore invalid or out-of-range measurements
         bool is_hit = (rayon > 0.f && rayon < SEARCH_BOUND_M);
         rayon = is_hit ? rayon : SEARCH_BOUND_M;
 
+        // Calculate global angle of the measurement
         float angle_world = pose_deg - scan.angles[i];
         if (isnan(angle_world)) continue;
 
+        // Normalize angle to [0, 360)
         while (angle_world >= 360.f) angle_world -= 360.f;
         while (angle_world <   0.f)  angle_world += 360.f;
 
@@ -100,17 +96,17 @@ void BayesianOccupancyGrid::update_map(const SyncedScan& lidar_scan)
         float hit_x = pose.x + rayon * cosv;
         float hit_y = pose.y + rayon * sinv;
 
-        int x0, y0, xhit, yhit;
+        int x0, y0, x_hit_grid, y_hit_grid;
         world_to_grid(pose.x, pose.y, x0, y0,
                       grid_resolution, grid_size_x, grid_size_y);
-        world_to_grid(hit_x, hit_y, xhit, yhit,
+        world_to_grid(hit_x, hit_y, x_hit_grid, y_hit_grid,
                       grid_resolution, grid_size_x, grid_size_y);
 
         // Bresenham ray tracing
-        int dx = abs(xhit - x0);
-        int dy = abs(yhit - y0);
-        int sx = (x0 < xhit) ? 1 : -1;
-        int sy = (y0 < yhit) ? 1 : -1;
+        int dx = abs(x_hit_grid - x0);
+        int dy = abs(y_hit_grid - y0);
+        int sx = (x0 < x_hit_grid) ? 1 : -1;
+        int sy = (y0 < y_hit_grid) ? 1 : -1;
         int err = dx - dy;
 
         int x = x0;
@@ -125,7 +121,7 @@ void BayesianOccupancyGrid::update_map(const SyncedScan& lidar_scan)
             int v = log_odds[idxg] + L_FREE_INT;
             log_odds[idxg] = (int8_t)(v < L_MIN_INT ? L_MIN_INT : v);
 
-            if (x == xhit && y == yhit)
+            if (x == x_hit_grid && y == y_hit_grid)
                 break;
 
             int e2 = 2 * err;
@@ -135,19 +131,16 @@ void BayesianOccupancyGrid::update_map(const SyncedScan& lidar_scan)
 
         // Mark occupied cell (SAFE)
         if (is_hit &&
-            xhit >= 0 && xhit < grid_size_x &&
-            yhit >= 0 && yhit < grid_size_y)
+            x_hit_grid >= 0 && x_hit_grid < grid_size_x &&
+            y_hit_grid >= 0 && y_hit_grid < grid_size_y)
         {
-            int idxg = yhit * grid_size_x + xhit;
+            int idxg = y_hit_grid * grid_size_x + x_hit_grid;
             int v = log_odds[idxg] + L_OCC_INT;
             log_odds[idxg] = (int8_t)(v > L_MAX_INT ? L_MAX_INT : v);
         }
     }
 }
 
-// ------------------------------------------------------
-// Probability access
-// ------------------------------------------------------
 float BayesianOccupancyGrid::get_cell_probability(int x, int y) const
 {
     // Out of bounds = obstacle (safe for A*)
@@ -158,9 +151,6 @@ float BayesianOccupancyGrid::get_cell_probability(int x, int y) const
     return prob_table[log_odds[idx] + 40];
 }
 
-// ------------------------------------------------------
-// Raw grid access
-// ------------------------------------------------------
 int8_t* BayesianOccupancyGrid::get_map_data() const
 {
     return log_odds;

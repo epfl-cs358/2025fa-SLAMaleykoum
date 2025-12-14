@@ -15,9 +15,11 @@
 #include "common/data_types.h"
 #include <cstdint>
 
-extern rp_descriptor_t resp_descriptor[];	///< List of Response descriptors 
-extern rq_message_t req_message[];			///< List of Request Messages
-extern rq_Packet_t req_Express[];			///< Request Message for Express Scan Modes
+// List of Response descriptors
+extern rp_descriptor_t resp_descriptor[];
+
+// List of Request Messages
+extern rq_message_t req_message[];
 
 /**
  * @brief Driver and processing class for the LiDAR unit.
@@ -28,15 +30,16 @@ public:
     /**
 	 * Construcor of Class
 	 *
-	 * @param pointer to used USART
-	 * @param Baudrate
+	 * @param ser the Serial to use USART and collect data
 	 */
 	Lidar(HardwareSerial& ser) : serial(ser) {}
+
+	// Storage to save the Data of a scan
+    // rawScanDataPoint_t DataBuffer[3250];
 
     /**
 	 * Starts the Lidar and its measurement system
 	 * 
-	 * @param modus to run the lidar
 	 * @return true if mode started correctly, false if not 
 	 */	
 	bool start();
@@ -46,37 +49,23 @@ public:
 	 * 
 	 * @return the number of data for the running mode (express *40, standard *1)
 	 */	
-	uint16_t readMeasurePoints();
-
-    /**
-	 * Checks if no Serial Data ist available in a given time
-	 * 
-	 * @param wait time ms 
-	 * @param amount of expected bytes
-	 * @return true if a timeout happend
-	 */	
-	bool checkForTimeout(uint32_t _time,size_t _size);
-
-    /**
-	 * Compares two Response Descriptors 
-	 * @returns true if equal 
-	 */	
-	bool compareDescriptor(rp_descriptor_t _descr1,rp_descriptor_t _descr2);
-
-    // Storage to save the Data of a Standard Scan
-    rawScanDataPoint_t DataBuffer[3250];
+	// uint16_t readMeasurePoints();
 
     /**
 	 * Calculates angle for Standard mode 
 	 * According to the Datasheet for standard mode angle´s
+	 * 
 	 * @param LS
 	 * @param MS
+	 * 
 	 * @returns angle 0.00-360.00
 	 */	
 	float calcAngle(uint8_t _lowByte, uint8_t _highByte);
 
     /**
 	 * Calculates the distance for Standard mode
+	 * According to the Datasheet for standard mode distance´s
+	 * 
 	 * @returns distance in mm
 	 */	
 	float calcDistance(uint8_t _lowByte, uint8_t _highByte);
@@ -88,7 +77,7 @@ public:
 	 * @param reference to bool that becomes true if a full scan is complete
 	 * @param reference to last angle read by ESP (to detect full rotation)
 	 */
-	void build_scan(LiDARScan* scan, bool &scanComplete_, float& lastAngleESP_);
+	// void build_scan(LiDARScan* scan, bool &scanComplete_, float& lastAngleESP_);
 
 	/**
 	 * Build a scan in real time
@@ -97,6 +86,8 @@ public:
 	 * @param scan to LiDARScan struc to fill
 	 * @param scancomplete the bool that becomes true if a full scan is complete
 	 * @param lastAngle the last angle read by ESP (to detect full rotation)
+	 * 
+	 * @return number of points in the scan
 	 */
 	uint16_t readScanLive(LiDARScan* scan, bool &scanComplete, float &lastAngle);
 
@@ -105,26 +96,32 @@ private:
     static constexpr uint8_t LIDAR_RX_PIN = 5;
     static constexpr uint8_t LIDAR_TX_PIN = 4;
     static constexpr uint32_t LIDAR_BAUDRATE = 460800;
+	static constexpr uint8_t DATA_SIZE = 5;
 
     /**
 	 * Tries to read a new full cycle of Points
 	 * 
 	 * @return the number of points 
 	 */	
-	uint16_t awaitStandardScan();
+	// uint16_t awaitStandardScan();
+
+	/**
+	 * Checks if no Serial Data is available in a given time
+	 * 
+	 * @param wait time ms 
+	 * @param amount of expected bytes
+	 * 
+	 * @return true if a timeout happend
+	 */	
+	bool checkForTimeout(uint32_t _time,size_t _size);
 
     /**
-     * @brief Converts raw data points into high-confidence, distinct features (Landmarks).
-     * This is where clustering, corner detection, or other algorithms would live.
-     * @param raw_points The raw sensor data.
-     * @return A vector of extracted Landmarks for the EKF-SLAM.
-     */
-    //std::vector<LiDARLandmark> extract_features(const std::vector<RawLiDARPoint>& raw_points);
-    // RIEN A FAIRE DANS LA CLASS LIDAR NON??????????????????????????????????????????????????????????????????????
+	 * Compares two Response Descriptors 
+	 * 
+	 * @returns true if equal 
+	 */	
+	bool compareDescriptor(rp_descriptor_t _descr1,rp_descriptor_t _descr2);
 
     // pointer to HardwareSerial USART 
     HardwareSerial& serial;
-
-
 };
-

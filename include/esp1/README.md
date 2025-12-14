@@ -1,40 +1,49 @@
 # ESP-1: Mapping & Global Planning Module
 ESP-1 is responsible for the **global understanding** of the robot's environment and mission. It maintains the authoritative map, and makes high-level navigation decisions. Operating at lower frequencies (1-10 Hz) but with higher computational complexity.
 
->**Core Mission**: Build accurate maps, know where we are globally, decide where to go next.
+>**Core Mission**: Build accurate map depending on the position given by ESP-2, decide where to go next.
 
 
 ---
 
 ## Hardware
 ### Lidar :
-#### 1. The Starting Point: LiDAR Data
+- **Goal**: Extract the LiDAR points from the Serial2 buffer and convert them into readable data for Bayesian Grid.
 
-- **Module**: LiDAR Hardware / Pre-processing Module
+- **Input**: Raw LiDAR data bytes (from RPLIDARC1).
 
-- **Input**: Raw LiDAR distance and angle readings (from RPLIDARC1).
+- **Process**: Each raw point of 5 bytes is converted into a LiDAR point containing : an angle (in degrees), a distance (in millimeters), a quality (between 0 and 255).
+Then, we put all the points of a "scan" (which corresponds to a 360° turn of the LiDAR) into a `LiDARScan`, which contains each points, the count of the scan and a timestamp to know when the scan has been calculated.
 
-- **Process**: The raw scan is processed to identify and extract distinctive environmental features (e.g., corners, endpoints, high-confidence reflective surfaces).
-
-- **Output**: `std::vector<LiDARLandmark>` (A list of range, angle, and quality for each detected feature).
+- **Output**: `LiDARScan` with a maximum of 100 points.
 
 ## Mapping
 ### The Bayesian Grid :
-#### 3. Map Building and Planning
 
-The corrected pose is immediately used by **two parallel processes**: the map builder and the loop detector.
+The **BayesianOccupancyGrid** class implements a 2D probabilistic occupancy grid used to build a persistent map of the environment from LiDAR data.
+Each grid cell stores a log-odds representation of the probability of being occupied, allowing robust incremental updates over time.
 
-**A. Bayesian Occupancy Grid Update**
+Each cell represents a square area of the world with a given metric resolution (meters per cell) and stores:
+- Low probability → free space
+- High probability → obstacle
+
+This module is designed to run on an ESP32, with strict memory and performance constraints.
+
+**Bayesian Occupancy Grid Update**
 - **Input**:
-     - The Corrected Global Pose from `EKF_SLAM`.
-     - The full, raw LiDAR Scan data (distances and angles).
+     A `SyncedScan` containing :
+     - The Global `Pose2D` of the car from ESP-2.
+     - A full `LiDARScan` data (distances, angles and qualities).
 
 - **Process**: The **BayesianOccupancyGrid** module:
      1. Uses the Global Pose to accurately determine the origin and orientation of the LiDAR scan in the global coordinate frame.
-     2. Applies a **ray-casting** algorithm to project the LiDAR beams onto the grid.
-     3. Uses **Bayes' theorem** to probabilistically update the log-odds ratio of each cell being occupied, integrating certainty over time and smoothing out transient noise.
+     2. Grid borders are initialized as occupied in order to guarantee:
+     - Safe behavior for planners
+     - No out-of-bounds exploration
+     3. Applies a **Bresenham ray tracing** algorithm to project the LiDAR beams onto the grid. All traversed cells are converted to free cells.
+     4. Uses **Bayes' theorem** to probabilistically update the log-odds ratio of each cell being occupied, integrating certainty over time and smoothing out transient noise.
 
-- **Role**: This grid is the dense, persistent map used by the A* Global Planner to find collision-free paths to the mission goal.
+- **Output**: A grid of size `size_x × size_y` and of resolution `grid_resolution` (meters per cell). This grid is the dense, persistent map used by the Global Planner to find collision-free paths to the mission goal.
 
 ## Planning
 ### Mission Planner :
