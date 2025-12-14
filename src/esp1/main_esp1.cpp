@@ -347,8 +347,6 @@ void Bayesian_Grid_Task(void* parameter) {
 // MISSION PLANNER TASK
 // =============================================================
 void Mission_Planner_Task(void* parameter) {
-    mission_planner->set_mission_state(MissionGoalType::EXPLORATION_MODE);
-    
     while (1) {
         Pose2D current_p;
         

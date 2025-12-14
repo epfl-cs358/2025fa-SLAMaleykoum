@@ -38,23 +38,16 @@ The corrected pose is immediately used by **two parallel processes**: the map bu
 
 ## Planning
 ### Mission Planner :
-**C. MissionPlanner**
 The Mission Manager module is responsible for:
-- **Goal Selection**: Deciding the next highest-priority task (e.g., Explore an unmapped region, Navigate to a specific waypoint, or Return Home).
+- **Finding the frontiers**: Selecting all the frontieres of the map. We begin by searching close to the robot and if nothing is found we extend the research to the whole map. These are the limits between what we have explored and what needs to be visited. Visually it corresponds to the white cells that have at least one gray cell as neighbour. 
 
-- **State Management**: Tracking the robot's current mode (Exploring, Path Following, Idle, Error).
+- **Goal Selection**: Finding the next region to explore depending on the frontieres. We regroup the ones that are close to each other in clusters using a BFS algorithm. Then we select the closest cluster that is big enough.
 
-- **Error Handling**: Detecting failures (e.g., Global Planner fails to find a path) and transitioning to recovery states.
+- **State Management**: Tracking the robot's current mode (`EXPLORATION_MODE` or `RETURN_HOME`). It is in `EXPLORATION_MODE` by default, and changes to return home when no more frontiers are left unexplored. Once in the `RETURN_HOME` mode it stays this way, unless it is changed manually via the `set_mission_state` function.
 
-It acts as the intermediary between the high-level system goal (e.g., "Map the entire area") and the low-level planner (A*).
-- **Input**:
-     - **Current Global Pose** (x,y,θ): From EKF_SLAM
-     Needed to check if the robot has reached its current target.
-     - **Map Coverage Status**: From Bayesian Occupancy Grid
-     Used to determine if there are unexplored areas left. This dictates the shift to the `EXPLORATION_NODE` goal type.
-     - **Global Planner Failure Status**: From System Status
-     If A* returns an empty path, the manager switches to a recovery behavior (e.g., rotate and replan, or declare mission failed).
-- **Output**: `MissionGoal` it's packaged with coordinates, defining the target for the `GlobalPlanner`.
+It acts as the intermediary between the high-level system (Bayesian grid) and the low-level planner (A*).
+
+- **Output**: `MissionGoal`, it is packaged with coordinates, defining the target for the `GlobalPlanner`.
 
 
 ### Global Planner :

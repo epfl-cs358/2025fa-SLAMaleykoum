@@ -16,6 +16,7 @@
 #define MAX_LIDAR_POINTS 500
 #define ROBOT_RADIUS 0.3f
 #define SEARCH_BOUND_M 3.0f
+#define GOAL_REACHED 0.4f
 
 // Free and Occupied probability thresholds
 #define FREE_BOUND_PROB 0.45 // = -6 en log_odds

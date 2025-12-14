@@ -117,8 +117,8 @@ void BayesianOccupancyGrid::update_map(const SyncedScan& lidar_scan)
         int y = y0;
 
         while (true) {
-            if (x < 0 || x >= grid_size_x ||
-                y < 0 || y >= grid_size_y)
+            if (x <= 0 || x >= grid_size_x - 1 ||
+                y <= 0 || y >= grid_size_y - 1)
                 break;
 
             int idxg = y * grid_size_x + x;
