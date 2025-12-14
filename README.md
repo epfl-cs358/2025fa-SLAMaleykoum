@@ -174,6 +174,10 @@ Both the encoder and the IMU are powered by the **3V3 pin of ESP2**, using two c
   - Power the encoder through its **VCC** pin using a cable screwed into the terminal block and connected to the **3V3 pin of ESP2** via a female connector (see [diagram](/assets/circuit/slamaleykoum_electrical_circuit.drawio.png)).  
   - Ground (GND) is connected to the buck converter’s ground harness as described above.
 
+<p align="center">
+  <img src="/assets/Images/circuit_images/encoder_connector_mount.jpg" alt="Encoder screw terminal blocks" width="200"/>
+</p>
+
 - **IMU**:  
   - Powered from the **3V3 pin of ESP2**, using a male connector on the IMU side and a female connector to ESP2 (see [diagram](/assets/circuit/slamaleykoum_electrical_circuit.drawio.png)).  
   - Ground (GND) is connected via a male connector on the IMU and a female connector on ESP2, both tied into the buck converter’s ground harness as described above.
