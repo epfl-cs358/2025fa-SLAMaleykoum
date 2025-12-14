@@ -1,6 +1,8 @@
 #include "../../../include/esp1/planning/local_planner.h"
 #include "esp_wifi.h"
 
+// NOT USED -> to delete ----------------------------------
+
 static inline void world_to_grid(
     int x, int y,
     int& gx, int& gy,
