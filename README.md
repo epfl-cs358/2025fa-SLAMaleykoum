@@ -410,11 +410,80 @@ The computational load will be devided over the two ESP32-S3 microcontrollers. T
 
 
 ## Set it up
-We recommend you create a python [virtual environment](https://docs.python.org/3/library/venv.html) (venv) for the project (e.g. `python3 -m venv slamaleykoum_venv`).
-Activate the venv (`source slamaleykoum_venv/bin/activate`) and install the requirements from our "requirements.txt" file: `pip install -r requirements.txt`
-*You could alternatively manually install every requirement (which you might already have).* 
+### Software
+#### Prerequisites
+* [Python 3.8+](https://www.python.org/downloads/)
+* [PlatformIO Core](https://docs.platformio.org/en/latest/core/index.html) or VS Code extension.
 
-// TODO: FINISH README
+#### Ground Station (PC)
+The ground station script runs on your computer to visualize telemetry.
+*Note: We recommend using a virtual environment.*
+Install the dependencies from our `requirements.txt` file.
+
+```bash
+# Create virtual environment
+python3 -m venv slamaleykoum_venv
+
+# Activate environment
+source slamaleykoum_venv/bin/activate # On Windows: slamaleykoum_venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+### Firmware (ESP32s)
+This project uses two ESP32s. You must flash them individually.
+
+Open in PlatformIO: Open the project folder in VS Code.
+
+**Upload Code:**
+Connect to the ESP1 via USB. Open the *platformio* extension in vscode (the alien logo). Click on `/esp2/General/Upload`. Repete for the ESP2.
+
+---
+
+## Usage / Operation
+
+### 1. Power Up Sequence
+1.  Connect the NiMH battery to the ESC.
+2.  Turn on the ESC switch.
+>WARNING: When disconnecting, first turn the ESC off, then disconnect the battery.
+
+### 2. WiFi Connection
+The car acts as an Access Point. Connect your computer to the following network:
+* **SSID:** `LIDAR_AP`
+* **Password:** `l1darpass`
+
+> *Dev Note: To change these credentials, modify `include/wifi_config.h` (or your specific path) before flashing.*
+
+### 3. Launch Ground Station
+Once connected to the WiFi, launch the Python interface:
+
+```bash
+# Ensure your venv is active
+source slamaleykoum_venv/bin/activate
+
+# Run the interface
+python ground_station.py
+```
+A *Pygame* window will appear. Press START to begin logging data and visualizing the real-time LIDAR feed.
+
+## Troubleshooting
+If you encounter issues, check the list below before reaching out.
+
+| Problem | Possible Cause | Solution |
+| :--- | :--- | :--- |
+| **Map has "fuzzy" walls** | The environment might contain windows, or reflective surfaces, maybe even the obstacles are too thin or the walls have wholes in them (mesh / fence) | Since the lidar can't correctly detect those kinds of objects, try mapping something else |
+| **Wifi doesn't appear** | You can not flasht the ESP32 from the left port, hence the code was never uploaded OR you might have uploaded the code of the ESP2 on the ESP1, it happens way too often | Flash the ESPs again, with their respective code on their RIGHT port (In our setup, it's the center ports, since the esp1 is upside-down) |
+| **Wheels turn, car doesn't moove** | The motor doesn't get any power | The ESC must be switched on imidiatly after connecting the battery |
+| **ESP doesn't initialize or crashes often** | Cables might have come loose | Double check the pin connections |
+| **ESP keeps crashing** | Battery might be to low | Check the battery level, charge it |
+| **Map is not displaying but python code is up** | Incoherent map sizes | Double check the values in the `ground_station.py` file and the rest of the code, for the size of the map (grid size) and their max bounds are the same |
+| **ESP1 crashes imidiately** | The map size is too big | Reduce the map size. Note: The max nb of cells we managed to run with is 70x70 but if the real world size is not enough, you can increase the `RESOLUTION` value which will increase what each cell represents in the real world |
+
+
+
+## Archives
+//TODO: Talk about the problems
 
 #### File structure:
 For now the file structure is still in development.
