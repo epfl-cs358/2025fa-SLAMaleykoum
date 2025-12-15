@@ -6,6 +6,8 @@
 #include "hardware/DMS15.h"
 #include "common/data_types.h"
 #include <WiFi.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
 
 void TaskPurePursuit(void *pvParameters) {
     // Wait until the first path is received
@@ -15,21 +17,50 @@ void TaskPurePursuit(void *pvParameters) {
 
     for (;;) {
         // 1. Path Update Logic
-        if (newPathArrived) {
-            purePursuit.set_path(receivedPath);
-            finishedPath = false;
-            newPathArrived = false;
-        }
+        // 1. Path Update Logic
+            bool hasNewPath = false;
+            PathMessage localPath;
+
+            if (xSemaphoreTake(pathMutex, portMAX_DELAY)) {
+                if (newPathArrived) {
+                    hasNewPath = true;
+                    localPath = receivedPath;
+                    newPathArrived = false;
+                }
+                xSemaphoreGive(pathMutex);
+            }
+
+            if (hasNewPath) {
+                purePursuit.set_path(localPath);
+                
+                if (xSemaphoreTake(stateMutex, portMAX_DELAY)) {
+                    finishedPath = false;
+                    xSemaphoreGive(stateMutex);
+                }
+            }
 
         // 2. Emergency Stop Check
-        if (emergencyStop) {
+        // 2. Emergency Stop Check
+        bool isEmergency = false;
+        if (xSemaphoreTake(stateMutex, portMAX_DELAY)) {
+            isEmergency = emergencyStop;
+            xSemaphoreGive(stateMutex);
+        }
+
+        if (isEmergency) {
             vTaskDelay(pdMS_TO_TICKS(100));
             continue;
         }
 
         // 3. Compute Control Command
-        Pose2D currentPose = {posX, posY, yaw};
-        Velocity velStruct = {velocity, 0.0f};
+        Pose2D currentPose;
+        Velocity velStruct;
+
+        if (xSemaphoreTake(poseMutex, portMAX_DELAY)) {
+            currentPose = {posX, posY, yaw};
+            velStruct = {velocity, 0.0f};
+            xSemaphoreGive(poseMutex);
+        }
 
         MotionCommand cmd = purePursuit.compute_command(currentPose, velStruct);
 

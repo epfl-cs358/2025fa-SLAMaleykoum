@@ -54,7 +54,7 @@ float posX = 0.0f;
 float posY = 0.0f;
 float yaw = 0.0f;
 float velocity = 0.0f;
-// Pose2D currentPose = {posX, posY, yaw, millis()};
+Pose2D currentPose = {0.0f, 0.0f, 0.0f, 0};
 
 // Path data
 PathMessage receivedPath = {{{0.f, 0.f}}, 1, 0, 0};

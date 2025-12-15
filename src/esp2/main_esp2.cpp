@@ -25,12 +25,26 @@
 // Task Handles
 TaskHandle_t motorTask, ultrasonicTask, pursuitTask, odomTask, receiveTask;
 
+//Protect variables used in multiple tasks
+SemaphoreHandle_t poseMutex = nullptr;
+SemaphoreHandle_t pathMutex = nullptr;
+SemaphoreHandle_t stateMutex = nullptr;
+
 void setup() {
     Serial.begin(115200);
     delay(2000);
 
     pinMode(LED_BUILTIN, OUTPUT);
-    digitalWrite(LED_BUILTIN, HIGH); // Turn off built-in LED
+    digitalWrite(LED_BUILTIN, HIGH); 
+
+    poseMutex = xSemaphoreCreateMutex();
+    pathMutex = xSemaphoreCreateMutex();
+    stateMutex = xSemaphoreCreateMutex();
+
+    if (!poseMutex || !pathMutex || !stateMutex) {
+        Serial.println("Mutex creation failed!");
+        while(1);
+    }
 
     // --- Hardware Init ---
     I2C_wire.begin(Config::SDA_PIN, Config::SCL_PIN);
@@ -59,11 +73,11 @@ void setup() {
     // digitalWrite(LED_BUILTIN, LOW); // Turn off built-in LED
 
     // --- FreeRTOS Tasks Creation ---
-    xTaskCreatePinnedToCore(TaskReceivePath,            "RX_Path",      4096, NULL, 3, &receiveTask,    0);
-    xTaskCreatePinnedToCore(TaskOdometryUnified_Stable, "Odom",         8192, NULL, 3, &odomTask,       0);
-    xTaskCreatePinnedToCore(TaskMotor,                  "Motor",        4096, NULL, 2, &motorTask,      1); 
-    xTaskCreatePinnedToCore(TaskUltrasonic,             "Ultrasonic",   4096, NULL, 2, &ultrasonicTask, 1); 
-    xTaskCreatePinnedToCore(TaskPurePursuit,            "PurePursuit",  4096, NULL, 1, &pursuitTask,    1); 
+    xTaskCreatePinnedToCore(TaskReceivePath,            "RX_Path",      6144, NULL, 3, &receiveTask,    0);
+    xTaskCreatePinnedToCore(TaskOdometryUnified_Stable, "Odom",         10240, NULL, 3, &odomTask,       0);
+    xTaskCreatePinnedToCore(TaskMotor,                  "Motor",         6144, NULL, 2, &motorTask,      1); 
+    xTaskCreatePinnedToCore(TaskUltrasonic,             "Ultrasonic",    6144, NULL, 2, &ultrasonicTask, 1); 
+    xTaskCreatePinnedToCore(TaskPurePursuit,            "PurePursuit",   6144, NULL, 1, &pursuitTask,    1); 
 
 
     digitalWrite(LED_BUILTIN, LOW); // Turn off built-in LED
