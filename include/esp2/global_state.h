@@ -7,7 +7,7 @@
  */
 
 #pragma once
-
+#include "common/data_types.h"
 // Forward declarations (avoid circular includes)
 class MotorManager;
 class DMS15;
@@ -30,6 +30,12 @@ extern DMS15 servo_dir;
 extern UltraSonicSensor ultrasonic;
 extern ImuSensor imu;
 extern EncoderCarVelocity encoder;
+
+//Mutex
+
+extern SemaphoreHandle_t poseMutex;
+extern SemaphoreHandle_t pathMutex;
+extern SemaphoreHandle_t stateMutex;
 
 // ===================================================================
 // CONTROL & LOCALIZATION - defined in global_state.cpp
@@ -62,6 +68,7 @@ extern float posX;      // meters
 extern float posY;      // meters
 extern float yaw;       // radians
 extern float velocity;  // m/s
+extern Pose2D currentPose;  // Current robot position and yaw
 
 // ===================================================================
 // PATH DATA - defined in global_state.cpp
