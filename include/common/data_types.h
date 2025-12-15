@@ -12,7 +12,7 @@
 // Define the maximum number of waypoints the controller can handle.
 #define MAX_PATH_LENGTH 5
 #define MAX_LOCAL_PATH_LENGTH 10
-#define MAX_LIDAR_POINTS 100
+#define MAX_LIDAR_POINTS 500
 #define ROBOT_RADIUS 0.3f
 #define SEARCH_BOUND_M 3.0f
 #define GOAL_REACHED 0.4f
@@ -141,7 +141,7 @@ struct IMUData : public Printable {
 typedef float MotorOutputs; // PWM = pulse duration in microseconds 
 // (1000 µs = full reverse, 1500 µs = neutral, 2000 µs = full forward)
 
-// --- MAPPING AND PLANNING DATA ---
+// --- LIDAR DATA ---
 /**
  * @brief Single LiDAR scan (360°).
  */
@@ -191,15 +191,6 @@ enum enRequest {
 	rq_scan
 };
 
-/**
- * @brief Detected landmark from LiDAR scan processing.
- */
-struct LiDARLandmark {
-    float range;   // Distance to the landmark (m)
-    float angle;   // Angle to the landmark (rad)
-    float quality; // Confidence/strength of the feature detection (0.0 to 1.0)
-};
-
 // --- Inter-Processor Communication (IPC) Structures ---
 
 /**
@@ -221,17 +212,6 @@ struct PathMessage {
     uint8_t current_length;        // Actual number of valid waypoints in the array
     uint16_t path_id; 
     uint64_t timestamp_ms;
-};
-
-/**
- * @brief Pose correction calculated by the Loop Closure module.
- * Sent from ESP-1 to ESP-2 to correct local pose drift.
- */
-struct LoopClosureCorrection {
-    float delta_x;    // Correction needed in X (m)
-    float delta_y;    // Correction needed in Y (m)
-    float delta_theta; // Correction needed in Yaw (rad)
-    uint32_t slam_time; // Timestamp of the correction event
 };
 
 // --- MISSION DATA ---
@@ -260,15 +240,6 @@ struct MissionGoal {
  * and knos what to do with the following message.
  */
 enum MsgId : uint8_t {
-  MSG_PATH_GLOBAL = 1,       // GloablPathMessage ESP1->ESP2
-  MSG_PATH_LOCAL = 2,
-  MSG_CORR = 3,       // LoopClosureCorrection ESP1->ESP2
-  MSG_POSE = 4,       // Pose2D ESP2->ESP1
-  MSG_TXT = 5
-  // maybe more to add
-};
-
-enum PathType : uint8_t {
-    GLOBAL = 1,
-    LOCAL = 2
+  MSG_PATH = 1,       // PathMessage ESP1->ESP2
+  MSG_POSE = 2,       // Pose2D ESP2->ESP1
 };

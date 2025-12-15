@@ -71,18 +71,17 @@ class Esp_link {
     void sendPos(const Pose2D& p);
 
     /**
-     * @brief Sends a GlobalPathMessage message over the ESP-to-ESP UART link.
+     * @brief Sends a PathMessage message over the ESP-to-ESP UART link.
      *
-     * Writes the MSG_PATH header byte and then transmits the GlobalPathMessage structure
+     * Writes the MSG_PATH header byte and then transmits the PathMessage structure
      * as raw binary data. The payload is sent exactly as it is laid out in memory,
      * allowing fast and compact communication.
      * 
      * gpm.current_length waypoints are sent even if some of them are not initialised. 
-     * (may change ---------)
      *
-     * @param gpm GlobalPathMessage struct to transmit.
+     * @param gpm PathMessage struct to transmit.
      */
-    void sendPath(const PathMessage& pm, PathType type);
+    void sendPath(const PathMessage& pm);
 
     /**
      * @brief Retrieves the oldest pending Pose2D message from the queue.
@@ -96,16 +95,16 @@ class Esp_link {
     bool get_pos(Pose2D& out);
 
     /**
-     * @brief Retrieves the most recently received GlobalPathMessage.
+     * @brief Retrieves the most recently received PathMessage.
      *
-     * Copies the internally stored GlobalPathMessage into @p out and
+     * Copies the internally stored PathMessage into @p out and
      * returns true. This function does not perform queueing: only the
      * latest received path is kept.
      *
-     * @param out Reference where the stored GlobalPathMessage will be written.
+     * @param out Reference where the stored PathMessage will be written.
      * @return true always, since a path is always considered available.
      */
-    bool get_path(PathMessage& out, PathType type);
+    bool get_path(PathMessage& out);
 
     private:
     // static constexpr size_t QUEUE_CAP = 1;
@@ -115,29 +114,9 @@ class Esp_link {
 
     HardwareSerial& ser_;
 
-    // Pose2D queue_pos[QUEUE_CAP];
-    // size_t head_pos = 0;
-    // size_t tail_pos = 0;
-    // size_t count_pos = 0;
-
     Pose2D pos_;
     bool pos_available = false;
 
     PathMessage gpm_;
-    PathMessage lpm_;
     bool gpm_available = false;
-    bool lpm_available = false;
-
-    /**
-     * @brief Stores a received Pose2D in the queue.
-     *
-     * Inserts the given Pose2D into the circular buffer used to hold
-     * pending pose messages. 
-     * 
-     * @note If the queue is full, the oldest entry
-     * is dropped to make room for the new one.
-     *
-     * @param p Pose2D message to enqueue.
-     */
-    // void push_pos(const Pose2D& p);
 };
