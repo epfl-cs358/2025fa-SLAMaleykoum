@@ -439,11 +439,10 @@ We tried many things that were eventually not used. These can be found in the su
 
 #### `esp1`
 - `rpLidar` (and `rpLidarTypes`) contains the full KKest library as found on GitHub. While we kept the same underlying implementation, we simplified it in our codebase to reduce memory usage. The original version is kept here for reference.
-- `ekf_slam` was not used because the imu was not accurate enough.
 
 #### `esp2`
 - `motor_pid` was ultimately not functional due to the poor quality of the ESC we used.
-- `ekf_localizer` was not used because the imu was not accurate enough.
+- `ekf_localizer` was not used because the imu was not accurate enough for acceleration_y and accelration_x so the computation of the position using imu was unreliable.
 - `pure_pursuit` is used in the project, but the archived files contain earlier implementations based on EKF and PID control. We kept the full version here for reference, while a cleaned and correct implementation is used in the main code.
 
 ### The Tests
