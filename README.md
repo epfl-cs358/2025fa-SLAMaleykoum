@@ -266,6 +266,9 @@ Note: The CAD files for the **front bumper**, **ultrasonic sensor case**, and **
 
 ### Challenges & Recommendations
 
+Before implementing the hardware setup, check the [Problems and Recommendations](#problems-and-recommendations) section to get a full scope of what may need to be modified.
+
+
 ## System Architecture
 
 ### High-Level Design Philosophy
@@ -507,6 +510,27 @@ If you encounter issues, check the list below before reaching out.
 | **ESP keeps crashing** | Battery might be to low | Check the battery level, charge it |
 | **Map is not displaying but python code is up** | Incoherent map sizes | Double check the values in the `ground_station.py` file and the rest of the code, for the size of the map (grid size) and their max bounds are the same |
 | **ESP1 crashes imidiately** | The map size is too big | Reduce the map size. Note: The max nb of cells we managed to run with is 70x70 but if the real world size is not enough, you can increase the `RESOLUTION` value which will increase what each cell represents in the real world |
+
+## Problems and Recommendations
+
+### Common ESP1 & ESP2
+- **Hardware wear and wiring issues**: reused components had weak solder joints and loose connectors, causing intermittent failures (especially the encoder).  
+  **Fix**: replaced fragile connectors with screw terminal blocks → stable signals.  
+  **Recommendation**: inspect wiring early, re‑solder weak joints, standardize connectors, and consider a small PCB for reliability.
+
+### ESP1
+- No major unique issues documented beyond general wiring/debugging challenges.
+
+### ESP2
+- **Encoder jitter**: noisy tick timing from electrical/mechanical issues degraded velocity estimation.  
+  **Fix**: used AS5600 library for error handling.  
+  **Recommendation**: sample encoder at high, consistent rates; fuse with IMU data; consider wheel‑mounted encoder for higher resolution.
+
+- **Motor PID control**: stock THW‑1060 ESC only allowed discrete throttle steps, preventing smooth PID control.  
+  **Recommendation**: replace with IBT‑4 (BTS7960) for smooth PWM and closed‑loop speed control.
+
+- **IMU acceleration**: drift and bias made acceleration unreliable for odometry/EKF fusion.  
+  **Recommendation**: 
 
 
 
