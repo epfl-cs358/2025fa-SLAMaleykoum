@@ -12,11 +12,12 @@
 #include <Wire.h>
 #include "hardware/I2C_wire.h"
 
+//TODO add all the protections for nana here and odometry!!
 EncoderCarVelocity::EncoderCarVelocity() {}
 
 // Initialize I2C and AS5600
 bool EncoderCarVelocity::begin() {
-    Wire.begin();  // default SDA/SCL pins
+    //Wire.begin();  // default SDA/SCL pins
     if (!as5600.begin()) {
         Serial.println("AS5600 not detected!");
         return false;
