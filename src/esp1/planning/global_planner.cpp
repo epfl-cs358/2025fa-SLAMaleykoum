@@ -5,9 +5,6 @@
 
 GlobalPlanner::GlobalPlanner() {}
 
-// ---------------------------------------------------------
-//                       A* PLANNER
-// ---------------------------------------------------------
 PathMessage GlobalPlanner::generate_path(
     const Pose2D& current_pose,
     const MissionGoal& goal,
@@ -30,9 +27,7 @@ PathMessage GlobalPlanner::generate_path(
     if (W <= 0 || H <= 0 || MAX_CELLS > GP_MAX_CELLS)
         return msg;
 
-    // -------------------------------------------
     // Convert start & goal to grid
-    // -------------------------------------------
     int sx, sy, gx, gy;
     world_to_grid(current_pose.x, current_pose.y, sx, sy, res, W, H);
     world_to_grid(goal.target_pose.x, goal.target_pose.y, gx, gy, res, W, H);
@@ -43,17 +38,13 @@ PathMessage GlobalPlanner::generate_path(
     int start_idx = sy * W + sx;
     int goal_idx  = gy * W + gx;
 
-    // -------------------------------------------
     // Reset workspace
-    // -------------------------------------------
     for (int i = 0; i < MAX_CELLS; i++) {
         ws->g_cost[i] = 1e9f;
         ws->closed[i] = 0;
     }
 
-    // -------------------------------------------
-    // Binary heap (MIN-HEAP)
-    // -------------------------------------------
+    // Binary Heap (MIN-HEAP)
     ws->pq_size = 0;
 
     auto pq_push = [&](int16_t idx, float f) {
@@ -91,9 +82,7 @@ PathMessage GlobalPlanner::generate_path(
         return ret;
     };
 
-    // -------------------------------------------
-    // Start A*
-    // -------------------------------------------
+    // A STAR SEARCH
     ws->g_cost[start_idx] = 0.f;
     float h0 = sqrtf((gx - sx)*(gx - sx) + (gy - sy)*(gy - sy));
     pq_push((int16_t)start_idx, h0);
@@ -105,6 +94,7 @@ PathMessage GlobalPlanner::generate_path(
     bool found = false;
     int loop_counter = 0;
 
+    // Main A* Loop
     while (ws->pq_size > 0) {
 
         loop_counter++;
@@ -127,6 +117,7 @@ PathMessage GlobalPlanner::generate_path(
         int cy = c_idx / W;
         float gc = ws->g_cost[c_idx];
 
+        // Explore neighbors (4-neighborhood)
         for (int i = 0; i < 4; i++) {
             int nx = cx + DX[i];
             int ny = cy + DY[i];
@@ -138,9 +129,7 @@ PathMessage GlobalPlanner::generate_path(
             // Obstacle check
             if (map.get_cell_probability(nx, ny) > FREE_BOUND_PROB) continue;
 
-            // -----------------------------
-            // 🔴 SAFETY COST (KEY FIX)
-            // -----------------------------
+            // Additional cost for nearby obstacles
             float obstacle_penalty = 0.0f;
             for (int oy = -1; oy <= 1; oy++) {
                 for (int ox = -1; ox <= 1; ox++) {
@@ -166,12 +155,11 @@ PathMessage GlobalPlanner::generate_path(
 
     if (!found) return msg;
 
-    // -------------------------------------------
-    // Reconstruction (SAFE)
-    // -------------------------------------------
+    // Reconstruct path (safe)
     int plen = 0;
     int curr = goal_idx;
 
+    // Backtrack from goal to start
     while (curr != start_idx && plen < GP_MAX_CELLS - 1) {
         ws->px[plen] = curr % W;
         ws->py[plen] = curr / W;
@@ -183,9 +171,7 @@ PathMessage GlobalPlanner::generate_path(
     ws->py[plen] = sy;
     plen++;
 
-    // -------------------------------------------
-    // Output
-    // -------------------------------------------
+    // Output path
     msg.current_length = std::min(plen, MAX_PATH_LENGTH);
 
     for (int i = 0; i < msg.current_length; i++) {

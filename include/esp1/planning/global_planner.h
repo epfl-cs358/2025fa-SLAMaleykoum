@@ -1,9 +1,7 @@
-// Filename: esp1/planning/global_planner.h
-// Description: Global path planning using A* on the Bayesian Occupancy Grid.
-/** @filename: esp1/hardware/bayesian_grid.h
- *  @description: Contract for the coarse Bayesian Occupancy Grid map.
+/** @filename: esp1/planning/global_planner.h
+ *  @description: Global path planning using A* on the Bayesian Occupancy Grid
  * 
- *  @job: Manages the occupancy map using Bayesian filtering.
+ *  @job: Produces a list of world-coordinate waypoints for the robot to follow.
  */
 #pragma once
 
@@ -29,7 +27,7 @@ struct GlobalPlannerWorkspace {
 };
 
 /**
- * @brief Global Planner implementing an (coarse) A* search on the full grid.
+ * @brief Global Planner implementing an A* search on the full grid.
  * 
  * Produces a list of world-coordinate waypoints for the robot to follow.
  * Rarely called (only when goal changes or if the map changes a lot)
@@ -43,10 +41,16 @@ public:
      *
      * @param current_pose  Current pose from localization.
      * @param goal          Mission goal
-     * @param map           Bayesian occupancy grid (coarse).
+     * @param map           Bayesian occupancy grid.
      * @param ws            Workspace for A* (to avoid reallocation).
+     * 
+     * This function uses A* to find a path from the current robot position
+     * to the goal position on the provided occupancy grid map.
+     * It accounts for obstacles by treating cells with high occupancy probability as blocked.
+     * A cell is considered occupied if its probability > FREE_BOUND_PROB.
+     * The planner gives the better path by using a heuristic based on Euclidean distance.
      *
-     * @return GlobalPathMessage containing a few waypoints in world coordinates.
+     * @return PathMessage containing a few waypoints in world coordinates.
      */
     PathMessage generate_path(const Pose2D& current_pose,
                               const MissionGoal& goal,

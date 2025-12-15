@@ -236,29 +236,38 @@ Both the encoder and the IMU are powered by the **3V3 pin of ESP2**, using two c
   <img src="/assets/circuit/soldering_step2_placeholder.png" alt="Soldering Step 2" width="300"/><br>
   <b>Soldering Step 2</b>
 </p>
----
 
-### CAD files
 
+### CAD Files
+
+You can explore all STL files directly in the [CAD folder](/assets/CAD).  
 
 This folder contains STL files for all custom 3D‑printed parts used in the car build.  
-Each part has its STL file and a reference photo of the real‑life assembly.
+Each part has its STL file and a preview image of the CAD design.
 
 - **Front Bumper & Ultrasonic Sensor Case**  
-  <p align="center"><img src="/assets/Images/cad_images/bumper_ultrasonic_real.jpg" width="300"/></p>
+  <p align="center"><img src="/assets/Images/CAD/bumber_cad_image.jpg" alt="Bumper CAD design" width="300"/></p>
+  <p align="center"><img src="/assets/Images/CAD/ultrasonic_holder_cad_image.jpg" alt="Ultrasonic Sensor Holder CAD design" width="300"/></p>
 
 - **Encoder Mount**  
-  <p align="center"><img src="/assets/Images/cad_images/encoder_real.jpg" width="300"/></p>
+  <p align="center"><img src="/assets/Images/CAD/encoder_holder_cad_image.jpg" alt="Encoder Mount CAD design" width="300"/></p>
 
 - **Car Body Platform**  
-  <p align="center"><img src="/assets/Images/cad_images/body_real.jpg" width="300"/></p>
+  <p align="center"><img src="/assets/Images/CAD/body_cad_image.jpg" alt="Car Body CAD design" width="300"/></p>
 
 - **Roof Cover**  
-  <p align="center"><img src="/assets/Images/cad_images/roof_real.jpg" width="300"/></p>
+  <p align="center"><img src="/assets/Images/CAD/roof_cad_image.jpg" alt="Roof CAD design" width="300"/></p>
+
+- **Body & Roof Cover (combined view)**  
+  <p align="center"><img src="/assets/Images/CAD/body_roof_cad_image.jpg" alt="Body & Roof CAD design" width="300"/></p>
 
 Note: The CAD files for the **front bumper**, **ultrasonic sensor case**, and **encoder mount** were originally designed by the group from whom we inherited the car, **TurboSLAM**.
 
-### Challenged & Recommendations
+
+### Challenges & Recommendations
+
+Before implementing the hardware setup, check the [Problems and Recommendations](#problems-and-recommendations) section to get a full scope of what may need to be modified.
+
 
 ## System Architecture
 
@@ -423,6 +432,27 @@ If you encounter issues, check the list below before reaching out.
 | **Map is not displaying but python code is up** | Incoherent map sizes | Double check the values in the `ground_station.py` file and the rest of the code, for the size of the map (grid size) and their max bounds are the same |
 | **ESP1 crashes imidiately** | The map size is too big | Reduce the map size. Note: The max nb of cells we managed to run with is 70x70 but if the real world size is not enough, you can increase the `RESOLUTION` value which will increase what each cell represents in the real world |
 
+## Problems and Recommendations
+
+### Common ESP1 & ESP2
+- **Hardware wear and wiring issues**: reused components had weak solder joints and loose connectors, causing intermittent failures (especially the encoder).  
+  **Fix**: replaced fragile connectors with screw terminal blocks → stable signals.  
+  **Recommendation**: inspect wiring early, re‑solder weak joints, standardize connectors, and consider a small PCB for reliability.
+
+### ESP1
+- No major unique issues documented beyond general wiring/debugging challenges.
+
+### ESP2
+- **Encoder jitter**: noisy tick timing from electrical/mechanical issues degraded velocity estimation.  
+  **Fix**: used AS5600 library for error handling.  
+  **Recommendation**: sample encoder at high, consistent rates; fuse with IMU data; consider wheel‑mounted encoder for higher resolution.
+
+- **Motor PID control**: stock THW‑1060 ESC only allowed discrete throttle steps, preventing smooth PID control.  
+  **Recommendation**: replace with IBT‑4 (BTS7960) for smooth PWM and closed‑loop speed control.
+
+- **IMU acceleration**: drift and bias made acceleration unreliable for odometry/EKF fusion.  
+  **Recommendation**: 
+
 
 
 ## Archives
@@ -434,6 +464,6 @@ You can the things that WILL NOT CHANGE are mainly the hardware files, since the
 
 Parts like the `pid_controller` or `ekf_filter` in `odometry/` will not change either since regardless of how we link everyhting those are things we MUST do.
 
-
+## Conclusion
 
 ---
