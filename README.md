@@ -271,9 +271,7 @@ Before implementing the hardware setup, check the [Problems and Recommendations]
 
 ## System Architecture
 
-### High-Level Design Philosophy
-
-The computational load will be devided over the two ESP32-S3 microcontrollers. The first one taking care of the mapping & global planning, while the second one takes care of localization & control of the vehicle. We run **FreeRTOS** to take care of our parallelism and we are comunicating between our two ESPs via **UART** (via the serial ports).
+The computational load is devided over the two ESP32-S3 microcontrollers. The first one takes care of the mapping & global planning, while the second one takes care of localization & control of the vehicle. We run **FreeRTOS** to take care of our parallelism and we are comunicating between our two ESPs via **UART** (via the serial ports).
 
 ### ESP-1: Mapping & Planning
 
@@ -288,8 +286,8 @@ The computational load will be devided over the two ESP32-S3 microcontrollers. T
 - Find the frontiers to explore and cluster them using BFS algorithms
 - Define a goal to reach
 - Plan global paths using A* algorithm
-- Send path to follow to esp2
 - Share maps with ground station via wifi
+- Send path to follow to esp2
 
 ### ESP-2: Localization & Control
 
@@ -301,61 +299,44 @@ The computational load will be devided over the two ESP32-S3 microcontrollers. T
 
 **Core Responsibilities**:
 - Execute Pure Pursuit path following algorithm
+- Handle emergency stop commands and maneuvers to escape when stuck
 - Aggregate sensor data (odometry, IMU) and forward to ESP-1
-- Handle emergency stop commands
+
+### Shared mecanisms (`common/`)
+
+- `data_types.h`: Definitions of shared data structures
+- `esp_link.h`: The communication system from one esp to the other. [Open esp_link README](include/common/esp_link_readme.md)
+- `transforms.h`: Functions that transforms the position of the robot to the grid and the other way around. [Open transforms README](include/common/transforms_readme.md)
+- `utils.h`: regroups the functions used accross different files to avoid redifining it.
+- `wifi_connection.h`: Protocol to connect the wifi for MQTT
 
 ### Why This Architecture?
 
-**Advantages**:
 1. **Performance**: Each processor can focus on its task without competing for resources
 2. **Modularity**: Components are well-isolated, making testing and debugging easier
 3. **Reliability**: Control loop continues operating even if global planning encounters issues
+4. **Efficiency**: Only essential datas are sent from one esp to the other, limiting the flow of information.
 
----
-
-### Shared Data Structures (`common/data_types.h`)
-
-Definitions of shared data structures that enable communication between components:
 
 ## Data Flow and Communication
 
 ### Inter-ESP Communication (UART)
 
-**ESP-2 → ESP-1 (1-2 Hz)**:
-- Aggregated odometry measurements
-- IMU data samples
-- Current local pose estimate
-- Status and telemetry
+**ESP-2 → ESP-1**: Current local pose estimate
 
-**ESP-1 → ESP-2 (Event-driven + periodic)**:
-- Global path updates (when new path computed)
-- Mission status updates
+**ESP-1 → ESP-2**: Global path updates (when new path computed)
 
-**Design Rationale**:
-- Low-frequency communication reduces UART overhead
-- ESP-2 aggregates high-frequency sensor data before transmission
-- Event-driven updates for time-critical information
+### Ground Station Communication (wifi / MQTT)
 
-### Ground Station Communication (MQTT)
+The ESP creates a Wi-Fi access point (AP) that we connect to for monitoring purposes only. We used MQTT at first to get feedback during tests, but quickly switched to TCP, as it supports higher data throughput.
 
 **ESP-1 → Ground Station**:
 - Real-time map visualization data
+- Mission status: goal and state
 - Robot pose and trajectory
-- Mission status and telemetry
-- Debug information
+- Telemetry
 
-**Ground Station → ESP-1**:
-- User-defined waypoints ("manual control")
-- Mission mode commands
-- Emergency stop override
-- Parameter adjustments
-
-**Benefits**:
-- MQTT provides publish-subscribe pattern for efficient multi-subscriber support
-- Quality of Service (QoS) levels ensure critical commands are delivered
-- WiFi enables wireless operation without tether
-
-
+--- 
 
 #### Diagram
 ![alt text](/docs/global-architecture-2.png)
