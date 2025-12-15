@@ -325,9 +325,10 @@ The computational load is devided over the two ESP32-S3 microcontrollers. The fi
 
 **ESP-1 → ESP-2**: Global path updates (when new path computed)
 
-### Ground Station Communication (wifi / MQTT)
+### Ground Station Communication (Wifi / MQTT)
 
 The ESP creates a Wi-Fi access point (AP) that we connect to for monitoring purposes only. We used MQTT at first to get feedback during tests, but quickly switched to TCP, as it supports higher data throughput.
+If you want to establish the same MQTT connection to debug, here is the guide to follow [Wifi and MQTT connection](/assets/docs/WiFi_and_MQTT_Connection_Guide___SLAMaleykoum.pdf).
 
 **ESP-1 → Ground Station**:
 - Real-time map visualization data
@@ -416,7 +417,19 @@ If you encounter issues, check the list below before reaching out.
   **Recommendation**: inspect wiring early, re‑solder weak joints, standardize connectors, and consider a small PCB for reliability.
 
 ### ESP1
-- No major unique issues documented beyond general wiring/debugging challenges.
+- The main problems encountered on the ESP1 were related to the **LiDAR**, as it's a difficult hardware component to work with.
+
+- The first problem was getting it to run by sending a command via the `RX pin` connected to the `LiDAR's TX pin`. The `RX pin` in the code must correspond to the one connected to the LiDAR's RX pin for the serial port to start correctly.
+
+- We then had to collect the **LiDAR data**, and there were many issues. Since the initially planned MQTT connection couldn't transmit that much data, we had to configure the ESP32 to create a Wi-Fi access point and a TCP server, which we connected to via a Python file and which printed a LiDAR map in real time. It's always necessary to accept that there will be some unforeseen issues, especially when trying to obtain all the points from every scan: latency can occur.
+
+- We found a **downsampling** solution: either taking one point every five points, or one scan every three. This works much better and remains accurate. The data had to be retrieved correctly according to the buffer obtained via the LiDAR, particularly by decoding it properly. We had to pay close attention to the conversions between degrees and radians.
+
+- Another problem encountered was the **Bayesian grid**. It had to be implemented efficiently enough for the algorithm to fit on the ESP32. Also, the map size and resolution had to match those defined in the Python file.
+
+- For the **Mission Planner**, the main problem was defining the correct boundaries. We ultimately chose to define a "boundary" point as a white square next to a gray square. The problem then was to cluster these points and choose the most interesting boundary to visit. We defined the best boundary as one with a minimum of 5 squares and the one closest to the SLAM (Short Land Area Map).
+
+- For the **Global Planner**, the problems encountered were mainly related to the efficiency of the **A-Star algorithm**. We limited the number of waypoints to a maximum of 5 and evenly distributed them along the found path. We decided to use a heursitic function with the distance from the current point to the goal to find the optimal path as quickly as possible.
 
 ### ESP2
 - **Encoder jitter**: noisy tick timing from electrical/mechanical issues degraded velocity estimation.  

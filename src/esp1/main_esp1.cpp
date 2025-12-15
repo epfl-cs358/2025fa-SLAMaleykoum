@@ -235,7 +235,7 @@ void IPC_Receive_Task(void* parameter) {
             if (xSemaphoreTake(Pose_Mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
                 float x_diff = incoming_pose.x -  last_known_pose.x;
                 float y_diff = incoming_pose.y -  last_known_pose.y;
-                if (((x_diff) * (x_diff) + (y_diff) * (y_diff)) > 100.0f) {
+                if (((x_diff) * (x_diff) + (y_diff) * (y_diff)) > 1.0f) {
                     // Discard obviously wrong pose
                     xSemaphoreGive(Pose_Mutex);
                     continue;
@@ -500,7 +500,7 @@ void Global_Planner_Task(void* parameter) {
     GlobalPlanner planner; 
     Pose2D local_pose;
     MissionGoal global_goal;
-    MissionGoal local_goal_copy; // ← NOUVEAU: garder une copie
+    MissionGoal local_goal_copy; // NOUVEAU: garder une copie
 
     while (1) {
         PathMessage pathMsg = {{{0}}, 0, 0, 0};
@@ -511,7 +511,7 @@ void Global_Planner_Task(void* parameter) {
             goal_pending = new_goal_arrived;
             if (goal_pending) {
                 local_pose = last_known_pose;
-                local_goal_copy = current_mission_goal; // ← Copie
+                local_goal_copy = current_mission_goal; // Copie
             }
             xSemaphoreGive(State_Mutex); 
         }
@@ -525,14 +525,12 @@ void Global_Planner_Task(void* parameter) {
             uint32_t duration = millis() - t0;
             sys_health.global_plan_time_us = duration * 1000;
             
-            // ⚠️ Log si trop long
+            // Log si trop long
             if (duration > 200) {
-                Serial.printf("🐌 A* took %lums for goal:(%.1f,%.1f)\n",
-                             duration, local_goal_copy.target_pose.x, 
-                             local_goal_copy.target_pose.y);
+                // A* took too long
             }
 
-            // ✅ VÉRIFIER: Le goal a-t-il changé pendant A*?
+            // VÉRIFIER: Le goal a-t-il changé pendant A*?
             if(xSemaphoreTake(State_Mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
                 bool goal_changed = (
                     current_mission_goal.target_pose.x != local_goal_copy.target_pose.x ||
@@ -541,16 +539,16 @@ void Global_Planner_Task(void* parameter) {
                 );
                 
                 if (goal_changed) {
-                    // ❌ Goal a changé pendant A* → Ignorer ce path
-                    Serial.println("⚠️ Goal changed during A* - discarding path");
+                    // Goal a changé pendant A* → Ignorer ce path
+                    Serial.println("Goal changed during A* - discarding path");
                 } else {
-                    // ✅ Goal n'a pas changé → Mettre à jour
+                    // Goal n'a pas changé → Mettre à jour
                     if (pathMsg.current_length == 0) {
                         global_path_invalid = true;
                         current_global_path.current_length = 0;
                     } else {
                         current_global_path = pathMsg;
-                        new_goal_arrived = false; // ← Safe maintenant
+                        new_goal_arrived = false; // Safe maintenant
                         esp_link.sendPath(current_global_path);
                     }
                 }

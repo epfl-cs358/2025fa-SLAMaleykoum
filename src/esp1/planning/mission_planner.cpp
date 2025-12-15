@@ -84,6 +84,8 @@ void MissionPlanner::store_candidate_if_valid(int sum_x, int sum_y, int size, in
 }
 
 void MissionPlanner::find_cluster(const BayesianOccupancyGrid& grid, int start_x, int start_y, int& candidate_count) {
+    bool first_set = false;
+
     // BFS Queue (Ring Buffer)
     struct Point { int16_t x; int16_t y; };
     static Point bfs_q[BFS_QUEUE_SIZE]; // Static: Allocated once in memory, not on stack
@@ -105,6 +107,13 @@ void MissionPlanner::find_cluster(const BayesianOccupancyGrid& grid, int start_x
         sum_x += current.x;
         sum_y += current.y;
         if (size >= 100) break;
+
+        // Store First Point
+        if (!first_set) {
+            candidates[candidate_count].first_x = current.x;
+            candidates[candidate_count].first_y = current.y;
+            first_set = true;
+        }
 
         // Check Neighbors
         static int dx8[8] = { 1,-1, 0, 0, 1, 1,-1,-1 };
@@ -179,6 +188,8 @@ bool MissionPlanner::is_current_goal_valid(const Pose2D& robot_pose, const Bayes
 MissionGoal MissionPlanner::update_goal(const Pose2D& pose, const BayesianOccupancyGrid& grid, bool global_planner_failed)
 {
     const int PATIENCE_LIMIT = 20; 
+    const int NEAR_RANGE_CELLS = (int)(FRONTIER_NEAR_RANGE_M / grid.grid_resolution);
+    const int NEAR_RANGE_SQ = NEAR_RANGE_CELLS * NEAR_RANGE_CELLS;
 
     if (current_target_.type == RETURN_HOME) {
         current_target_.target_pose = home_pose_;
@@ -213,10 +224,9 @@ MissionGoal MissionPlanner::update_goal(const Pose2D& pose, const BayesianOccupa
 
         // Select Best
         int best_idx = -1;
-        int max_size = -1;
         float min_dist_sq = 100000.0f;
 
-        for(int i=0; i<candidate_count; i++){
+        for(int i = 0; i < candidate_count; i++) {
             if(candidates[i].valid) {
                 float dx = (candidates[i].center_x - rx);
                 float dy = (candidates[i].center_y - ry);
@@ -230,10 +240,26 @@ MissionGoal MissionPlanner::update_goal(const Pose2D& pose, const BayesianOccupa
         }
 
         if (best_idx != -1) {
-            grid_to_world(candidates[best_idx].center_x, candidates[best_idx].center_y, 
-                          current_target_.target_pose.x, current_target_.target_pose.y,
-                          grid.grid_resolution, grid.grid_size_x, grid.grid_size_y);
-            return current_target_;
+            int cx = candidates[best_idx].center_x;
+            int cy = candidates[best_idx].center_y;
+
+            // Check Distance to Robot
+            int dx = cx - rx;
+            int dy = cy - ry;
+            int d_sq = dx*dx + dy*dy;
+
+            // Check if near range
+            if (d_sq < NEAR_RANGE_SQ) {
+                grid_to_world(candidates[best_idx].first_x, candidates[best_idx].first_y,
+                    current_target_.target_pose.x, current_target_.target_pose.y,
+                    grid.grid_resolution, grid.grid_size_x, grid.grid_size_y);
+                return current_target_;
+            } else {
+                grid_to_world(candidates[best_idx].center_x, candidates[best_idx].center_y, 
+                            current_target_.target_pose.x, current_target_.target_pose.y,
+                            grid.grid_resolution, grid.grid_size_x, grid.grid_size_y);
+                return current_target_;
+            }
         // No candidate found, check patience limit
         } else {
             fail_count++;
@@ -246,4 +272,3 @@ MissionGoal MissionPlanner::update_goal(const Pose2D& pose, const BayesianOccupa
     }
     return current_target_;
 }
-

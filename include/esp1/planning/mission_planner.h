@@ -8,6 +8,7 @@
 #define MAX_FRONTIER_CANDIDATES 10
 #define BFS_QUEUE_SIZE 200
 #define MIN_CLUSTER_SIZE 8
+#define FRONTIER_NEAR_RANGE_M  1.0f
 
 class MissionPlanner {
 public:
@@ -58,6 +59,8 @@ private:
         int center_x;
         int center_y;
         int size;
+        int first_x;
+        int first_y;
         bool valid;
     };
 
