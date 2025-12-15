@@ -437,13 +437,31 @@ If you encounter issues, check the list below before reaching out.
 
 
 ## Archives
-//TODO: Talk about the problems
+The purpose of this directory is to save our previous work, and keep track of the tests we made.
 
-#### File structure:
-For now the file structure is still in development.
-You can the things that WILL NOT CHANGE are mainly the hardware files, since they will "just" get/send data from/to the sensors/actuators and do so in a "nice" way to make it easily accessible from other modules. (aka integrate them with our custom api)
+### Previous work
+We tried many things that were eventually not used. These can be found in the subdirectories of `esp1` and `esp2`.
 
-Parts like the `pid_controller` or `ekf_filter` in `odometry/` will not change either since regardless of how we link everyhting those are things we MUST do.
+#### `esp1`
+- `rpLidar` (and `rpLidarTypes`) contains the full KKest library as found on GitHub. While we kept the same underlying implementation, we simplified it in our codebase to reduce memory usage. The original version is kept here for reference.
+- `ekf_slam` was not used because the imu was not accurate enough.
+
+#### `esp2`
+- `motor_pid` was ultimately not functional due to the poor quality of the ESC we used.
+- `ekf_localizer` was not used because the imu was not accurate enough.
+- `pure_pursuit` is used in the project, but the archived files contain earlier implementations based on EKF and PID control. We kept the full version here for reference, while a cleaned and correct implementation is used in the main code.
+
+### The Tests
+Some tests are no longer directly runnable without modifications, as data types evolved over time and the include paths differ from the current project structure.
+
+There is one test directory per ESP, containing all the tests developed throughout the project. Some tests target specific components, while others exercise the full system.
+
+To avoid redefining the same constants and parameters in every test, two shared files are used:
+`test_common_esp<i>` contains constants and the prototypes of the setup and loop functions, and `test_globals_esp<i>` defines and initializes global variables.
+
+Each test entry point is implemented in `test_main_esp<i>`, which simply includes these shared files. In the setup and loop functions of the test main, the test to run is selected via a test ID.
+
+The Python files are used for TCP monitoring and for displaying the received data in a structured format.
 
 ## Conclusion
 
