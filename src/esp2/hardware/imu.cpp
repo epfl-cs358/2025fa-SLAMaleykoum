@@ -7,9 +7,7 @@ ImuSensor::ImuSensor()
     : bno086(), sensorValue{}, imu_data{} {}
 
 bool ImuSensor::begin() {
-    
     // Initialize the BNO086
-    //if (!bno086.begin_I2C(IMU_ADDR, &I2C_wire, 4)) { 
     if (!bno086.begin_I2C(IMU_ADDR, &I2C_wire)) {
         Serial.println("Failed to initialize BNO08x!");
         return false;
@@ -26,9 +24,7 @@ bool ImuSensor::begin() {
 }
 
 bool ImuSensor::configureSensor(uint32_t period_us) {
-    return bno086.enableReport(SH2_GAME_ROTATION_VECTOR, period_us) 
-            && bno086.enableReport(SH2_LINEAR_ACCELERATION, period_us);
-            //&& bno086.enableReport(SH2_GYROSCOPE_UNCALIBRATED, period_us);
+    return bno086.enableReport(SH2_GAME_ROTATION_VECTOR, period_us);
 }
 
 void ImuSensor::readAndUpdate() {
@@ -43,22 +39,6 @@ void ImuSensor::readAndUpdate() {
         imu_data.qy = rv.j;
         imu_data.qz = rv.k;
     }
-
-    // Linear acceleration (m/s²)
-    if (sensorValue.sensorId == SH2_LINEAR_ACCELERATION) {
-        const auto& a = sensorValue.un.linearAcceleration;
-        imu_data.acc_x = a.x;
-        imu_data.acc_y = a.y;
-        imu_data.acc_z = a.z;
-    }
-
-    // Angular velocity (rad/s)
-    // if (sensorValue.sensorId == SH2_GYROSCOPE_UNCALIBRATED) {
-    //     const auto& g = sensorValue.un.gyroscope;
-    //     imu_data.omega_x = g.x;
-    //     imu_data.omega_y = g.y;
-    //     imu_data.omega_z = g.z;
-    // }
 
     imu_data.timestamp_ms = millis();
 }

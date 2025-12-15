@@ -1,9 +1,6 @@
 /**
  * @file MotorController.h
  * @brief Low-level driver for controlling the DC motor through the Tamiya brushed ESC
- * 
- * @author SLAMaleykoum & TurboSLAM no changes
- * @date Oct 2025
  */
 
 #pragma once
@@ -25,7 +22,6 @@ static constexpr uint16_t UPDATE_PERIOD_MS = 50; // 50ms between each step
  * @class MotorController 
  * @brief Sends the PWM signals to the motor via the ESC
  */
-
 class MotorController {
 public:
   /**
@@ -37,8 +33,10 @@ public:
   /**
    * @brief Initializes the ESC and sets it to neutral.
    * @return True if ESC successfully attached to the PWM pin, false otherwise.
+   * 
+   * @note Call once in setup(); returns false on failure
   */
-  bool begin(); // Call once in setup(); returns false on failure
+  bool begin();
 
   /**
    * @brief Set a target PWM pulse width directly.
@@ -69,9 +67,6 @@ public:
    * @return Current pulse width in microseconds.
    */
   uint16_t currentUs() const { return _currentUs;}
-
-  
-  //void command(int dir); TODO they didn't end up using it 
 
 private:
   int   _pwmPin;

@@ -23,7 +23,6 @@ private:
     sh2_SensorValue_t sensorValue; // temp structure to keep the current mesure
     const uint8_t IMU_ADDR = 0x4B;
   
-
     /**
      * @brief Enable desired BNO08x reports at a given period.
      * @param period_us Reporting period in microseconds
