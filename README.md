@@ -240,6 +240,8 @@ Both the encoder and the IMU are powered by the **3V3 pin of ESP2**, using two c
 
 ### CAD Files
 
+You can explore all STL files directly in the [CAD folder](/assets/CAD).  
+
 This folder contains STL files for all custom 3D‑printed parts used in the car build.  
 Each part has its STL file and a preview image of the CAD design.
 
@@ -262,7 +264,7 @@ Each part has its STL file and a preview image of the CAD design.
 Note: The CAD files for the **front bumper**, **ultrasonic sensor case**, and **encoder mount** were originally designed by the group from whom we inherited the car, **TurboSLAM**.
 
 
-### Challenged & Recommendations
+### Challenges & Recommendations
 
 ## System Architecture
 
@@ -517,6 +519,6 @@ You can the things that WILL NOT CHANGE are mainly the hardware files, since the
 
 Parts like the `pid_controller` or `ekf_filter` in `odometry/` will not change either since regardless of how we link everyhting those are things we MUST do.
 
-
+## Conclusion
 
 ---
