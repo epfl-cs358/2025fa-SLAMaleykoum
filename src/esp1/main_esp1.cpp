@@ -21,6 +21,8 @@
 #define TCP_HEADER_SIZE 96
 
 // --- NETWORK CONFIG ---
+// const char* ssid = "SPOT-iot";
+// const char* password = "KyrielleCivetTicketNombreuse6695";
 const char* ssid = "LIDAR_AP";
 const char* password = "l1darpass";
 const uint16_t TCP_PORT = 9000;
@@ -231,6 +233,13 @@ void IPC_Receive_Task(void* parameter) {
         Pose2D incoming_pose;
         if (esp_link.get_pos(incoming_pose)) {
             if (xSemaphoreTake(Pose_Mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+                float x_diff = incoming_pose.x -  last_known_pose.x;
+                float y_diff = incoming_pose.y -  last_known_pose.y;
+                if (((x_diff) * (x_diff) + (y_diff) * (y_diff)) > 100.0f) {
+                    // Discard obviously wrong pose
+                    xSemaphoreGive(Pose_Mutex);
+                    continue;
+                }
                 last_known_pose = incoming_pose;
                 // 1. Update Heartbeat
                 sys_health.last_esp2_packet_ms = millis(); 
@@ -254,8 +263,8 @@ void Lidar_Read_Task(void* parameter) {
 
     while (1) {
         bool scanComplete = false;
-        // lidar.build_scan(&scan, scanComplete, lastAngleESP);
-        lidar.readScanLive(&scan, scanComplete, lastAngleESP);
+        lidar.build_scan(&scan, scanComplete, lastAngleESP);
+        // lidar.readScanLive(&scan, scanComplete, lastAngleESP);
 
         if (scanComplete) {
             if (scan.count > 10) { 
@@ -303,8 +312,12 @@ void Lidar_Sync_Map_Task(void* parameter) {
                 xQueueSend(Lidar_Pose_Queue_Ready, &current_work_buffer, 0);
             } else {
                 // Serial.println("DROP: Map task too slow, no free buffers!");
+
+                vTaskDelay(pdMS_TO_TICKS(5));
             }
         }
+
+        vTaskDelay(pdMS_TO_TICKS(5));
     }
 }
 
@@ -339,7 +352,11 @@ void Bayesian_Grid_Task(void* parameter) {
             // 3. RECYCLE: Return the pointer to the Free Queue
             // The Producer can now use this memory again.
             xQueueSend(Lidar_Pose_Queue_Free, &incoming_data_ptr, 0);
-        } 
+
+            vTaskDelay(pdMS_TO_TICKS(5));
+        } else {
+            vTaskDelay(pdMS_TO_TICKS(10));
+        }
     }
 }
 
@@ -389,45 +406,159 @@ void Mission_Planner_Task(void* parameter) {
 // =============================================================
 // GLOBAL PLANNER TASK
 // =============================================================
+// void Global_Planner_Task(void* parameter) {
+//     GlobalPlanner planner; 
+//     Pose2D local_pose;
+//     MissionGoal global_goal;
+
+//     while (1) {
+//         // Initialize explicitly to ensure length is 0 if not updated
+//         PathMessage pathMsg = {{{0}}, 0, 0, 0};      
+        
+//         if (new_goal_arrived) {
+//             if(xSemaphoreTake(State_Mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+//                 local_pose = last_known_pose;
+//                 global_goal = current_mission_goal;
+//                 xSemaphoreGive(State_Mutex); 
+//             } else {
+//                 vTaskDelay(pdMS_TO_TICKS(100));
+//                 continue;
+//             }
+
+//             // Generate Path + Health Monitoring
+//             uint32_t t0 = micros();
+//             pathMsg = planner.generate_path(local_pose, global_goal, *TheMap, gp_workspace);
+//             sys_health.global_plan_time_us = micros() - t0;
+
+//             if (pathMsg.current_length == 0) {
+//                  // Path planning failed!
+//                  if(xSemaphoreTake(State_Mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+//                     global_path_invalid = true;
+//                     current_global_path.current_length = 0; 
+//                     xSemaphoreGive(State_Mutex);
+//                 }
+//                 //  Serial.println("GP: A* Failed or Empty.");
+//             } else {
+//                 // Success
+//                 current_global_path = pathMsg;
+//                 esp_link.sendPath(current_global_path);
+//                 new_goal_arrived = false; 
+//             }
+//         }
+//         vTaskDelay(pdMS_TO_TICKS(500));
+//     }
+// }
+
+// void Global_Planner_Task(void* parameter) {
+//     GlobalPlanner planner; 
+//     Pose2D local_pose;
+//     MissionGoal global_goal;
+
+//     while (1) {
+//         PathMessage pathMsg = {{{0}}, 0, 0, 0};
+//         bool goal_pending = false;
+        
+//         // Read flag with mutex protection
+//         if(xSemaphoreTake(State_Mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+//             goal_pending = new_goal_arrived;
+//             if (goal_pending) {
+//                 local_pose = last_known_pose;
+//                 global_goal = current_mission_goal;
+//             }
+//             xSemaphoreGive(State_Mutex); 
+//         }
+        
+//         if (goal_pending) {
+//             // Generate Path + Health Monitoring
+//             uint32_t t0 = micros();
+//             pathMsg = planner.generate_path(local_pose, global_goal, *TheMap, gp_workspace);
+//             sys_health.global_plan_time_us = micros() - t0;
+
+//             if (pathMsg.current_length == 0) {
+//                 if(xSemaphoreTake(State_Mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+//                     global_path_invalid = true;
+//                     current_global_path.current_length = 0;
+//                     new_goal_arrived = false;
+//                     xSemaphoreGive(State_Mutex);
+//                 }
+//             } else {
+//                 // Success
+//                 if(xSemaphoreTake(State_Mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+//                     current_global_path = pathMsg;
+//                     new_goal_arrived = false;
+//                     xSemaphoreGive(State_Mutex);
+//                 }
+//                 esp_link.sendPath(current_global_path);
+//             }
+//         }
+        
+//         vTaskDelay(pdMS_TO_TICKS(500));
+//     }
+// }
+
 void Global_Planner_Task(void* parameter) {
     GlobalPlanner planner; 
     Pose2D local_pose;
     MissionGoal global_goal;
+    MissionGoal local_goal_copy; // ← NOUVEAU: garder une copie
 
     while (1) {
-        // Initialize explicitly to ensure length is 0 if not updated
-        PathMessage pathMsg = {{{0}}, 0, 0, 0};      
+        PathMessage pathMsg = {{{0}}, 0, 0, 0};
+        bool goal_pending = false;
         
-        if (new_goal_arrived) {
-            if(xSemaphoreTake(State_Mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+        // Lire le flag + goal
+        if(xSemaphoreTake(State_Mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+            goal_pending = new_goal_arrived;
+            if (goal_pending) {
                 local_pose = last_known_pose;
-                global_goal = current_mission_goal;
-                xSemaphoreGive(State_Mutex); 
-            } else {
-                vTaskDelay(pdMS_TO_TICKS(100));
-                continue;
+                local_goal_copy = current_mission_goal; // ← Copie
+            }
+            xSemaphoreGive(State_Mutex); 
+        }
+        
+        if (goal_pending) {
+            uint32_t t0 = millis();
+            
+            // A* peut prendre 300ms
+            pathMsg = planner.generate_path(local_pose, local_goal_copy, *TheMap, gp_workspace);
+            
+            uint32_t duration = millis() - t0;
+            sys_health.global_plan_time_us = duration * 1000;
+            
+            // ⚠️ Log si trop long
+            if (duration > 200) {
+                Serial.printf("🐌 A* took %lums for goal:(%.1f,%.1f)\n",
+                             duration, local_goal_copy.target_pose.x, 
+                             local_goal_copy.target_pose.y);
             }
 
-            // Generate Path + Health Monitoring
-            uint32_t t0 = micros();
-            pathMsg = planner.generate_path(local_pose, global_goal, *TheMap, gp_workspace);
-            sys_health.global_plan_time_us = micros() - t0;
-
-            if (pathMsg.current_length == 0) {
-                 // Path planning failed!
-                 if(xSemaphoreTake(State_Mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
-                    global_path_invalid = true;
-                    current_global_path.current_length = 0; 
-                    xSemaphoreGive(State_Mutex);
+            // ✅ VÉRIFIER: Le goal a-t-il changé pendant A*?
+            if(xSemaphoreTake(State_Mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+                bool goal_changed = (
+                    current_mission_goal.target_pose.x != local_goal_copy.target_pose.x ||
+                    current_mission_goal.target_pose.y != local_goal_copy.target_pose.y ||
+                    current_mission_goal.type != local_goal_copy.type
+                );
+                
+                if (goal_changed) {
+                    // ❌ Goal a changé pendant A* → Ignorer ce path
+                    Serial.println("⚠️ Goal changed during A* - discarding path");
+                } else {
+                    // ✅ Goal n'a pas changé → Mettre à jour
+                    if (pathMsg.current_length == 0) {
+                        global_path_invalid = true;
+                        current_global_path.current_length = 0;
+                    } else {
+                        current_global_path = pathMsg;
+                        new_goal_arrived = false; // ← Safe maintenant
+                        esp_link.sendPath(current_global_path);
+                    }
                 }
-                //  Serial.println("GP: A* Failed or Empty.");
-            } else {
-                // Success
-                current_global_path = pathMsg;
-                esp_link.sendPath(current_global_path, GLOBAL);
-                new_goal_arrived = false; 
+                
+                xSemaphoreGive(State_Mutex);
             }
         }
+        
         vTaskDelay(pdMS_TO_TICKS(500));
     }
 }
@@ -471,7 +602,7 @@ void setup() {
     Path_Send_Queue = xQueueCreate(1, sizeof(PathMessage));
 
 
-// --- MUTEXES & OBJECTS ---
+    // --- MUTEXES & OBJECTS ---
     Bayesian_Grid_Mutex = xSemaphoreCreateMutex();
     Pose_Mutex = xSemaphoreCreateMutex();
     State_Mutex = xSemaphoreCreateMutex();
@@ -484,9 +615,16 @@ void setup() {
     //     while(1); 
     // }
 
+    // --- WIFI SETUP ---
     WiFi.mode(WIFI_AP);
     WiFi.softAP(ssid, password);
     delay(1000); // Give WiFi time to settle
+    // WiFi.mode(WIFI_STA);
+    // WiFi.setHostname("esp32-lidar-slamaleykoum");
+    // WiFi.begin(ssid, password);
+    // delay(3000);
+
+    // --- TCP SERVER SETUP ---
     tcpServer.begin();
     tcpServer.setNoDelay(true);
 
@@ -504,30 +642,27 @@ void setup() {
     digitalWrite(LED_BUILTIN, HIGH); // Turn off built-in LED
     delay(500);
 
+    digitalWrite(LED_BUILTIN, LOW); // Turn off built-in LED
+    delay(200);
+    digitalWrite(LED_BUILTIN, HIGH); // Turn off built-in LED
+    delay(200);
+    digitalWrite(LED_BUILTIN, LOW); // Turn off built-in LED
+    delay(200);
+    digitalWrite(LED_BUILTIN, HIGH); // Turn off built-in LED
+    delay(200);
+    digitalWrite(LED_BUILTIN, LOW); // Turn off built-in LED
+
     // -- Core 0 (Comms) --
-    xTaskCreatePinnedToCore(IPC_Receive_Task, "IPC_Rx", 2048, NULL, 4, NULL, 0);
-    xTaskCreatePinnedToCore(TCP_Transmit_Task, "TCP_Tx", 4096, NULL, 3, &TCP_Task_Handle, 0); 
-    
+    xTaskCreatePinnedToCore(IPC_Receive_Task, "IPC_Rx", 2048, NULL, 3, NULL, 0);
+    xTaskCreatePinnedToCore(Mission_Planner_Task, "Mission", 4096, NULL, 2, &MPlan_Task_Handle, 0);
+    xTaskCreatePinnedToCore(TCP_Transmit_Task, "TCP_Tx", 4096, NULL, 1, &TCP_Task_Handle, 0); 
+
     // -- Core 1 --
     // NOTE: Passing &MPlan_Task_Handle captures the task ID for monitoring
-    xTaskCreatePinnedToCore(Mission_Planner_Task, "Mission", 4096, NULL, 1, &MPlan_Task_Handle, 0);
-
     xTaskCreatePinnedToCore(Lidar_Read_Task, "Lidar_Read", 3072, NULL, 4, &Lidar_Task_Handle, 1);
     xTaskCreatePinnedToCore(Lidar_Sync_Map_Task, "Lidar_Sync", 4096, NULL, 4, NULL, 1);
     xTaskCreatePinnedToCore(Bayesian_Grid_Task, "Map_Comp", 4096, NULL, 2, NULL, 1);
-    
     xTaskCreatePinnedToCore(Global_Planner_Task, "Global_Plan", 8192, NULL, 1, &GPlan_Task_Handle, 1);
-
-
-    digitalWrite(LED_BUILTIN, LOW); // Turn off built-in LED
-    delay(200);
-    digitalWrite(LED_BUILTIN, HIGH); // Turn off built-in LED
-    delay(200);
-    digitalWrite(LED_BUILTIN, LOW); // Turn off built-in LED
-    delay(200);
-    digitalWrite(LED_BUILTIN, HIGH); // Turn off built-in LED
-    delay(200);
-    digitalWrite(LED_BUILTIN, LOW); // Turn off built-in LED
 }
 
 void loop() {}

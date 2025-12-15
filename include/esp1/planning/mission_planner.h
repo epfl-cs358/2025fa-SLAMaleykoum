@@ -7,7 +7,7 @@
 
 #define MAX_FRONTIER_CANDIDATES 10
 #define BFS_QUEUE_SIZE 200
-#define MIN_CLUSTER_SIZE 5
+#define MIN_CLUSTER_SIZE 8
 
 class MissionPlanner {
 public:

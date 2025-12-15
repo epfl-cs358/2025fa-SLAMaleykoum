@@ -1,7 +1,6 @@
 #include "../../../include/esp1/planning/global_planner.h"
 #include "esp_wifi.h"
 #include "../../include/common/utils.h"
-#include <cmath>
 
 GlobalPlanner::GlobalPlanner() {}
 
@@ -55,8 +54,12 @@ PathMessage GlobalPlanner::generate_path(
 
         while (i > 0) {
             int p = (i - 1) / 2;
-            if (ws->pq[p].f <= ws->pq[i].f) break;
-            std::swap(ws->pq[p], ws->pq[i]);
+            if (ws->pq[p].f <= ws->pq[i].f) break; // Parent is smaller, heap property satisfied
+            
+            // Swap
+            GlobalPlannerWorkspace::Node temp = ws->pq[i];
+            ws->pq[i] = ws->pq[p];
+            ws->pq[p] = temp;
             i = p;
         }
     };
@@ -68,15 +71,21 @@ PathMessage GlobalPlanner::generate_path(
             ws->pq[0] = ws->pq[ws->pq_size];
             int i = 0;
             while (true) {
-                int l = 2 * i + 1;
-                int r = 2 * i + 2;
-                int s = i;
+                int left = 2 * i + 1;
+                int right = 2 * i + 2;
+                int smallest = i;
 
-                if (l < ws->pq_size && ws->pq[l].f < ws->pq[s].f) s = l;
-                if (r < ws->pq_size && ws->pq[r].f < ws->pq[s].f) s = r;
-                if (s == i) break;
-                std::swap(ws->pq[i], ws->pq[s]);
-                i = s;
+                if (left < ws->pq_size && ws->pq[left].f < ws->pq[smallest].f)
+                    smallest = left;
+                if (right < ws->pq_size && ws->pq[right].f < ws->pq[smallest].f)
+                    smallest = right;
+
+                if (smallest == i) break;
+
+                GlobalPlannerWorkspace::Node temp = ws->pq[i];
+                ws->pq[i] = ws->pq[smallest];
+                ws->pq[smallest] = temp;
+                i = smallest;
             }
         }
         return ret;
@@ -130,37 +139,48 @@ PathMessage GlobalPlanner::generate_path(
             if (map.get_cell_probability(nx, ny) > FREE_BOUND_PROB) continue;
 
             // Additional cost for nearby obstacles
-            float obstacle_penalty = 0.0f;
-            for (int oy = -1; oy <= 1; oy++) {
-                for (int ox = -1; ox <= 1; ox++) {
-                    int tx = nx + ox;
-                    int ty = ny + oy;
-                    if (map.get_cell_probability(tx, ty) > FREE_BOUND_PROB) {
-                        obstacle_penalty += 5.0f;
+            // Wall Buffering (Simplified for 1D)
+            bool too_close = false;
+            // Check 8 neighbors of (nx, ny)
+            for (int buf_y = -1; buf_y <= 1; buf_y++) {
+                for (int buf_x = -1; buf_x <= 1; buf_x++) {
+                    if (buf_x == 0 && buf_y == 0) continue;
+                    int bx = nx + buf_x;
+                    int by = ny + buf_y;
+                    if (bx >= 0 && bx < W && by >= 0 && by < H) {
+                         // Note: get_cell_probability handles 1D conversion internally usually, 
+                         // but here we use (x,y) API of the map class.
+                         if (map.get_cell_probability(bx, by) > FREE_BOUND_PROB) {
+                             too_close = true; buf_y = 2; break; // Break outer loop
+                         }
                     }
                 }
             }
 
-            float new_g = gc + 1.0f + obstacle_penalty;
+            if (too_close) continue;
+
+            // Update Path
+            float new_g = gc + 1.0f;
 
             if (new_g < ws->g_cost[n_idx]) {
                 ws->g_cost[n_idx] = new_g;
-                ws->parent_index[n_idx] = (int16_t)c_idx;
-
-                float h = sqrtf((gx - nx)*(gx - nx) + (gy - ny)*(gy - ny));
-                pq_push((int16_t)n_idx, new_g + h);
+                ws->parent_index[n_idx] = (int16_t)c_idx; // Store 1D index
+                
+                // Euclidean Heuristic
+                float dist = 2 * (abs(gx - nx) + abs(gy - ny)); // Weighted to favor straight paths
+                pq_push((int16_t)n_idx, new_g + dist);
             }
         }
     }
 
     if (!found) return msg;
 
-    // Reconstruct path (safe)
+    // Reconstruction (Using 1D indices)
     int plen = 0;
     int curr = goal_idx;
 
-    // Backtrack from goal to start
-    while (curr != start_idx && plen < GP_MAX_CELLS - 1) {
+    // We use px/py arrays to store grid coords, derived from 1D curr
+    while (curr != start_idx && plen < GP_MAX_CELLS) {
         ws->px[plen] = curr % W;
         ws->py[plen] = curr / W;
         plen++;
@@ -172,13 +192,37 @@ PathMessage GlobalPlanner::generate_path(
     plen++;
 
     // Output path
-    msg.current_length = std::min(plen, MAX_PATH_LENGTH);
+    if (plen == 0) {
+        msg.current_length = 1;
+        msg.path[0].x = goal.target_pose.x;
+        msg.path[0].y = goal.target_pose.y;
+        return msg;
+    }
 
-    for (int i = 0; i < msg.current_length; i++) {
-        int idx = plen - 1 - i;
-        grid_to_world(ws->px[idx], ws->py[idx],
-                      msg.path[i].x, msg.path[i].y,
-                      res, W, H);
+    if (plen <= MAX_PATH_LENGTH) {
+        msg.current_length = plen;
+        int j = 0;
+        for (int i = plen - 1; i >= 0; i--) {
+            grid_to_world(ws->px[i], ws->py[i], msg.path[j].x, msg.path[j].y, res, W, H);
+            j++; 
+        }
+    } else {
+        msg.current_length = MAX_PATH_LENGTH;
+
+        // Start
+        grid_to_world(ws->px[plen - 1], ws->py[plen - 1], msg.path[0].x, msg.path[0].y, res, W, H);
+        
+        // End
+        grid_to_world(ws->px[0], ws->py[0], msg.path[MAX_PATH_LENGTH - 1].x, msg.path[MAX_PATH_LENGTH - 1].y, res, W, H);
+
+        // Middle
+        float ratio = float(plen - 1) / (MAX_PATH_LENGTH - 1);
+        for (int k = 1; k < MAX_PATH_LENGTH - 1; k++) {
+            int idx = (plen - 1) - int(k * ratio);
+            if (idx < 0) idx = 0; 
+            if (idx >= plen) idx = plen - 1;
+            grid_to_world(ws->px[idx], ws->py[idx], msg.path[k].x, msg.path[k].y, res, W, H);
+        }
     }
 
     return msg;

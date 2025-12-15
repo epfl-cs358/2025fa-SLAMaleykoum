@@ -35,7 +35,7 @@ public:
 	Lidar(HardwareSerial& ser) : serial(ser) {}
 
 	// Storage to save the Data of a scan
-    // rawScanDataPoint_t DataBuffer[3250];
+    rawScanDataPoint_t DataBuffer[3250];
 
     /**
 	 * Starts the Lidar and its measurement system
@@ -49,7 +49,7 @@ public:
 	 * 
 	 * @return the number of data for the running mode (express *40, standard *1)
 	 */	
-	// uint16_t readMeasurePoints();
+	uint16_t readMeasurePoints();
 
     /**
 	 * Calculates angle for Standard mode 
@@ -77,7 +77,7 @@ public:
 	 * @param reference to bool that becomes true if a full scan is complete
 	 * @param reference to last angle read by ESP (to detect full rotation)
 	 */
-	// void build_scan(LiDARScan* scan, bool &scanComplete_, float& lastAngleESP_);
+	void build_scan(LiDARScan* scan, bool &scanComplete_, float& lastAngleESP_);
 
 	/**
 	 * Build a scan in real time
@@ -103,7 +103,7 @@ private:
 	 * 
 	 * @return the number of points 
 	 */	
-	// uint16_t awaitStandardScan();
+	uint16_t awaitStandardScan();
 
 	/**
 	 * Checks if no Serial Data is available in a given time

@@ -51,57 +51,57 @@ bool Lidar::start()
 	return false;
 }
 
-// uint16_t Lidar::readMeasurePoints()
-// {
-// 	uint16_t count=0;
-// 	count=awaitStandardScan();
-// 	return count;
-// }
+uint16_t Lidar::readMeasurePoints()
+{
+	uint16_t count=0;
+	count=awaitStandardScan();
+	return count;
+}
 
-// uint16_t Lidar::awaitStandardScan()
-// {
-// 	uint8_t *pBuff=(uint8_t*)&DataBuffer; //Pointer to Buffer
-// 	uint16_t count=0;
-// 	rawScanDataPoint_t point;
-// 	bool frameStart=false;
+uint16_t Lidar::awaitStandardScan()
+{
+	uint8_t *pBuff=(uint8_t*)&DataBuffer; //Pointer to Buffer
+	uint16_t count=0;
+	rawScanDataPoint_t point;
+	bool frameStart=false;
 
-// 	uint32_t startTime=millis();
-// 	while(millis()<(startTime+5000)) //timeout after 5 seconds
-// 	{
-// 		if(serial.available()>=5)
-// 		{
-// 			serial.readBytes((uint8_t*)&point,5);
+	uint32_t startTime=millis();
+	while(millis()<(startTime+5000)) //timeout after 5 seconds
+	{
+		if(serial.available()>=5)
+		{
+			serial.readBytes((uint8_t*)&point,5);
 			
-// 			//search for frameStart
-// 			if((point.quality&0x01)&&(!(point.quality&0x02))&&!frameStart)
-// 			{
-// 				if(point.angle_low&0x01) //check Bit
-// 				{
-// 					frameStart=true;
-// 				}
-// 			} else if(frameStart&&(point.quality&0x01)&&!(point.quality&0x02)&&count>1)
-// 			{
-// 				if(point.angle_low&0x01)
-// 				{
-// 					return count;
-// 				}
-// 			}
-// 			else if(frameStart)
-// 			{
-// 				memmove(pBuff,(uint8_t*)&point,sizeof(point)); //copy memory from incoming buffer to DataBuffer
-// 				count++; //new point
-// 				if(count<sizeof(DataBuffer)/sizeof(rawScanDataPoint))
-// 				{
-// 					pBuff=pBuff+5; //move pointer to next measure point in storage
-// 				}
-// 			}
-// 			// else if(!frameStart)
-// 			// 	serial->readBytes((uint8_t*)&point,1);
+			//search for frameStart
+			if((point.quality&0x01)&&(!(point.quality&0x02))&&!frameStart)
+			{
+				if(point.angle_low&0x01) //check Bit
+				{
+					frameStart=true;
+				}
+			} else if(frameStart&&(point.quality&0x01)&&!(point.quality&0x02)&&count>1)
+			{
+				if(point.angle_low&0x01)
+				{
+					return count;
+				}
+			}
+			else if(frameStart)
+			{
+				memmove(pBuff,(uint8_t*)&point,sizeof(point)); //copy memory from incoming buffer to DataBuffer
+				count++; //new point
+				if(count<sizeof(DataBuffer)/sizeof(rawScanDataPoint))
+				{
+					pBuff=pBuff+5; //move pointer to next measure point in storage
+				}
+			}
+			// else if(!frameStart)
+			// 	serial->readBytes((uint8_t*)&point,1);
 			
-// 		}
-// 	}
-// 	return count;
-// }
+		}
+	}
+	return count;
+}
 
 float Lidar::calcAngle(uint8_t _lowByte,uint8_t _highByte)
 {
@@ -117,35 +117,35 @@ float Lidar::calcDistance(uint8_t _lowByte,uint8_t _highByte)
 	return distance / 4.0;
 }
 
-// void Lidar::build_scan(LiDARScan* scan, bool &scanComplete_, float& lastAngleESP_) {
-// 	if (scanComplete_) {
-// 		scan->count = 0;
-// 	}
+void Lidar::build_scan(LiDARScan* scan, bool &scanComplete_, float& lastAngleESP_) {
+	if (scanComplete_) {
+		scan->count = 0;
+	}
 
-//     // read lidar data
-//     uint16_t count = this->readMeasurePoints();
+    // read lidar data
+    uint16_t count = this->readMeasurePoints();
 
-//     for (uint16_t i = 0; i < MIN(count, MAX_LIDAR_POINTS) && !scanComplete_; i++) {
-//         rawScanDataPoint_t dataPoint = this->DataBuffer[i];
+    for (uint16_t i = 0; i < MIN(count, MAX_LIDAR_POINTS) && !scanComplete_; i++) {
+        rawScanDataPoint_t dataPoint = this->DataBuffer[i];
 
-//         uint16_t dist_mm = this->calcDistance(dataPoint.distance_low, dataPoint.distance_high);
-//         if (dist_mm <= 0) continue;
-//         uint16_t angle_deg = this->calcAngle(dataPoint.angle_low, dataPoint.angle_high);
-//         uint8_t quality = dataPoint.quality >> 2;
+        uint16_t dist_mm = this->calcDistance(dataPoint.distance_low, dataPoint.distance_high);
+        if (dist_mm <= 0) continue;
+        uint16_t angle_deg = this->calcAngle(dataPoint.angle_low, dataPoint.angle_high);
+        uint8_t quality = dataPoint.quality >> 2;
 
-//         // Store in buffer
-//         scan->angles[scan->count] = angle_deg;
-//         scan->distances[scan->count] = dist_mm;
-//         scan->qualities[scan->count] = quality;
-// 		scan->count++;
+        // Store in buffer
+        scan->angles[scan->count] = angle_deg;
+        scan->distances[scan->count] = dist_mm;
+        scan->qualities[scan->count] = quality;
+		scan->count++;
 
-//         if (angle_deg < lastAngleESP_) {
-//             scanComplete_ = true;
-//         }
-//         lastAngleESP_ = angle_deg;
-//     }
-//     scan->timestamp_ms = millis();
-// }
+        if (angle_deg < lastAngleESP_) {
+            scanComplete_ = true;
+        }
+        lastAngleESP_ = angle_deg;
+    }
+    scan->timestamp_ms = millis();
+}
 
 uint16_t Lidar::readScanLive(LiDARScan* scan, bool &scanComplete, float &lastAngle) 
 {
