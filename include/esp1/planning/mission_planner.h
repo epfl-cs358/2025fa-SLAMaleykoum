@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../../common/data_types.h"
-#include "../../esp1/mapping/occupancy/bayesian_grid.h" 
+#include "../../esp1/mapping/bayesian_grid.h" 
 
 #include <stdint.h>
 
@@ -52,7 +52,7 @@ public:
 private:
     Pose2D home_pose_;
     MissionGoal current_target_;
-    static int fail_count;
+    int fail_count;
 
     struct ClusterCandidate {
         int center_x;

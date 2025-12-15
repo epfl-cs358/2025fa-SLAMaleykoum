@@ -8,7 +8,7 @@
 #include "common/data_types.h"
 #include "common/esp_link.h"
 #include "esp1/hardware/lidar.h"
-#include "esp1/mapping/occupancy/bayesian_grid.h"
+#include "esp1/mapping/bayesian_grid.h"
 #include "esp1/planning/global_planner.h"
 #include "esp1/planning/mission_planner.h"
 // #include "esp1/planning/local_planner.h"
@@ -254,8 +254,8 @@ void Lidar_Read_Task(void* parameter) {
 
     while (1) {
         bool scanComplete = false;
-        lidar.build_scan(&scan, scanComplete, lastAngleESP);
-        // lidar.readScanLive(&scan, scanComplete, lastAngleESP);
+        // lidar.build_scan(&scan, scanComplete, lastAngleESP);
+        lidar.readScanLive(&scan, scanComplete, lastAngleESP);
 
         if (scanComplete) {
             if (scan.count > 10) { 
