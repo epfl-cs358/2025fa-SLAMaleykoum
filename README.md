@@ -12,7 +12,7 @@
 8. [Mission and Task Management](#mission-and-task-management)
 9. [Set it up](#set-it-up)
 
-
+// TODO: table of content is not up to date !
 ---
 
 ## Project Overview
@@ -42,7 +42,6 @@ Here is our original [Project proposal](https://www.overleaf.com/9942875199zgzbk
 - **Communication**: UART (inter-processor), MQTT (ground station)
 - **Algorithms**: Extended Kalman Filter, A* pathfinding, Pure Pursuit control, Bayesian occupancy mapping
 
----
 
 ## Hardware Overview
 
@@ -336,8 +335,6 @@ The ESP creates a Wi-Fi access point (AP) that we connect to for monitoring purp
 - Robot pose and trajectory
 - Telemetry
 
---- 
-
 #### Diagram
 ![alt text](/docs/global-architecture-2.png)
 
@@ -371,8 +368,6 @@ Open in PlatformIO: Open the project folder in VS Code.
 
 **Upload Code:**
 Connect to the ESP1 via USB. Open the *platformio* extension in vscode (the alien logo). Click on `/esp2/General/Upload`. Repete for the ESP2.
-
----
 
 ## Usage / Operation
 
@@ -464,5 +459,3 @@ Each test entry point is implemented in `test_main_esp<i>`, which simply include
 The Python files are used for TCP monitoring and for displaying the received data in a structured format.
 
 ## Conclusion
-
----
