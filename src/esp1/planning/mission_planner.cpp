@@ -63,6 +63,95 @@ MissionPlanner::MissionPlanner(const Pose2D& initial_home_pose) : home_pose_(ini
     fail_count = 0;
 }
 
+inline bool MissionPlanner::is_visited(int x, int y) const {
+    // Math: x/8 finds the byte, x%8 finds the bit position
+    return visited_mask[y][x/8] & (1 << (x%8));
+}
+
+inline void MissionPlanner::set_visited(int x, int y) {
+    visited_mask[y][x/8] |= (1 << (x%8));
+}
+
+void MissionPlanner::store_candidate_if_valid(int sum_x, int sum_y, int size, int& candidate_count) {
+    if (size >= MIN_CLUSTER_SIZE) {
+        // Math: Calculate Centroid (Average position)
+        candidates[candidate_count].center_x = sum_x / size;
+        candidates[candidate_count].center_y = sum_y / size;
+        candidates[candidate_count].size = size;
+        candidates[candidate_count].valid = true;
+        candidate_count++;
+    }
+}
+
+void MissionPlanner::find_cluster(const BayesianOccupancyGrid& grid, int start_x, int start_y, int& candidate_count) {
+    // BFS Queue (Ring Buffer)
+    struct Point { int16_t x; int16_t y; };
+    static Point bfs_q[BFS_QUEUE_SIZE]; // Static: Allocated once in memory, not on stack
+    int head = 0, tail = 0;
+    
+    // Initialize BFS
+    bfs_q[tail++] = {(int16_t)start_x, (int16_t)start_y};
+    set_visited(start_x, start_y);
+
+    int size = 0, sum_x = 0, sum_y = 0;
+
+    // BFS Loop
+    while(head != tail) {
+        Point current = bfs_q[head];
+        head = (head + 1) % BFS_QUEUE_SIZE; // Ring buffer wrap
+        
+        // Accumulate Stats
+        size++;
+        sum_x += current.x;
+        sum_y += current.y;
+        if (size >= 100) break;
+
+        // Check Neighbors
+        static int dx8[8] = { 1,-1, 0, 0, 1, 1,-1,-1 };
+        static int dy8[8] = { 0, 0, 1,-1, 1,-1, 1,-1 };
+
+        for(int k=0; k<8; k++){
+            int nx = current.x + dx8[k]; 
+            int ny = current.y + dy8[k];
+
+            // Boundary Check
+            if (nx < 0 || ny < 0 || nx >= grid.grid_size_x || ny >= grid.grid_size_y) continue;
+            
+            if (!is_visited(nx, ny) && is_frontier_cell(grid, nx, ny)) {
+                int next_tail = (tail + 1) % BFS_QUEUE_SIZE;
+                if (next_tail != head) {
+                    bfs_q[tail] = {(int16_t)nx, (int16_t)ny};
+                    tail = next_tail;
+                    set_visited(nx, ny);
+                }
+            }
+        }
+    }
+    store_candidate_if_valid(sum_x, sum_y, size, candidate_count);
+}
+
+
+void MissionPlanner::search_for_candidates(const BayesianOccupancyGrid& grid, 
+                                           int x_min, int x_max, int y_min, int y_max, 
+                                           int& candidate_count)
+{
+    for (int y = y_min; y <= y_max; y++) {
+        for (int x = x_min; x <= x_max; x++) {
+            
+            // Skip checks (save compute time)
+            if (is_visited(x, y)) continue;
+            
+            // Found a new frontier? Expand it.
+            if (is_frontier_cell(grid, x, y)) {
+                if (candidate_count >= MAX_FRONTIER_CANDIDATES) return;
+                
+                find_cluster(grid, x, y, candidate_count);
+            }
+        }
+    }
+}
+
+
 bool MissionPlanner::is_current_goal_valid(const Pose2D& robot_pose, const BayesianOccupancyGrid& grid) {
     // Proximity Check
     float dx = robot_pose.x - current_target_.target_pose.x;
@@ -85,89 +174,6 @@ bool MissionPlanner::is_current_goal_valid(const Pose2D& robot_pose, const Bayes
                 return true;
     
     return false;
-}
-
-void MissionPlanner::search_for_candidates(const BayesianOccupancyGrid& grid, 
-                                           int x_min, int x_max, int y_min, int y_max, 
-                                           int& candidate_count)
-{
-    for (int y = y_min; y <= y_max; y++) {
-        for (int x = x_min; x <= x_max; x++) {
-            
-            // 1. Skip if already visited (Bitmask check)
-            // visited_mask is [200][25] (200 rows, 25 bytes per row)
-            if (visited_mask[y][x/8] & (1 << (x%8))) continue;
-            
-            // 2. Check if this specific cell is a frontier
-            if (is_frontier_cell(grid, x, y)) {
-                
-                // Stop if we have maxed out our candidate array
-                if (candidate_count >= MAX_FRONTIER_CANDIDATES) return;
-
-                // --- BFS CLUSTERING INITIALIZATION ---
-                struct Point { int16_t x; int16_t y; };
-                static Point bfs_q[BFS_QUEUE_SIZE]; // Static allocation for memory safety
-                int head = 0, tail = 0;
-
-                // Enqueue start point
-                bfs_q[tail++] = {(int16_t)x, (int16_t)y};
-                visited_mask[y][x/8] |= (1 << (x%8)); // Mark visited
-
-                int cluster_size = 0;
-                int sum_x = 0;
-                int sum_y = 0;
-
-                // --- BFS LOOP ---
-                while(head != tail) {
-                    Point curr = bfs_q[head];
-                    head = (head + 1) % BFS_QUEUE_SIZE; // Ring buffer wrap
-
-                    // Accumulate stats for centroid calculation
-                    cluster_size++; 
-                    sum_x += curr.x; 
-                    sum_y += curr.y;
-
-                    // Optimization: Stop growing if cluster is large enough
-                    if (cluster_size >= 100) break;
-
-                    // Check 8-connected neighbors
-                    static int dx8[8] = {1,-1,0,0, 1,1,-1,-1};
-                    static int dy8[8] = {0,0,1,-1, 1,-1,1,-1};
-
-                    for(int k=0; k<8; k++){
-                        int nx = curr.x + dx8[k]; 
-                        int ny = curr.y + dy8[k];
-
-                        // Bounds check against grid limits
-                        if (nx < 0 || ny < 0 || nx >= grid.grid_size_x || ny >= grid.grid_size_y) continue;
-                        
-                        // Visited check
-                        if (visited_mask[ny][nx/8] & (1 << (nx%8))) continue;
-
-                        if (is_frontier_cell(grid, nx, ny)) {
-                            int next_tail = (tail + 1) % BFS_QUEUE_SIZE;
-                            // Add to queue if not full
-                            if (next_tail != head) {
-                                bfs_q[tail] = {(int16_t)nx, (int16_t)ny};
-                                tail = next_tail;
-                                visited_mask[ny][nx/8] |= (1 << (nx%8)); // Mark visited immediately
-                            }
-                        }
-                    }
-                }
-
-                // --- CLUSTER VALIDATION ---
-                // Only keep clusters that are large enough (filters noise)
-                if (cluster_size >= MIN_CLUSTER_SIZE) {
-                    candidates[candidate_count].center_x = sum_x / cluster_size;
-                    candidates[candidate_count].center_y = sum_y / cluster_size;
-                    candidates[candidate_count].size = cluster_size;
-                    candidates[candidate_count].valid = true;
-                    candidate_count++;
-                }
-            }
-        }
-    }
 }
 
 MissionGoal MissionPlanner::update_goal(const Pose2D& pose, const BayesianOccupancyGrid& grid, bool global_planner_failed)

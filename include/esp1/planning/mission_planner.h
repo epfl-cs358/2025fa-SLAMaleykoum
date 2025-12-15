@@ -61,21 +61,61 @@ private:
         bool valid;
     };
 
+    // List of candidates found during the search.
     ClusterCandidate candidates[MAX_FRONTIER_CANDIDATES];
-    uint8_t visited_mask[GP_MAX_H][GP_MAX_W / 8 + 1]; // Bitmask for visited cells during BFS
+
+    // 1bit per cell version of the grid for visited cells during BFS
+    uint8_t visited_mask[GP_MAX_H][GP_MAX_W / 8 + 1];
+
+    /**
+     * @brief Helper to check and mark a cell as visited (Bit manipulation).
+     * Inline for performance as it is called millions of times.
+     * 
+     * It will prevent infinite loops during BFS.
+     */
+    inline bool is_visited(int x, int y) const;
+    inline void set_visited(int x, int y);
+
+    /**
+     * @brief Takes a valid frontier seed and runs BFS to find the whole cluster.
+     * 
+     * @param grid Reference to the occupancy grid.
+     * @param start_x, start_y The starting cell coordinates of the frontier seed.
+     * @param candidate_count Reference to the current count of valid candidates (updated by this function).
+     * 
+     * Breadth-First Search (BFS) starting from the given frontier cell. It explores all connected cells, 8 neighbors,
+     * and if the neighbor is a frontier cell, then it is added to the BFS queue. The cells visited during the search
+     * form a potential cluster. Once the BFS is complete, it calls `store_candidate_if_valid()` to validate
+     * and store the cluster as a candidate.
+     */
+    void find_cluster(const BayesianOccupancyGrid& grid, int start_x, int start_y, int& candidate_count);
+
+    /**
+     * @brief Validates the final cluster and adds it to the array if good.
+     * 
+     * @param sum_x, sum_y The accumulated x and y coordinates of all cells in the cluster.
+     * @param size The total number of cells in the cluster.
+     * @param candidate_count Reference to the current count of valid candidates (updated by this function).
+     * 
+     * If the cluster has at least `MIN_CLUSTER_SIZE` cells, it calculates the geometric centroid
+     * and adds it to the `candidates` array, marking it as valid.
+     */
+    void store_candidate_if_valid(int sum_x, int sum_y, int size, int& candidate_count);
 
     /**
      * @brief Searches a specific rectangular area of the grid for frontier clusters.
-     * 
-     * @param grid Reference to the occupancy grid.
-     * @param x_min, x_max, y_min, y_max The bounds of the search area.
-     * @param candidate_count Reference to the current count of valid candidates (updated by this function).
-     * 
-     * This function iterates through the grid within the specified bounds. If it finds
-     * a frontier cell, it expands it into a cluster using BFS, calculates the centroid,
-     * and adds it to the candidate list.
-     * 
-     * @return void
+     * * @param grid Reference to the occupancy grid.
+     * @param x_min, x_max, y_min, y_max The bounds of the search area (in grid coordinates).
+     * @param candidate_count Reference to the current count of valid candidates. This is 
+     * incremented whenever a new valid cluster is found.
+     * * The process follows these steps:
+     * 1. Iteration: Loops through every cell within the specified bounding box.
+     * 2. Optimization Check: Checks the `visited_mask` first. If a cell was already 
+     * processed (part of a previously found cluster), we skip it immediately.
+     * 3. Frontier Detection: Checks if the current cell is a "seed" (an unvisited frontier point).
+     * 4. Expansion: If a seed is found, we call `expand_cluster()` that runs a BFS to identify the entire
+     * connected frontier, calculates its centroid, and adds it to the `candidates` array if it's valid.
+     * * @return void
      */
     void search_for_candidates(const BayesianOccupancyGrid& grid, 
                                int x_min, int x_max, int y_min, int y_max, 
