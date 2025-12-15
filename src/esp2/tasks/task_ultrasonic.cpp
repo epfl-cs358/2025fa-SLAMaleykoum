@@ -3,20 +3,36 @@
 #include "config.h"
 #include "hardware/UltraSonicSensor.h"
 #include "hardware/MotorManager.h"
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
 
 void TaskUltrasonic(void *pvParameters) {
     for (;;) {
-        /*if (!startSignalReceived) {
-            vTaskDelay(pdMS_TO_TICKS(100));
-            continue;
-        }*/
         float dist = ultrasonic.readDistance();
-        if (dist > 0 && dist < Config::EMERGENCY_DISTANCE && !isPerformingCreneau) {
-            motor.stop();
-            motor.update();
-            emergencyStop = true;
-            isCrenFinished = false;
+        
+        if (dist > 0 && dist < Config::EMERGENCY_DISTANCE) {
+            bool shouldStop = false;
+            
+            // Read isPerformingCreneau safely
+            if (xSemaphoreTake(stateMutex, portMAX_DELAY)) {
+                if (!isPerformingCreneau) {
+                    shouldStop = true;
+                }
+                xSemaphoreGive(stateMutex);
+            }
+            
+            if (shouldStop) {
+                motor.stop();
+                motor.update();
+                
+                // Write emergencyStop safely
+                if (xSemaphoreTake(stateMutex, portMAX_DELAY)) {
+                    emergencyStop = true;
+                    xSemaphoreGive(stateMutex);
+                }
+            }
         }
+        
         vTaskDelay(pdMS_TO_TICKS(200));
     }
 }

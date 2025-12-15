@@ -1,40 +1,27 @@
 /**
  * @file HR-SR04.cpp
  * @brief Implementation of the UltraSonicSensor class for the HR-SE04 sensor
- * 
- * @author SLAMaleykoum & TurboSLAM : Same file as the TurboSLAM but removed all code related to ROS messages
- * @date Oct 2025
  */
 
 #include "hardware/UltraSonicSensor.h"
 
-
-/**
- * @brief Constructor that creates an UltraSonicSensor object that stores which pins are used by the sensor 
-*/
 UltraSonicSensor::UltraSonicSensor(uint8_t triggerPin, uint8_t echoPin)
     : trigPin(triggerPin), echoPin(echoPin) {}
 
-/**
- * @brief Initializes the sensor by configurating the pins and verifying that it can receive echos 
- * @return true if it receives an echo and false if it doesn't 
-*/    
 bool UltraSonicSensor::begin() {
-
     pinMode(trigPin, OUTPUT);
     pinMode(echoPin, INPUT);
 
     digitalWrite(trigPin, LOW);
     delay(50);
 
-    /*Sends pulse*/
+    // Sends pulse
     digitalWrite(trigPin, HIGH);
     delayMicroseconds(10);
     digitalWrite(trigPin, LOW);
 
-    /*Checks how long it took for the pulse to be received
-    *Prints message accordingly
-    */
+    // Checks how long it took for the pulse to be received
+    // Prints message accordingly
     unsigned long duration = pulseIn(echoPin, HIGH, 38UL * 1000UL); 
     if (duration == 0) {
         // no echo received
@@ -46,10 +33,6 @@ bool UltraSonicSensor::begin() {
     return true;
 }
 
-/**
- * @brief Measures the distance between the sensor and an object
- * @return -1.0 if no echo is received (no object or a timeout) or the distance in meters
- */
 float UltraSonicSensor::readDistance() {
     digitalWrite(trigPin, LOW);
     delayMicroseconds(2);

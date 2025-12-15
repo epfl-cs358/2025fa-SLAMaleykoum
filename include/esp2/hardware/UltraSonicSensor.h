@@ -1,17 +1,13 @@
 /**
  * @file UltraSonicSensor.h
- * @brief Header file defining the UltraSonicSensor class to be used to measure the distance between 
+ * @brief Header file defining the UltraSonicSensor class used to measure the distance between 
  * the car and obstacles
- *
- * @author SLAMaleykoum & TurboSLAM : Same file as the TurboSLAM but removed all code related to ROS messages
- * @date Oct 2025
  */
 
 #ifndef ULTRASONIC_SENSOR_H
 #define ULTRASONIC_SENSOR_H
 
 #include <Arduino.h>
-
 
 /**
  * @class UltraSonicSensor 

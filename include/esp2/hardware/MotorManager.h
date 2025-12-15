@@ -12,14 +12,12 @@
  * @class MotorManager
  * @brief High-level methods to control the car's motor
 */
-
 class MotorManager {
 public:
     /**
      * @brief Construct a MotorManager object
      * @param escPin pin connected to the ESC signal input
      */
-
     MotorManager(int pwmPin);
 
     /**
@@ -52,6 +50,7 @@ public:
 
     /**
      * @brief Updates the internal control loop of the motor
+     * Gradually ramp motor to target speed
      */
     void update();
 

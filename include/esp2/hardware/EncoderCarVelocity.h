@@ -22,7 +22,6 @@
 #define GEAR_RATIO 10.0f     // Motor to wheel gear reduction ratio (10:1) 
 #define WHEEL_RADIUS 0.0495f // Wheel radius in meters //maybe needs to be adapted but 9.9 diametre  
 
-
 /**
  * @class EncoderCarVelocity
  * @brief Manages velocity and position measurements from AS5600 magnetic encoder.
@@ -53,14 +52,19 @@ public:
      * Reads the instantaneous angular speed directly from the AS5600.
      * 
      * @return Motor angular velocity in radians per second.
+     * 
+     * @note library handles delta / dt internally
      */
-    float getMotorAngularVelocity(); 
+    float getMotorAngularVelocity() {return as5600.getAngularSpeed(AS5600_MODE_RADIANS, true);}
     
     /**
-     * @brief Gets filtered motor angular velocity using EMA and moving average.
+     * @brief Gets filtered motor angular velocity using dual-stage filtering.
      * 
-     * Applies exponential moving average (alpha=0.02) followed by 
-     * a 5-sample moving average to reduce noise.
+     * Filtering stages:
+     * 1. Exponential Moving Average (EMA) with alpha=0.02 (98% historical weight)
+     * 2. 5-sample moving average for additional smoothing
+     * 
+     * This provides stable velocity estimates with minimal lag.
      * 
      * @return Filtered motor angular velocity in radians per second.
      */
@@ -73,7 +77,7 @@ public:
      * 
      * @return Wheel angular velocity in radians per second.
      */
-    float getWheelAngularVelocity();  
+    float getWheelAngularVelocity() {return getMotorAngularVelocity() / GEAR_RATIO;} 
     
     /**
      * @brief Gets the linear velocity of the car.
@@ -83,7 +87,7 @@ public:
      * 
      * @return Linear velocity in meters per second.
      */
-    float getWheelLinearVelocity();    
+    float getWheelLinearVelocity() {return getWheelAngularVelocity() * WHEEL_RADIUS;}
     
     /**
      * @brief Gets the raw cumulative position from AS5600.
@@ -93,18 +97,26 @@ public:
      * 
      * @return Cumulative position in encoder ticks (int32_t).
      */
-    int32_t getCumulativePosition();
+    int32_t getCumulativePosition() {return as5600.getCumulativePosition();}
 
     /**
-     * @brief Gets the total distance traveled by the car.
+     * @brief Calculates the total distance traveled by the car.
      * 
      * Accumulates distance based on encoder tick changes between calls.
      * Returns cumulative distance since begin() was called.
      * 
+     * Process:
+     * 1. Reads current cumulative position from AS5600
+     * 2. Calculates incremental ticks since last call
+     * 3. Converts ticks -> motor rotations (4096 ticks/rev)
+     * 4. Converts motor rotations -> wheel rotations (÷ gear ratio)
+     * 5. Converts wheel rotations -> linear distance (× wheel circumference)
+     * 6. Accumulates into total distance traveled
+     * 
      * @note Must be called at 100+ Hz for accurate tracking per AS5600 requirements.
      * @note This function maintains internal state and accumulates over time.
      * 
-     * @return Total distance traveled in meters (cumulative).
+     * @return Total distance traveled in meters since begin() was called (cumulative).
      */
     float getDistance();
 
