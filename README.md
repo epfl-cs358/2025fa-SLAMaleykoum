@@ -32,16 +32,15 @@ Here is our original [Project proposal](https://www.overleaf.com/9942875199zgzbk
 - **Robust Localization**: Maintain accurate pose estimation through sensor fusion
 - **Intelligent Navigation**: Plan and execute collision-free paths to destinations
 - **Real-time Control**: Execute precise motor control for path following
-- **Remote Monitoring**: Provide ground station (GS) visualization and emergency override capabilities
+- **Remote Monitoring**: Provide ground station (GS) visualization
 > **Important**: The car should be able to opperate fully autonomously -> with **no** GS.
 > No computations nor storage will be offloaded to the GS. 
 
 ### Core Technologies
 - **Hardware**: Dual ESP32-S3 microcontrollers, LiDAR sensor, wheel encoders, IMU
 - **Operating System**: FreeRTOS for real-time multitasking
-- **Communication**: UART (inter-processor), MQTT (ground station)
-- **Algorithms**: Extended Kalman Filter, A* pathfinding, Pure Pursuit control, Bayesian occupancy mapping
-
+- **Communication**: UART (inter-processor), TCP (ground station)
+- **Algorithms**: A* pathfinding, Pure-Pursuit controller, Breshmann //TODO: Santiago, fill this up
 
 ## Hardware Overview
 
@@ -64,14 +63,16 @@ Here is our original [Project proposal](https://www.overleaf.com/9942875199zgzbk
 
 
 Alongside the listed components, you will also need:
-- 3 × 1 kΩ resistors (for the ultrasonic sensor voltage divider)
+- $3 \times 1 K\Omega$ resistors (for the ultrasonic sensor voltage divider)
 - Assorted jumper cables and connectors (male/female)
 - Heat‑shrink tubing or insulation sleeves
 - Soldering kit (soldering iron, solder wire)
 - Hot air/heat gun (for shrinking tubing)
 - Screw set (M3 and M6 as used in mounts)
-### How to Assemble
 
+# //TODO: @Cléa should we do a separate readme for this ?
+
+### How to Assemble
 
 To begin, assemble the mechanical base of the car following the official [Tamiya Blitzer Beetle manual](https://www.tamiyausa.com/media/files/58502ml-829-5367.pdf).
 We only need the minimal mechanical build so the car can drive, skip the decorative carcass.
@@ -96,7 +97,7 @@ We only need the minimal mechanical build so the car can drive, skip the decorat
 
 **Step 4: Mount the ESP Boards**  
 - Place ESP1 and ESP2 onto the platform.  
-- ⚠️ Important: mount both facing **upwards** so their LEDs are visible; this makes debugging much easier.  
+*Improovement note: mount both microcontrollers facing **upwards** so their LEDs and reset buttons are visible.*
 - Our current ESP1 faces down, which hides the LEDs and complicates troubleshooting.  
 
 **Step 5: Ultrasonic Sensor Mount**  
@@ -112,7 +113,7 @@ We only need the minimal mechanical build so the car can drive, skip the decorat
 - Once the mechanical build is complete, proceed to the [Soldering & Wiring](#soldering--wiring) section.  
 - Follow the circuit [diagram](/assets/circuit/slamaleykoum_electrical_circuit.drawio.png) for all connections.  
 
-*TODO: For each step, insert assembly photos so readers can clearly see component placement and orientation.*
+*//TODO: For each step, insert assembly photos so readers can clearly see component placement and orientation.*
 ---
 
 ### Soldering & Wiring
@@ -151,8 +152,8 @@ Use heat shrink tubing to insulate exposed connections and ensure long-term reli
   Create a single 5V harness by soldering all red 5V leads together from **OUT +**, and a ground harness by soldering all black leads together from **OUT –**.  
 
   From this split:
-  - **5V bus (red):** one male connector (main feed), plus branches to both ESP32 boards (two female connectors), the ultrasonic sensor (male), the lidar (male), and the servo (male).  
-  - **Ground bus (black):** common ground returning to **OUT –** for all the same devices. The ground from the buck converter is taken from **OUT –** via a male connector, then soldered to multiple cables that connect to the GND pins of different components:  
+  - **5V power (red):** one male connector (main feed), plus branches to both ESP32 boards (two female connectors), the ultrasonic sensor (male), the lidar (male), and the servo (male).  
+  - **Ground (black):** common ground returning to **OUT –** for all the same devices. The ground from the buck converter is taken from **OUT –** via a male connector, then soldered to multiple cables that connect to the GND pins of different components:  
     - Servo (male)  
     - ESP32 board 1 (female)  
     - ESP32 board 2 (female)  
@@ -226,6 +227,7 @@ Both the encoder and the IMU are powered by the **3V3 pin of ESP2**, using two c
 
 #### Example Layout
 
+# //TODO: @CLEA
 <p align="center">
   <img src="/assets/circuit/soldering_step1_placeholder.png" alt="Soldering Step 1" width="300"/><br>
   <b>Soldering Step 1</b>
@@ -265,6 +267,8 @@ Note: The CAD files for the **front bumper**, **ultrasonic sensor case**, and **
 
 ### Challenges & Recommendations
 
+# //TODO: @Cléa & @Santiago Change this. Doesn't fit.
+
 Before implementing the hardware setup, check the [Problems and Recommendations](#problems-and-recommendations) section to get a full scope of what may need to be modified.
 
 
@@ -272,9 +276,11 @@ Before implementing the hardware setup, check the [Problems and Recommendations]
 
 The computational load is devided over the two ESP32-S3 microcontrollers. The first one takes care of the mapping & global planning, while the second one takes care of localization & control of the vehicle. We run **FreeRTOS** to take care of our parallelism and we are comunicating between our two ESPs via **UART** (via the serial ports).
 
+*Note: For each ESP we've got a dedicated README file delving into more details. They can be found in [`include/esp1/README.md`](include/esp1/README.md) and [`include/esp2/README.md`](include/esp2/README.md)*
+
 ### ESP-1: Mapping & Planning
 
-  👉 [Open ESP-1 README](include/esp1/README.md)
+  👉 [Clicky link - Dedicated ESP-1 README](include/esp1/README.md)
 
 **Primary Mission**: Create and maintain a global understanding of the environment and plan high-level navigation strategies.
 
@@ -282,15 +288,15 @@ The computational load is devided over the two ESP32-S3 microcontrollers. The fi
 
 **Core Responsibilities**:
 - Generate and maintain occupancy grid maps
-- Find the frontiers to explore and cluster them using BFS algorithms
-- Define a goal to reach
+- Find the frontier cells to explore and cluster them using BFS algorithms
+- Define a temporary goal for the car to reach
 - Plan global paths using A* algorithm
-- Share maps with ground station via wifi
-- Send path to follow to esp2
+- Share telemetry with ground station via wifi (visualisation purpouses)
+- Send the computed path to the esp2
 
 ### ESP-2: Localization & Control
 
-  👉 [Open ESP-2 README](include/esp2/README.md)
+  👉 [Clicky link - Dedicated ESP-2 README](include/esp2/README.md)
 
 **Primary Mission**: Execute precise vehicle control and maintain high-frequency local pose tracking.
 
@@ -337,6 +343,7 @@ If you want to establish the same MQTT connection to debug, here is the guide to
 - Telemetry
 
 #### Diagram
+# //TODO: HERE ??
 ![alt text](/docs/global-architecture-2.png)
 
 
@@ -410,6 +417,7 @@ If you encounter issues, check the list below before reaching out.
 | **ESP1 crashes imidiately** | The map size is too big | Reduce the map size. Note: The max nb of cells we managed to run with is 70x70 but if the real world size is not enough, you can increase the `RESOLUTION` value which will increase what each cell represents in the real world |
 
 ## Problems and Recommendations
+# //TODO: @Cléa :))
 
 ### Common ESP1 & ESP2
 - **Hardware wear and wiring issues**: reused components had weak solder joints and loose connectors, causing intermittent failures (especially the encoder).  
