@@ -1,5 +1,5 @@
 /** @filename: esp1/mapping/bayesian_grid.h
- *  @description: Contract for the coarse Bayesian Occupancy Grid map.
+ *  @description: Contract for the Bayesian Occupancy Grid map.
  * 
  *  @job: Manages the occupancy map using Bayesian filtering.
  */
@@ -26,6 +26,11 @@ public:
 
     /**
      * @brief Updates the occupancy grid based on a new LiDAR scan and the robot's pose.
+     * It keeps the previous map and applies Bayesian updates to the log-odds values.
+     * The log-odds values are clamped to avoid overconfidence.
+     * 
+     * The update uses Bresenham's line algorithm for ray tracing.
+     * Given two grid cells, the algorithm lists all the grid cells that a straight line between them passes through.
      * 
      * @param lidar_scan Synchronized LiDAR scan and robot pose.
      */

@@ -62,12 +62,18 @@ It acts as the intermediary between the high-level system (Bayesian grid) and th
 ### Global Planner :
 **D. GlobalPlanner (A\*)**
 
-- **Input**: The Bayesian Occupancy Grid (the map) and the Mission Goal (the target coordinates).
+The **GlobalPlanner** module computes a global, collision-free path on a Bayesian occupancy grid using the A* search algorithm.
+It is designed to be deterministic, memory-safe, and compatible with real-time constraints.
 
-- **Process**: The `GlobalPlanner` runs the **A\*** search algorithm on the grid, finding the shortest, collision-free route from the robot's current EKF pose to the target.
+- **Input**: The `BayesianOccupancyGrid`, the `MissionGoal` (the target coordinates) and the `Pose2D` of the car. The `GlobalPlannerWorkspace` is a pre-allocated memory buffer that stores A* state.
 
-- **Output**: A list of coordinates, packaged as a `GlobalPathMessage` (a vector of `Waypoint` structs).
-Note: The `GlobalPlanner` hands this path message to the UART Sender task on ESP-1. The UART Receiver task on ESP-2 receives the path and passes it to the Local Planner (Pure Pursuit) module.
+- **Process**: The robot pose and mission goal are converted from world coordinates to grid indices. The `GlobalPlanner` runs the **A\*** search algorithm on the grid, finding the shortest, collision-free route from the robot's current pose to the target.
+We've got two functions that we sum to know what is the better path to follow : 
+     - g(n) → accumulated path cost
+     - h(n) → Euclidean distance to the goal (admissible heuristic)
+
+- **Output**: A list of coordinates, packaged as a `PathMessage` (a vector of `Waypoint` structs).
+Note: The `GlobalPlanner` hands this path message to the UART Sender task on ESP-1.
 
 ---
 
