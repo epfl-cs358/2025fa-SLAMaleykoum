@@ -9,30 +9,23 @@
 void TaskUltrasonic(void *pvParameters) {
     for (;;) {
         float dist = ultrasonic.readDistance();
-        
-        if (dist > 0 && dist < Config::EMERGENCY_DISTANCE) {
-            bool shouldStop = false;
-            
-            // Read isPerformingCreneau safely
+
+        bool performingTurn = false;
+
+        if (xSemaphoreTake(stateMutex, portMAX_DELAY)) {
+            performingTurn = isPerformingCreneau;
+            xSemaphoreGive(stateMutex);
+        }
+
+        // Only trigger emergency if not performing recovery turn
+        if (!performingTurn && (dist > 0 ) && (dist < Config::EMERGENCY_DISTANCE)) {
+
             if (xSemaphoreTake(stateMutex, portMAX_DELAY)) {
-                if (!isPerformingCreneau) {
-                    shouldStop = true;
-                }
+                emergencyStop = true;
                 xSemaphoreGive(stateMutex);
             }
-            
-            if (shouldStop) {
-                motor.stop();
-                motor.update();
-                
-                // Write emergencyStop safely
-                if (xSemaphoreTake(stateMutex, portMAX_DELAY)) {
-                    emergencyStop = true;
-                    xSemaphoreGive(stateMutex);
-                }
-            }
         }
-        
+
         vTaskDelay(pdMS_TO_TICKS(200));
     }
 }

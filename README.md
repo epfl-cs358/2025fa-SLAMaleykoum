@@ -465,6 +465,7 @@ We tried many things that were eventually not used. These can be found in the su
 - `motor_pid` was ultimately not functional due to the poor quality of the ESC we used.
 - `ekf_localizer` was not used because the imu was not accurate enough for acceleration_y and accelration_x so the computation of the position using imu was unreliable.
 - `pure_pursuit` is used in the project, but the archived files contain earlier implementations based on EKF and PID control. We kept the full version here for reference, while a cleaned and correct implementation is used in the main code.
+`recovery_maneuver` turned the car toward the first waypoint of a path. Not used due to delays with new paths; current version does an automatic 180° turn for reliability. We kept this improved version in the archive.
 
 ### The Tests
 Some tests are no longer directly runnable without modifications, as data types evolved over time and the include paths differ from the current project structure.

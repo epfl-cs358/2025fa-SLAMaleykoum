@@ -13,9 +13,6 @@
 void TaskReceivePath(void *pvParameters) {
 
     PathMessage gpm;
-    // connection.setupWifi();
-    // connection.check_connection();
-    // connection.publish(mqtt_topic_connection_esp2_receive, "Wifi Setup success");
     for (;;) {
         esp_link.poll();
         if (esp_link.get_path(gpm)) {
@@ -32,9 +29,6 @@ void TaskReceivePath(void *pvParameters) {
                 xSemaphoreGive(stateMutex);
             }
         }
-        // snprintf(msgReceive, sizeof(msgReceive), "coucou j'ai pas recu, NUUUUUUUL");
-            
-        // connection.publish(mqtt_topic_connection_esp2_receive, msgReceive);
 
         vTaskDelay(pdMS_TO_TICKS(10));
     }

@@ -31,7 +31,7 @@ void TaskOdometryUnified_Stable(void *pvParameters) {
     uint32_t prevTime = micros();
     uint32_t lastPrintTime = 0;
 
-    const float MAX_YAW_CHANGE_RAD = 0.523599f;//0.2618f; //30 this is 15 degreees
+    const float MAX_YAW_CHANGE_RAD = 0.2618f; //30 this is 15 degreees
 
     // Variable to track previous yaw and position
     float prevYaw = 0.0f;

@@ -7,291 +7,56 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 
-/*
+
 void TaskMotor(void *pvParameters) {
-
-    //Our state machine
-    enum class MotorState {
-        IDLE,
-        DRIVING,
-        EMERGENCY_STOPPED,
-    };
-
-    MotorState state = MotorState::IDLE; //first state is IDLE because the car is stopped 
-
+    bool recoveryTriggered = false;
 
     for (;;) {
-        switch (state) {
-            case MotorState::IDLE:
-                motor.stop();
-                servo_dir.setAngle(90);
-                if (firstPathReceived && !emergencyStop) {
-                    state = MotorState::DRIVING;
-                }
-                break;
-                
-            case MotorState::DRIVING:
-                if (finishedPath) {
-                    motor.stop();
-                    servo_dir.setAngle(90);
-                    state = MotorState::IDLE;
-                    break;
-                }
-                
-                if (emergencyStop && !isPerformingCreneau) {
-                    motor.stop();
-                    servo_dir.setAngle(90);
-                    state = MotorState::EMERGENCY_STOPPED;
-                    break;
-                }
-                
-                motor.forward(Config::MOTOR_POWER_DRIVE);
-                break;
-                
-            case MotorState::EMERGENCY_STOPPED:
-                motor.stop();
-                /*
-                if (newPathArrived && receivedPath.current_length > 0) {//if we've received a path with more than one waypoint
-                        
-                        //TODO: this target yaw is wrong, reocmpute everyhting after testing again with IMU to make sure you get correct values when car is turning left or right
-                        float targetYaw = Control::calculateTargetYaw(
-                            currentPose.x, currentPose.y,
-                            receivedPath.path[0].x, 
-                            receivedPath.path[0].y
-                        );
-                        
-                        // TODO: esp_link.sendStatus(MessageType::TURNING_IN_PROGRESS);
-                        //delay(500);
-                        vTaskDelay(pdMS_TO_TICKS(500));
-                        
-                        isPerformingCreneau = true;
-                        Control::performMultiPointTurn(targetYaw);
-                        isPerformingCreneau = false;
-                        
-                        // TODO: esp_link.sendStatus(MessageType::READY_FOR_UPDATES);
-                        
-                        emergencyStop = false;
-                        isCrenFinished = true;
-                        newPathArrived = false;
-                        state = MotorState::DRIVING;
-                    
-                }
-                //if no new path arrived maybe 
-                else{//no new path arrived
+        bool localEmergency = false;
+        bool localFinished = false;
+        bool localFirstPath = false;
 
-                    for(int i = 0; i<3; i++){
-                        digitalWrite(LED_BUILTIN, HIGH);
-                    }
-
-                    isPerformingCreneau = true;
-                    float targetYaw =
-                    currentPose.theta * 180.0f / PI + 180.0f;
-
-                    if (targetYaw > 180)  targetYaw -= 360;
-                    if (targetYaw < -180) targetYaw += 360;
-
-                    Control::performMultiPointTurn(targetYaw);
-                    isPerformingCreneau = false;
-                        
-                        // TODO: esp_link.sendStatus(MessageType::READY_FOR_UPDATES);
-                        
-                    emergencyStop = false;
-                    isCrenFinished = true;
-                    newPathArrived = false;
-                    digitalWrite(LED_BUILTIN,LOW);
-                    state = MotorState::DRIVING;
-
-
-                }*/
-                //else
-               /* break;
-        }
-        
-        motor.update();
-        vTaskDelay(pdMS_TO_TICKS(20));
-    }
-}*/
-/*
-void TaskMotor(void *pvParameters) {
-    for (;;) {
-        if (emergencyStop || finishedPath || !firstPathReceived /*|| !startSignalReceived*////){
-           /* motor.stop();
-            servo_dir.setAngle(90);
-            /*
-            if(emergencyStop && !isCrenFinished){
-                isPerformingCreneau = true;
-                delay(1000);
-                for(int i = 0; i<10; i++){
-                    motor.backward(0.21f);
-                    motor.update();
-                }
-                delay(800);
-                for(int i = 0; i<3; i++){
-                    motor.stop();
-                    motor.update();
-                }
-
-                for(int i = 0 ; i< 5; i++){
-            
-                
-                    servo_dir.setAngle(120);
-                    delay(500);
-                    for(int i = 0; i<8; i++){
-                        motor.backward(0.21f);
-                        motor.update();
-                    }
-
-                    delay(800);
-
-
-
-                    for(int i = 0; i<3; i++){
-                        motor.stop();
-                        motor.update();
-                    }
-
-                    delay(1500);
-
-                    servo_dir.setAngle(60);
-                    delay(500);
-                    for(int i = 0; i<8; i++){
-                        motor.forward(0.17f);
-                        motor.update();
-                    }
-
-                    delay(800);
-
-
-
-                    for(int i = 0; i<3; i++){
-                        motor.stop();
-                        motor.update();
-                    }
-
-                    delay(1500);
-                    
-                }
-
-                servo_dir.setAngle(90);
-
-                isCrenFinished = true;
-                // CLEAR FLAG: Re-enable emergency stop detection
-                isPerformingCreneau = false;
-                
-                // Clear emergency stop so vehicle can continue
-                emergencyStop = false;*/
-        //}
-      /*  } else {
-            motor.forward(Config::MOTOR_POWER_DRIVE);
-        }
-        motor.update();
-        vTaskDelay(pdMS_TO_TICKS(20));
-    }
-}*/
-/*
-void TaskMotor(void *pvParameters) {
-    for (;;) {
-        bool shouldStop = false;
-        
-        // Read shared state safely
         if (xSemaphoreTake(stateMutex, portMAX_DELAY)) {
-            shouldStop = (emergencyStop || finishedPath || !firstPathReceived);
+            localEmergency = emergencyStop;
+            localFinished = finishedPath;
+            localFirstPath = firstPathReceived;
             xSemaphoreGive(stateMutex);
         }
-        
-        if (shouldStop) {
+
+        // EMergency stop trigger so recovery maneuver
+        if (localEmergency && !recoveryTriggered) {
+            //recoveryTriggered = true;
+
             motor.stop();
             servo_dir.setAngle(90);
-        } else {
+
+            isPerformingCreneau = true;
+            Control::performMultiPointTurn();
+            isPerformingCreneau = false;
+
+            if (xSemaphoreTake(stateMutex, portMAX_DELAY)) {
+                emergencyStop = false;
+                isCrenFinished = true;
+                xSemaphoreGive(stateMutex);
+            }
+        }
+
+        // Reset local emergency to false after recover maneuver done
+        if (!localEmergency) {
+            recoveryTriggered = false;
+        }
+
+        // Continue driving 
+        if (!localEmergency && !localFinished && localFirstPath) {
             motor.forward(Config::MOTOR_POWER_DRIVE);
+        } else {
+            motor.stop();
+            servo_dir.setAngle(90);
         }
+
         motor.update();
         vTaskDelay(pdMS_TO_TICKS(20));
     }
 }
-    */
 
-void TaskMotor(void *pvParameters) {
-
-    //Our state machine
-
-    enum class MotorState {
-        IDLE,
-        DRIVING,
-        EMERGENCY_STOPPED,
-    };
-
-    MotorState state = MotorState::IDLE;
-    bool waitingForNewPath = false;
-
-
-    for (;;) {
-        switch (state) {
-            case MotorState::IDLE:
-                motor.stop();
-                servo_dir.setAngle(90);
-                if (firstPathReceived && !emergencyStop) {
-                    state = MotorState::DRIVING;
-                }
-                break;
-                
-            case MotorState::DRIVING:
-                if (finishedPath) {
-                    motor.stop();
-                    servo_dir.setAngle(90);
-                    // TODO: esp_link.sendStatus(MessageType::MISSION_COMPLETE);
-                    state = MotorState::IDLE;
-                    break;
-                }
-                
-                if (emergencyStop && !isPerformingCreneau) {
-                    motor.stop();
-                    servo_dir.setAngle(90);
-                    // TODO: esp_link.sendStatus(MessageType::OBSTACLE_DETECTED);
-                    waitingForNewPath = true;
-                    state = MotorState::EMERGENCY_STOPPED;
-                    break;
-                }
-                
-                motor.forward(Config::MOTOR_POWER_DRIVE);
-                break;
-                
-            case MotorState::EMERGENCY_STOPPED:
-                motor.stop();
-                
-                if (waitingForNewPath && newPathArrived) {
-                    waitingForNewPath = false;
-                    
-                    
-                    if (receivedPath.current_length > 0) {//if we've received a path with more than one waypoint
-                        
-                        //TODO: this target yaw is wrong, reocmpute everyhting after testing again with IMU to make sure you get correct values when car is turning left or right
-                        float targetYaw = Control::calculateTargetYaw(
-                            currentPose.x, currentPose.y,
-                            receivedPath.path[0].x, //TODO: check if we turn toward the first point or the goal, or what? mayeb  not goal, end up facing wall
-                            //TODO : will gloabl planner never give you a poitn facing a wall, norally, it should be far enough from a wall
-                            receivedPath.path[0].y
-                        );
-                        
-                        // TODO: esp_link.sendStatus(MessageType::TURNING_IN_PROGRESS);
-                        delay(500);
-                        
-                        isPerformingCreneau = true;
-                        Control::performMultiPointTurn(targetYaw);
-                        isPerformingCreneau = false;
-                        
-                        // TODO: esp_link.sendStatus(MessageType::READY_FOR_UPDATES);
-                        
-                        emergencyStop = false;
-                        isCrenFinished = true;
-                        newPathArrived = false;
-                        state = MotorState::DRIVING;
-                    }
-                }
-                break;
-        }
-        
-        motor.update();
-        vTaskDelay(pdMS_TO_TICKS(20));
-    }
-}
+  

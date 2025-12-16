@@ -23,6 +23,7 @@ void TaskPurePursuit(void *pvParameters) {
 
             if (xSemaphoreTake(pathMutex, portMAX_DELAY)) {
                 if (newPathArrived) {
+                    firstPathReceived = true;
                     hasNewPath = true;
                     localPath = receivedPath;
                     newPathArrived = false;
