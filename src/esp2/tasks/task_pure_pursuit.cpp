@@ -17,7 +17,6 @@ void TaskPurePursuit(void *pvParameters) {
 
     for (;;) {
         // 1. Path Update Logic
-        // 1. Path Update Logic
             bool hasNewPath = false;
             PathMessage localPath;
 
@@ -40,7 +39,6 @@ void TaskPurePursuit(void *pvParameters) {
                 }
             }
 
-        // 2. Emergency Stop Check
         // 2. Emergency Stop Check
         bool isEmergency = false;
         if (xSemaphoreTake(stateMutex, portMAX_DELAY)) {
@@ -67,6 +65,11 @@ void TaskPurePursuit(void *pvParameters) {
 
         // 4. Apply Control Command
         servo_dir.setAngle(cmd.delta_target);
+
+        /*
+        * If you decide you use the pid option in the files located in the archive folder
+        * uncomment this line
+        */
         // pid.setTargetVelocity(cmd.v_target);
 
         if ((cmd.v_target == 0)){

@@ -2,13 +2,9 @@
 #include "tasks/task_receive_path.h"
 #include "esp2/global_state.h"
 #include "common/data_types.h"
-
-#include "common/wifi_connection.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 
-// char msgReceive[100];
-// const char* mqtt_topic_connection_esp2_receive= "slamaleykoum77/setupesp2";
 
 void TaskReceivePath(void *pvParameters) {
 

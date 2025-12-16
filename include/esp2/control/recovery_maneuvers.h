@@ -22,7 +22,6 @@ namespace Control {
      * orientation.
      *
     */
-    //void performMultiPointTurn(float targetYaw);
     void performMultiPointTurn();
 
 }
