@@ -4,6 +4,83 @@
 
 GlobalPlanner::GlobalPlanner() {}
 
+void checkForPath(
+    PathMessage* path,
+    const BayesianOccupancyGrid& map
+) {
+    if (!path || path->current_length == 0) return;
+
+    const int W = map.grid_size_x;
+    const int H = map.grid_size_y;
+    const float res = map.grid_resolution;
+
+    // Rayon du robot en nombre de cellules
+    const int r_cells = (int)ceilf(ROBOT_RADIUS / res);
+
+    for (int i = 1; i < path->current_length - 1; i++) {
+
+        float& wx = path->path[i].x;
+        float& wy = path->path[i].y;
+
+        int cx, cy;
+        world_to_grid(wx, wy, cx, cy, res, W, H);
+
+        // Si le point est déjà hors-map, on ignore
+        if (cx < 0 || cx >= W || cy < 0 || cy >= H) continue;
+
+        float shift_x = 0.0f;
+        float shift_y = 0.0f;
+        bool collision = false;
+
+        // Vérifie le disque autour du point
+        for (int dy = -r_cells; dy <= r_cells; dy++) {
+            for (int dx = -r_cells; dx <= r_cells; dx++) {
+
+                if (dx*dx + dy*dy > r_cells*r_cells) continue;
+
+                int nx = cx + dx;
+                int ny = cy + dy;
+
+                // Hors-map = mur
+                if (nx < 0 || nx >= W || ny < 0 || ny >= H) {
+                    collision = true;
+                    shift_x -= dx;
+                    shift_y -= dy;
+                    continue;
+                }
+
+                if (map.get_cell_probability(nx, ny) > FREE_BOUND_PROB) {
+                    collision = true;
+                    shift_x -= dx;
+                    shift_y -= dy;
+                }
+            }
+        }
+
+        if (!collision) continue;
+
+        float norm = sqrtf(shift_x*shift_x + shift_y*shift_y);
+        if (norm < 1e-3f) continue;
+
+        shift_x /= norm;
+        shift_y /= norm;
+
+        // Déplacement limité (plus stable)
+        const float step = 0.5f * ROBOT_RADIUS;
+        float new_x = wx + shift_x * step;
+        float new_y = wy + shift_y * step;
+
+        // Clamp dans la map
+        int gx, gy;
+        world_to_grid(new_x, new_y, gx, gy, res, W, H);
+        if (gx >= 0 && gx < W && gy >= 0 && gy < H) {
+            wx = new_x;
+            wy = new_y;
+        }
+        // sinon : on ne bouge pas le point
+    }
+}
+
 PathMessage GlobalPlanner::generate_path(
     const Pose2D& current_pose,
     const MissionGoal& goal,
@@ -224,6 +301,8 @@ PathMessage GlobalPlanner::generate_path(
             grid_to_world(ws->px[idx], ws->py[idx], msg.path[k].x, msg.path[k].y, res, W, H);
         }
     }
+
+    checkForPath(&msg, map);
 
     return msg;
 }
