@@ -2,6 +2,7 @@
 
 #include "../../common/data_types.h"
 #include "../../esp1/mapping/bayesian_grid.h" 
+#include "../../common/utils.h"
 
 #include <stdint.h>
 
@@ -48,7 +49,7 @@ public:
      * 
      * @return The new goal to reach.
      */
-    MissionGoal update_goal(const Pose2D& pose, const BayesianOccupancyGrid& grid, bool global_planner_failed);
+    MissionGoal update_goal(const Pose2D& pose, const BayesianOccupancyGrid& grid, const InvalidGoals& invalid_goals);
 
 private:
     Pose2D home_pose_;
@@ -122,7 +123,7 @@ private:
      */
     void search_for_candidates(const BayesianOccupancyGrid& grid, 
                                int x_min, int x_max, int y_min, int y_max, 
-                               int& candidate_count);
+                               int& candidate_count, const InvalidGoals& invalid_goals);
 
     /**
      * @brief Checks if the current goal is still valid.

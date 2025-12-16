@@ -16,7 +16,7 @@ namespace Control {
 
 void performMultiPointTurn() {
         const float ANGLE_TOLERANCE = 5.0; //in degrees
-        const int MAX_ITERATIONS = 10; //from testing 5 is around 180 degrees so double should return facing the original direction
+        const int MAX_ITERATIONS = 5; //from testing 5 is around 180 degrees so double should return facing the original direction
 
         //Start by moving backwards to have enough space to turn around without crashing into the wall
         servo_dir.setAngle(90);

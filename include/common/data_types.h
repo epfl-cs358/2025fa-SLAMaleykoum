@@ -13,6 +13,7 @@
 #define MAX_PATH_LENGTH 15
 #define MAX_LOCAL_PATH_LENGTH 10
 #define MAX_LIDAR_POINTS 500
+#define MAX_INVALID_GOALS 5
 #define ROBOT_RADIUS 0.3f
 #define SEARCH_BOUND_M 3.0f
 #define GOAL_REACHED 0.4f
@@ -205,4 +206,9 @@ struct MissionGoal {
 enum MsgId : uint8_t {
   MSG_PATH = 1,       // PathMessage ESP1->ESP2
   MSG_POSE = 2,       // Pose2D ESP2->ESP1
+};
+
+struct InvalidGoals {
+    Pose2D lasts[MAX_INVALID_GOALS];
+    uint8_t size;
 };
