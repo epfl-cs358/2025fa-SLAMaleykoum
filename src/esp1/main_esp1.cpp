@@ -11,7 +11,6 @@
 #include "esp1/mapping/bayesian_grid.h"
 #include "esp1/planning/global_planner.h"
 #include "esp1/planning/mission_planner.h"
-// #include "esp1/planning/local_planner.h"
 #include "../../include/common/utils.h"
 
 #include <WiFi.h>
@@ -21,8 +20,6 @@
 #define TCP_HEADER_SIZE 96
 
 // --- NETWORK CONFIG ---
-// const char* ssid = "SPOT-iot";
-// const char* password = "KyrielleCivetTicketNombreuse6695";
 const char* ssid = "LIDAR_AP";
 const char* password = "l1darpass";
 const uint16_t TCP_PORT = 9000;
@@ -45,7 +42,6 @@ TaskHandle_t  TCP_Task_Handle = NULL;
 // MUTEXES
 SemaphoreHandle_t Bayesian_Grid_Mutex;
 SemaphoreHandle_t Pose_Mutex;
-// SemaphoreHandle_t State_Mutex;
 SemaphoreHandle_t Goal_Mutex;
 SemaphoreHandle_t Path_Mutex;
 SemaphoreHandle_t Planner_State_Mutex;
@@ -54,7 +50,6 @@ SemaphoreHandle_t Planner_State_Mutex;
 const int GRID_SIZE_X = 70;
 const int GRID_SIZE_Y = 70;
 const float RESOLUTION = 0.2f;
-// const int factor = 4;
 
 const uint32_t RLE_BUFFER_SIZE = 10000;
 
@@ -71,9 +66,7 @@ SyncedScan* Scan_Buffer_2 = nullptr;
 Pose2D last_known_pose = {0,0,0,0};
 PathMessage current_global_path = {{{0.f, 0.f}}, 1, 0, 0};
 MissionGoal current_mission_goal = {{0.0f, 0.f, 0.f, 0}, EXPLORATION_MODE};
-// PathMessage current_local_path = {{}, 0, 0, 0};
 bool new_goal_arrived = true;
-// bool global_path_invalid = false; // Set by Global Planner, read by Mission Planner
 bool path_found = false;
 
 InvalidGoals invalid_goals = {{}, 0};
@@ -89,7 +82,6 @@ struct StateSnapshot {
     MissionGoal goal;
     PathMessage global_path;
     uint8_t state;
-    // PathMessage local_path;
 } Tx_Snapshot;
 
 HardwareSerial& LIDAR_SERIAL = Serial2;
@@ -98,14 +90,7 @@ Lidar lidar(LIDAR_SERIAL);
 HardwareSerial& IPC_Serial = Serial1; 
 Esp_link esp_link(IPC_Serial);
 
-
-// =============================================================
-// TASK 5: TCP TRANSMIT
-// =============================================================
-// TODO: We can optimize here
-// RLE COMPRESSION FOR MAP TRANSMISSION (!!!! CAN GET RID OF THIS IF IT TAKES TOO MUCH SPACE or time !!!!)
-// RLE Buffer: 200x200 = 40000 bytes. RLE typically reduces this >90%.
-// We allocate a static buffer to handle the worst case.
+// TASK: TCP TRANSMIT
 static uint8_t rle_buffer[10000]; // 10KB static buffer for compressed map
 void TCP_Transmit_Task(void* parameter) {
     WiFiClient tcpClient;
@@ -125,20 +110,12 @@ void TCP_Transmit_Task(void* parameter) {
             if (newClient) {
                 tcpClient = newClient;
                 tcpClient.setNoDelay(true);
-                // Serial.println("TCP: Connected!");
             } else {
                 continue;
             }
         }
 
         // 1. Prepare State (Quick Copy)
-        // if (xSemaphoreTake(State_Mutex, pdMS_TO_TICKS(20)) == pdTRUE) {
-        //     Tx_Snapshot.pose = last_known_pose;
-        //     Tx_Snapshot.global_path = current_global_path;
-        //     Tx_Snapshot.goal = current_mission_goal;
-        //     Tx_Snapshot.state = (uint8_t)current_mission_goal.type;
-        //     xSemaphoreGive(State_Mutex);
-        // }
         if (xSemaphoreTake(Pose_Mutex, pdMS_TO_TICKS(20)) == pdTRUE) {
             Tx_Snapshot.pose = last_known_pose;
             xSemaphoreGive(Pose_Mutex);
@@ -205,10 +182,6 @@ void TCP_Transmit_Task(void* parameter) {
         uint16_t gplen_2bytes = (0 << 8) | gplen;
         memcpy(&header[6], &gplen_2bytes, 2);
 
-        // uint16_t lplen = Tx_Snapshot.local_path.current_length;
-        // if(lplen > MAX_LOCAL_PATH_LENGTH) lplen = 0;
-        // memcpy(&header[8], &lplen, 2);
-
         memcpy(&header[8], &Tx_Snapshot.pose.x, 4);
         memcpy(&header[12], &Tx_Snapshot.pose.y, 4);
         memcpy(&header[16], &Tx_Snapshot.pose.theta, 4);
@@ -236,7 +209,6 @@ void TCP_Transmit_Task(void* parameter) {
         if (tcpClient.connected()) {
             tcpClient.write(header, TCP_HEADER_SIZE);
             if(gplen > 0) tcpClient.write((uint8_t*)Tx_Snapshot.global_path.path, gplen * sizeof(Waypoint));
-            // if(lplen > 0) tcpClient.write((uint8_t*)Tx_Snapshot.local_path.path, lplen * sizeof(Waypoint));
             
             // 4. SEND COMPRESSED MAP 
             if (payload_map_sz > 0) {
@@ -247,9 +219,7 @@ void TCP_Transmit_Task(void* parameter) {
     }
 }
 
-// =============================================================
-// TASK 1: IPC RECEIVE
-// =============================================================
+// TASK: IPC RECEIVE
 void IPC_Receive_Task(void* parameter) {
     while (1) {
         esp_link.poll();
@@ -275,9 +245,7 @@ void IPC_Receive_Task(void* parameter) {
     }
 }
 
-// =============================================================
 // TASK 2: LIDAR READ 
-// =============================================================
 void Lidar_Read_Task(void* parameter) {
     const TickType_t xDelay = pdMS_TO_TICKS(10); 
     static LiDARScan scan; 
@@ -287,7 +255,6 @@ void Lidar_Read_Task(void* parameter) {
     while (1) {
         bool scanComplete = false;
         lidar.build_scan(&scan, scanComplete, lastAngleESP);
-        // lidar.readScanLive(&scan, scanComplete, lastAngleESP);
 
         if (scanComplete) {
             if (scan.count > 10) { 
@@ -300,9 +267,7 @@ void Lidar_Read_Task(void* parameter) {
     }
 }
 
-// =============================================================
-// TASK 3: SYNC FUSION
-// =============================================================
+// TASK: SYNC FUSION
 void Lidar_Sync_Map_Task(void* parameter) {
     LiDARScan* scan_buffer = new LiDARScan(); // Heap alloc for temp storage
     SyncedScan* current_work_buffer = nullptr;
@@ -313,7 +278,7 @@ void Lidar_Sync_Map_Task(void* parameter) {
         // We still copy here because LiDARScan is "only" ~1-2KB and it's safer for serial reading
         if (xQueueReceive(Lidar_Buffer_Queue, scan_buffer, portMAX_DELAY) == pdPASS) {
             
-            // Downsample: Only process every 3rd scan to save CPU
+            // Downsample: Only process every 7 scan to save CPU
             local_counter++;
             if (local_counter % 7 != 0) continue;
 
@@ -334,8 +299,6 @@ void Lidar_Sync_Map_Task(void* parameter) {
                 // This copies 4 bytes (address), not 4500 bytes.
                 xQueueSend(Lidar_Pose_Queue_Ready, &current_work_buffer, 0);
             } else {
-                // Serial.println("DROP: Map task too slow, no free buffers!");
-
                 vTaskDelay(pdMS_TO_TICKS(5));
             }
         }
@@ -344,9 +307,7 @@ void Lidar_Sync_Map_Task(void* parameter) {
     }
 }
 
-// =============================================================
-// TASK 4: BAYESIAN MAPPING
-// =============================================================
+// TASK: BAYESIAN MAPPING
 void Bayesian_Grid_Task(void* parameter) {
     SyncedScan* incoming_data_ptr = nullptr;
     
@@ -410,9 +371,7 @@ bool is_current_goal_valid(const Pose2D& robot_pose, const BayesianOccupancyGrid
     
     return false;
 }
-// =============================================================
 // MISSION PLANNER TASK
-// =============================================================
 void Mission_Planner_Task(void* parameter) {
 
     while (1) {
@@ -438,7 +397,6 @@ void Mission_Planner_Task(void* parameter) {
             continue; // Garder le même goal
         }
 
-        // gare aux invalid_goals qui ne sont pas reset
         MissionGoal new_goal = mission_planner->update_goal(current_p, *TheMap, invalid_goals);
 
         if (xSemaphoreTake(Goal_Mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
@@ -451,11 +409,8 @@ void Mission_Planner_Task(void* parameter) {
     }
 }
 
-// =============================================================
 // GLOBAL PLANNER TASK
-// =============================================================
 void Global_Planner_Task(void* parameter) {
-
     GlobalPlanner planner; 
     Pose2D local_pose;
     MissionGoal local_goal;
@@ -508,9 +463,7 @@ void Global_Planner_Task(void* parameter) {
     }
 }
 
-// =============================================================
 // SETUP
-// =============================================================
 void setup() {
     Serial.begin(115200);
     delay(1000);
@@ -521,14 +474,8 @@ void setup() {
     Scan_Buffer_1 = new SyncedScan();
     Scan_Buffer_2 = new SyncedScan();
     
-    // if (!Scan_Buffer_1 || !Scan_Buffer_2) {
-    //     Serial.println("FATAL: Heap alloc failed!"); while(1);
-    // }
     gp_workspace = new GlobalPlannerWorkspace();
-    if (!gp_workspace) {
-        // Serial.println("FATAL: Not enough RAM for Planner!");
-        while(1);
-    }
+    if (!gp_workspace) while(1);
 
     // --- QUEUES ---
     Lidar_Buffer_Queue = xQueueCreate(2, sizeof(LiDARScan));
@@ -547,7 +494,6 @@ void setup() {
     // --- MUTEXES & OBJECTS ---
     Bayesian_Grid_Mutex = xSemaphoreCreateMutex();
     Pose_Mutex = xSemaphoreCreateMutex();
-    // State_Mutex = xSemaphoreCreateMutex();
     Pose_Mutex = xSemaphoreCreateMutex();
     Goal_Mutex = xSemaphoreCreateMutex();
     Path_Mutex = xSemaphoreCreateMutex();
@@ -559,10 +505,6 @@ void setup() {
     WiFi.mode(WIFI_AP);
     WiFi.softAP(ssid, password);
     delay(1000); // Give WiFi time to settle
-    // WiFi.mode(WIFI_STA);
-    // WiFi.setHostname("esp32-lidar-slamaleykoum");
-    // WiFi.begin(ssid, password);
-    // delay(3000);
 
     // --- TCP SERVER SETUP ---
     tcpServer.begin();
@@ -571,8 +513,6 @@ void setup() {
     esp_link.begin(); 
     lidar.start(); 
     delay(1000);
-
-    // delay(50000);
 
     // --- TASK PRIORITIES & CORE ASSIGNMENT ---
     // Rule: Higher number = Higher Priority.
