@@ -28,8 +28,32 @@
 #define GP_PQ_SIZE   (GP_MAX_CELLS / 3) // Queue doesn't need to hold the whole map, just the frontier
 
 // --- Debugging & Profiling ---
-// Force 4-byte alignment to match Python's default struct unpacking
+#define MAX_TRACE_EVENTS 512
+#define EVENT_START 1
+#define EVENT_END   0
+
+enum TaskID : uint8_t {
+    ID_IDLE = 0,
+    ID_LIDAR = 1,     // Core 1
+    ID_SYNC = 2,      // Core 1
+    ID_MAP = 3,       // Core 1
+    ID_IPC = 4,       // Core 0
+    ID_GPLAN = 5,     // Core 0
+    ID_MPLAN = 6,     // Core 0
+    ID_TCP = 7,       // Core 0
+    ID_VALIDATOR = 8  // Core 0
+};
+
 #pragma pack(push, 4)
+
+// Represents one "mark" on the timeline
+struct TaskEvent {
+    uint32_t timestamp_us; // When it happened
+    uint8_t  task_id;      // Which task
+    uint8_t  type;         // Start or End
+    uint8_t  core_id;      // 0 or 1
+    uint8_t  padding;      // Alignment
+};
 
 enum PlannerStatus : int32_t { // Changed to int32_t for alignment
     PLANNER_IDLE_MY_TYPE = 0,
@@ -42,29 +66,24 @@ enum PlannerStatus : int32_t { // Changed to int32_t for alignment
 };
 
 struct SystemHealth {
-    // 1. Resources
     uint32_t free_heap;
     uint32_t min_free_heap;
     
-    // 2. Latencies (us)
     uint32_t map_update_time_us;
     uint32_t global_plan_time_us;
     uint32_t mission_plan_time_us;
     
-    // 3. Stack High Water Marks (bytes)
     uint32_t stack_min_tcp;
     uint32_t stack_min_gplan;
     uint32_t stack_min_mplan;
     uint32_t stack_min_lidar;
     
-    // 4. Counters (The Debugger)
     uint32_t lidar_frames_processed; 
     uint32_t map_frames_processed;   
     uint32_t planner_fail_count;     
     
-    // 5. Status
-    int32_t  last_planner_status; // Int32 for alignment
-    uint32_t queue_load_percent;  // Int32 for alignment (0-100)
+    int32_t  last_planner_status;
+    uint32_t queue_load_percent;
     uint32_t last_esp2_packet_ms;
 };
 

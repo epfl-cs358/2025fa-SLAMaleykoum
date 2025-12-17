@@ -176,27 +176,21 @@ For step-by-step soldering instructions, connector types, power distribution det
 
 You can explore all STL files directly in the [CAD folder](/assets/CAD).  
 
-This folder contains STL files for all custom 3D‑printed parts used in the car build.  
-Each part has its STL file and a preview image of the CAD design.
+This folder contains:
+- STL files for every custom part
+- Preview images of the CAD designs
+For detailed descriptions, images, and design notes, see the dedicated CAD documentation: 
+[CAD README](assets/CAD/README.md)
 
-- **Front Bumper & Ultrasonic Sensor Case**  
-  <p align="center"><img src="/assets/Images/CAD/bumber_cad_image.jpg" alt="Bumper CAD design" width="300"/></p>
-  <p align="center"><img src="/assets/Images/CAD/ultrasonic_holder_cad_image.jpg" alt="Ultrasonic Sensor Holder CAD design" width="300"/></p>
+Here is a quick video of the car's body and roof :
 
-- **Encoder Mount**  
-  <p align="center"><img src="/assets/Images/CAD/encoder_holder_cad_image.jpg" alt="Encoder Mount CAD design" width="300"/></p>
-
-- **Car Body Platform**  
-  <p align="center"><img src="/assets/Images/CAD/body_cad_image.jpg" alt="Car Body CAD design" width="300"/></p>
-
-- **Roof Cover**  
-  <p align="center"><img src="/assets/Images/CAD/roof_cad_image.jpg" alt="Roof CAD design" width="300"/></p>
-
-- **Body & Roof Cover (combined view)**  
-  <p align="center"><img src="/assets/Images/CAD/body_roof_cad_image.jpg" alt="Body & Roof CAD design" width="300"/></p>
+<p align="center">
+  <video width="500" controls>
+    <source src="assets/CAD/fast_cad_video.mp4" type="video/mp4">
+  </video>
+</p>
 
 Note: The CAD files for the **front bumper**, **ultrasonic sensor case**, and **encoder mount** were originally designed by the group from whom we inherited the car, **TurboSLAM**.
-
 
 ### Challenges & Recommendations
 
@@ -398,7 +392,7 @@ We tried many things that were eventually not used. These can be found in the su
 - `motor_pid` was ultimately not functional due to the poor quality of the ESC we used.
 - `ekf_localizer` was not used because the imu was not accurate enough for acceleration_y and accelration_x so the computation of the position using imu was unreliable.
 - `pure_pursuit` is used in the project, but the archived files contain earlier implementations based on EKF and PID control. We kept the full version here for reference, while a cleaned and correct implementation is used in the main code.
-`recovery_maneuver` turned the car toward the first waypoint of a path. Not used due to delays with new paths; current version does an automatic 180° turn for reliability. We kept this improved version in the archive.
+- `recovery_maneuver` turned the car toward the first waypoint of a path. Not used due to delays with new paths; current version does an automatic 180° turn for reliability. We kept this improved version in the archive.
 
 ### The Tests
 Some tests are no longer directly runnable without modifications, as data types evolved over time and the include paths differ from the current project structure.
