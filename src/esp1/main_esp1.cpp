@@ -46,6 +46,7 @@ TaskHandle_t  TCP_Task_Handle = NULL;
 SemaphoreHandle_t Bayesian_Grid_Mutex;
 SemaphoreHandle_t Pose_Mutex;
 SemaphoreHandle_t State_Mutex; 
+SemaphoreHandle_t Invalid_Mutex;
 
 // --- GLOBAL OBJECTS ---
 const int GRID_SIZE_X = 70;
@@ -71,6 +72,7 @@ MissionGoal current_mission_goal = {{0.0f, 0.f, 0.f, 0}, EXPLORATION_MODE};
 // PathMessage current_local_path = {{}, 0, 0, 0};
 bool new_goal_arrived = true;
 bool global_path_invalid = false; // Set by Global Planner, read by Mission Planner
+bool mission = true;
 
 // --- SYSTEM HEALTH MONITOR ---
 SystemHealth sys_health = {0, 0, 0, 0, 0, 0};
@@ -92,6 +94,7 @@ Lidar lidar(LIDAR_SERIAL);
 HardwareSerial& IPC_Serial = Serial1; 
 Esp_link esp_link(IPC_Serial);
 
+InvalidGoals invalid_goals;
 
 // =============================================================
 // TASK 5: TCP TRANSMIT
@@ -364,7 +367,11 @@ void Bayesian_Grid_Task(void* parameter) {
 // MISSION PLANNER TASK
 // =============================================================
 void Mission_Planner_Task(void* parameter) {
+    InvalidGoals mission_invalid;
+
     while (1) {
+
+
         Pose2D current_p;
         
         // Securely read pose
@@ -384,7 +391,12 @@ void Mission_Planner_Task(void* parameter) {
 
         // New goal calculation + Health Monitoring
         uint32_t t0 = micros();
-        MissionGoal new_goal = mission_planner->update_goal(current_p, *TheMap, planner_fail);
+        if (xSemaphoreTake(Invalid_Mutex, pdMS_TO_TICKS(20)) == pdTRUE) {
+            mission_invalid = invalid_goals;
+            xSemaphoreGive(Invalid_Mutex);
+        } else continue;
+
+        MissionGoal new_goal = mission_planner->update_goal(current_p, *TheMap, planner_fail, mission_invalid);
         sys_health.mission_plan_time_us = micros() - t0;
 
         // Check if goal actually changed before taking Mutex
@@ -521,7 +533,14 @@ void Global_Planner_Task(void* parameter) {
             
             // A* peut prendre 300ms
             pathMsg = planner.generate_path(local_pose, local_goal_copy, *TheMap, gp_workspace);
-            
+            if (pathMsg.current_length == 0) {
+                if (xSemaphoreTake(Invalid_Mutex, pdMS_TO_TICKS(20)) == pdTRUE) {
+                    if (invalid_goals.size >= MAX_INVALID_GOALS) invalid_goals.size = 0;
+                    invalid_goals.lasts[invalid_goals.size++] = local_goal_copy.target_pose;
+                    xSemaphoreGive(Invalid_Mutex);
+                }
+            }
+
             uint32_t duration = millis() - t0;
             sys_health.global_plan_time_us = duration * 1000;
             
@@ -604,6 +623,7 @@ void setup() {
     Bayesian_Grid_Mutex = xSemaphoreCreateMutex();
     Pose_Mutex = xSemaphoreCreateMutex();
     State_Mutex = xSemaphoreCreateMutex();
+    Invalid_Mutex = xSemaphoreCreateMutex();
 
     TheMap = new BayesianOccupancyGrid(RESOLUTION, GRID_SIZE_X, GRID_SIZE_Y);
     mission_planner = new MissionPlanner({0.0f, 0.0f, 0.0f, 0});
@@ -654,13 +674,13 @@ void setup() {
     xTaskCreatePinnedToCore(IPC_Receive_Task, "IPC_Rx", 2048, NULL, 3, NULL, 0);
     xTaskCreatePinnedToCore(Mission_Planner_Task, "Mission", 4096, NULL, 2, &MPlan_Task_Handle, 0);
     xTaskCreatePinnedToCore(TCP_Transmit_Task, "TCP_Tx", 4096, NULL, 1, &TCP_Task_Handle, 0); 
+    xTaskCreatePinnedToCore(Global_Planner_Task, "Global_Plan", 8192, NULL, 2, &GPlan_Task_Handle, 0);
 
     // -- Core 1 --
     // NOTE: Passing &MPlan_Task_Handle captures the task ID for monitoring
     xTaskCreatePinnedToCore(Lidar_Read_Task, "Lidar_Read", 3072, NULL, 4, &Lidar_Task_Handle, 1);
     xTaskCreatePinnedToCore(Lidar_Sync_Map_Task, "Lidar_Sync", 4096, NULL, 4, NULL, 1);
     xTaskCreatePinnedToCore(Bayesian_Grid_Task, "Map_Comp", 4096, NULL, 2, NULL, 1);
-    xTaskCreatePinnedToCore(Global_Planner_Task, "Global_Plan", 8192, NULL, 1, &GPlan_Task_Handle, 1);
 }
 
 void loop() {}

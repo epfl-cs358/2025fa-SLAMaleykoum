@@ -206,3 +206,10 @@ enum MsgId : uint8_t {
   MSG_PATH = 1,       // PathMessage ESP1->ESP2
   MSG_POSE = 2,       // Pose2D ESP2->ESP1
 };
+
+#define MAX_INVALID_GOALS 10
+
+struct InvalidGoals {
+    uint8_t size = 0;
+    Pose2D lasts[MAX_INVALID_GOALS];
+};
