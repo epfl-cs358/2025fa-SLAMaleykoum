@@ -58,6 +58,10 @@ It acts as the intermediary between the high-level system (Bayesian grid) and th
 
 - **Output**: `MissionGoal`, it is packaged with coordinates, defining the target for the `GlobalPlanner`.
 
+# // TODO: @Blanche & @Santiago
+### Goal Validation :
+...
+![FSM](/assets/docs/esp1/goal-validation-fsm.png)
 
 ### Global Planner :
 **D. GlobalPlanner (A\*)**
@@ -78,6 +82,6 @@ Note: The `GlobalPlanner` hands this path message to the UART Sender task on ESP
 ---
 
 ## architecture diagram
-//TODO: UPDATE THIS DIAGRAM.
+# //TODO: UPDATE THIS DIAGRAM.
 Here is the current architecture.
-![alt text](/docs/global-architecture-2.png)
+![alt text](/assets/docs/esp1/global-architecture-Page-3.png)
