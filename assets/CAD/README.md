@@ -28,9 +28,7 @@ Placed in front of the motor to secure the encoder and its magnet.
 <p align="center">
   <img src="/assets/Images/CAD/encoder_holder_cad_image.jpg" alt="Encoder Mount " width="300"/>
 </p>
-<p align="center">
-  <img src="/assets/Images/CAD/encoder_real.jpg" alt="Encoder Mount real-life photo" width="300"/>
-</p>
+
 
 
 

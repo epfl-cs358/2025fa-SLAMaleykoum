@@ -82,6 +82,7 @@ We only need the minimal mechanical build so the car can drive, skip the decorat
 - Mount the steering servo inside the chassis.  
 - Ensure the servo cables are routed through the rectangular opening so they can later connect to the ESP.  
 
+<p align="center"><img src="/assets/Images/tamiya blitzer chassis.jpg" alt="Chassis" width="200"/></p>
 **Step 2: Encoder Mount + Magnet**  
 - 3D‑print the encoder mount (CAD file available in /assets/CAD/).  
 - Attach the mount in front of the motor.  
@@ -132,7 +133,6 @@ We only need the minimal mechanical build so the car can drive, skip the decorat
 
 <p align="center"><img src="/assets/Images/Photoshoot/IMG_2668.jpg" alt="Side view open" width="200"/></p>
 
-*//TODO: For each step, insert assembly photos so readers can clearly see component placement and orientation.*
 ---
 
 ### Soldering & Wiring
