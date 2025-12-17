@@ -45,6 +45,12 @@ struct SystemHealth {
     
     // Connectivity
     uint32_t last_esp2_packet_ms; // Time since last packet from ESP2
+
+    // Diag counts
+    uint32_t lidar_frames_processed;
+    uint32_t map_frames_processed;
+    uint32_t planner_fail_count;
+    uint32_t last_planner_status;
 };
 
 // --- Core Geometric Structures ---

@@ -10,7 +10,7 @@
  * The point must be:
  * - in a reachable distance, within the `ROBOT_RADIUS`.
  * - within the limits of the map
- * - on an unoccupied cell, free or unknown is fine. 
+ * - on a free cell. 
  * 
  * @return ture if the point is safe to reach, false otherwise.
  */
@@ -25,7 +25,7 @@ static bool is_point_safe(const BayesianOccupancyGrid& grid, int gx, int gy)
             int nx = gx + dx;
             int ny = gy + dy;
             if (nx < 0 || ny < 0 || nx >= grid.grid_size_x || ny >= grid.grid_size_y) continue;
-            if (grid.get_cell_probability(nx, ny) > OCC_BOUND_PROB) return false;
+            if (grid.get_cell_probability(nx, ny) > FREE_BOUND_PROB) return false;
         }
     }
     return true;
@@ -52,6 +52,15 @@ static bool is_frontier_cell(const BayesianOccupancyGrid& grid, int x, int y)
         if (np > FREE_BOUND_PROB && np < OCC_BOUND_PROB) return true;
     }
 
+    return false;
+}
+
+//TODO: Check if this is actually an equality since grid world conversion.
+static bool invalid(int x, int y, InvalidGoals invalid_goals) {
+    for (int i = 0; i < invalid_goals.size; ++i) {
+        if (invalid_goals.lasts[i].x == x && invalid_goals.lasts[i].y == y) 
+            return true;
+    }
     return false;
 }
 
@@ -106,7 +115,7 @@ void MissionPlanner::find_cluster(const BayesianOccupancyGrid& grid, int start_x
         size++;
         sum_x += current.x;
         sum_y += current.y;
-        if (size >= 100) break;
+        if (size >= MAX_CLUSTER_SIZE) break;
 
         // Store First Point
         if (!first_set) {
@@ -139,13 +148,6 @@ void MissionPlanner::find_cluster(const BayesianOccupancyGrid& grid, int start_x
     store_candidate_if_valid(sum_x, sum_y, size, candidate_count);
 }
 
-static bool invalid(int x, int y, InvalidGoals invalid_goals) {
-    for (int i = 0; i < invalid_goals.size; ++i) {
-        if (invalid_goals.lasts[i].x == x && invalid_goals.lasts[i].y == y) 
-            return true;
-    }
-    return false;
-}
 
 void MissionPlanner::search_for_candidates(const BayesianOccupancyGrid& grid, 
                                            int x_min, int x_max, int y_min, int y_max, 
@@ -180,7 +182,7 @@ bool MissionPlanner::is_current_goal_valid(const Pose2D& robot_pose, const Bayes
     world_to_grid(current_target_.target_pose.x, current_target_.target_pose.y, 
                   gx, gy, grid.grid_resolution, grid.grid_size_x, grid.grid_size_y);
 
-    if (grid.get_cell_probability(gx, gy) > OCC_BOUND_PROB) 
+    if (grid.get_cell_probability(gx, gy) > FREE_BOUND_PROB)
         return false;
 
     // Check Frontier Integrity
@@ -197,6 +199,10 @@ MissionGoal MissionPlanner::update_goal(const Pose2D& pose, const BayesianOccupa
     const int PATIENCE_LIMIT = 20; 
     const int NEAR_RANGE_CELLS = (int)(FRONTIER_NEAR_RANGE_M / grid.grid_resolution);
     const int NEAR_RANGE_SQ = NEAR_RANGE_CELLS * NEAR_RANGE_CELLS;
+
+    if (global_planner_failed) {
+        current_target_.type = EXPLORATION_MODE; // Force recalculation
+    }
 
     if (current_target_.type == RETURN_HOME) {
         current_target_.target_pose = home_pose_;
@@ -235,8 +241,13 @@ MissionGoal MissionPlanner::update_goal(const Pose2D& pose, const BayesianOccupa
 
         for(int i = 0; i < candidate_count; i++) {
             if(candidates[i].valid) {
-                float dx = (candidates[i].center_x - rx);
-                float dy = (candidates[i].center_y - ry);
+                int cx = candidates[i].center_x;
+                int cy = candidates[i].center_y;
+
+                if (invalid(cx, cy, invalid_goals)) continue;
+
+                float dx = (cx - rx);
+                float dy = (cy - ry);
                 float d_sq = dx*dx + dy*dy;
 
                 if (candidates[i].size > MIN_CLUSTER_SIZE && d_sq < min_dist_sq) {

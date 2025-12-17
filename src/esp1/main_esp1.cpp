@@ -11,7 +11,6 @@
 #include "esp1/mapping/bayesian_grid.h"
 #include "esp1/planning/global_planner.h"
 #include "esp1/planning/mission_planner.h"
-// #include "esp1/planning/local_planner.h"
 #include "../../include/common/utils.h"
 
 #include <WiFi.h>
@@ -21,8 +20,6 @@
 #define TCP_HEADER_SIZE 96
 
 // --- NETWORK CONFIG ---
-// const char* ssid = "SPOT-iot";
-// const char* password = "KyrielleCivetTicketNombreuse6695";
 const char* ssid = "LIDAR_AP";
 const char* password = "l1darpass";
 const uint16_t TCP_PORT = 9000;
@@ -40,7 +37,9 @@ QueueHandle_t Lidar_Pose_Queue_Free;  // Holds pointers to EMPTY buffers (Map ->
 TaskHandle_t GPlan_Task_Handle = NULL;
 TaskHandle_t MPlan_Task_Handle = NULL;
 TaskHandle_t Lidar_Task_Handle = NULL;
-TaskHandle_t  TCP_Task_Handle = NULL;
+TaskHandle_t TCP_Task_Handle = NULL;
+TaskHandle_t Sync_Task_Handle = NULL;
+TaskHandle_t Map_Task_Handle = NULL;
 
 // MUTEXES
 SemaphoreHandle_t Bayesian_Grid_Mutex;
@@ -48,11 +47,14 @@ SemaphoreHandle_t Pose_Mutex;
 SemaphoreHandle_t State_Mutex; 
 SemaphoreHandle_t Invalid_Mutex;
 
+// PingPong Goal/Path
+SemaphoreHandle_t xSemaphoreGOAL;
+SemaphoreHandle_t xSemaphorePATH;
+
 // --- GLOBAL OBJECTS ---
 const int GRID_SIZE_X = 70;
 const int GRID_SIZE_Y = 70;
 const float RESOLUTION = 0.2f;
-// const int factor = 4;
 
 const uint32_t RLE_BUFFER_SIZE = 10000;
 
@@ -61,7 +63,6 @@ MissionPlanner* mission_planner = nullptr;
 GlobalPlannerWorkspace* gp_workspace = nullptr;
 
 // --- DOUBLE BUFFERING POOL ---
-// We allocate these ONCE on the Heap. They never move.
 SyncedScan* Scan_Buffer_1 = nullptr;
 SyncedScan* Scan_Buffer_2 = nullptr;
 
@@ -69,23 +70,31 @@ SyncedScan* Scan_Buffer_2 = nullptr;
 Pose2D last_known_pose = {0,0,0,0};
 PathMessage current_global_path = {{{0.f, 0.f}}, 1, 0, 0};
 MissionGoal current_mission_goal = {{0.0f, 0.f, 0.f, 0}, EXPLORATION_MODE};
-// PathMessage current_local_path = {{}, 0, 0, 0};
 bool new_goal_arrived = true;
-bool global_path_invalid = false; // Set by Global Planner, read by Mission Planner
-bool mission = true;
+bool global_path_invalid = false;
 
 // --- SYSTEM HEALTH MONITOR ---
 SystemHealth sys_health = {0, 0, 0, 0, 0, 0};
 uint32_t last_ipc_activity_ts = 0;
 
+// --- DIAGNOSTIC COUNTERS (NEW) ---
+struct DiagnosticCounters {
+    uint32_t lidar_scans_received;
+    uint32_t sync_frames_processed;
+    uint32_t sync_frames_dropped;
+    uint32_t map_updates_completed;
+    uint32_t mutex_failures_sync;
+    uint32_t mutex_failures_map;
+    uint32_t queue_ready_depth;
+    uint32_t queue_free_depth;
+} diag_counters = {0, 0, 0, 0, 0, 0, 0, 0};
+
 // --- TRANSMISSION BUFFERS ---
-uint8_t* Tx_Map_Buffer = nullptr; 
 struct StateSnapshot {
     Pose2D pose;
     MissionGoal goal;
     PathMessage global_path;
     uint8_t state;
-    // PathMessage local_path;
 } Tx_Snapshot;
 
 HardwareSerial& LIDAR_SERIAL = Serial2;
@@ -97,134 +106,47 @@ Esp_link esp_link(IPC_Serial);
 InvalidGoals invalid_goals;
 
 // =============================================================
-// TASK 5: TCP TRANSMIT
+// TRACE LOGGING SYSTEM
 // =============================================================
-// TODO: We can optimize here
-// RLE COMPRESSION FOR MAP TRANSMISSION (!!!! CAN GET RID OF THIS IF IT TAKES TOO MUCH SPACE or time !!!!)
-// RLE Buffer: 200x200 = 40000 bytes. RLE typically reduces this >90%.
-// We allocate a static buffer to handle the worst case.
-static uint8_t rle_buffer[10000]; // 10KB static buffer for compressed map
-void TCP_Transmit_Task(void* parameter) {
-    WiFiClient tcpClient;
-    uint8_t header[TCP_HEADER_SIZE]; 
-    
-    const TickType_t TelemetryFreq = pdMS_TO_TICKS(100); 
-    const TickType_t MapFreq = pdMS_TO_TICKS(3000); // 3 Seconds
-    
-    TickType_t lastMapTime = 0;
-    TickType_t xLastWakeTime = xTaskGetTickCount();
+// Task IDs for profiling
+#define ID_LIDAR     1
+#define ID_SYNC      2
+#define ID_MAP       3
+#define ID_IPC       4
+#define ID_GPLAN     5
+#define ID_MPLAN     6
+#define ID_TCP       7
 
-    while (1) {
-        vTaskDelayUntil(&xLastWakeTime, TelemetryFreq);
+// Event types
+#define EVENT_START  1
+#define EVENT_END    0
 
-        if (!tcpClient || !tcpClient.connected()) {
-            WiFiClient newClient = tcpServer.available();
-            if (newClient) {
-                tcpClient = newClient;
-                tcpClient.setNoDelay(true);
-                // Serial.println("TCP: Connected!");
-            } else {
-                continue;
-            }
-        }
+// Trace buffer
+#define MAX_TRACE_EVENTS 200
 
-        // 1. Prepare State (Quick Copy)
-        if (xSemaphoreTake(State_Mutex, pdMS_TO_TICKS(20)) == pdTRUE) {
-            Tx_Snapshot.pose = last_known_pose;
-            Tx_Snapshot.global_path = current_global_path;
-            Tx_Snapshot.goal = current_mission_goal;
-            Tx_Snapshot.state = (uint8_t)current_mission_goal.type;
-            xSemaphoreGive(State_Mutex);
-        }
+struct TaskEvent {
+    uint32_t timestamp_us;
+    uint8_t task_id;
+    uint8_t type;        // 0=END, 1=START
+    uint8_t core_id;
+    uint8_t padding;
+} __attribute__((packed));
 
-        // 2. Decide if we send map
-        bool send_map_now = (xTaskGetTickCount() - lastMapTime > MapFreq);
-        uint32_t payload_map_sz = 0;
+TaskEvent trace_buffer[MAX_TRACE_EVENTS];
+volatile uint16_t trace_head = 0;
+portMUX_TYPE trace_mux = portMUX_INITIALIZER_UNLOCKED;
 
-        // ---------------------------------------------------------
-        // RLE COMPRESSION (NO MUTEX)
-        // ---------------------------------------------------------
-        // We read the map "Dirty". If Lidar writes to it while we read,
-        // we might get a single pixel "tear", which is fine for debug.
-        if (send_map_now) {
-            // OPTIMIZATION: REMOVED MUTEX LOCK
-            const int8_t* raw_map = TheMap->get_map_data();
-            uint32_t total_cells = TheMap->get_total_size();
-            
-            uint32_t rle_idx = 0;
-            uint32_t raw_idx = 0;
-
-            while (raw_idx < total_cells && rle_idx < RLE_BUFFER_SIZE - 2) {
-                int8_t current_val = raw_map[raw_idx];
-                uint8_t count = 0;
-
-                // Count identical bytes (max 255)
-                // If raw_map[raw_idx] changes mid-loop due to Lidar, loop breaks.
-                // This is safe; it just starts a new RLE run.
-                while (raw_idx < total_cells && raw_map[raw_idx] == current_val && count < 255) {
-                    count++;
-                    raw_idx++;
-                }
-
-                rle_buffer[rle_idx++] = count;
-                rle_buffer[rle_idx++] = (uint8_t)current_val;
-            }
-            
-            payload_map_sz = rle_idx; // Compressed size
-        }
-
-        // 3. Header
-        memset(header, 0, TCP_HEADER_SIZE);
-        header[0] = 0xBE; header[1] = 0xEF;
-        
-        // Send COMPRESSED size
-        memcpy(&header[2], &payload_map_sz, 4);
-        
-        uint8_t gplen = Tx_Snapshot.global_path.current_length;
-        if(gplen > MAX_PATH_LENGTH) gplen = 0;
-        uint16_t gplen_2bytes = (0 << 8) | gplen;
-        memcpy(&header[6], &gplen_2bytes, 2);
-
-        // uint16_t lplen = Tx_Snapshot.local_path.current_length;
-        // if(lplen > MAX_LOCAL_PATH_LENGTH) lplen = 0;
-        // memcpy(&header[8], &lplen, 2);
-
-        memcpy(&header[8], &Tx_Snapshot.pose.x, 4);
-        memcpy(&header[12], &Tx_Snapshot.pose.y, 4);
-        memcpy(&header[16], &Tx_Snapshot.pose.theta, 4);
-
-        memcpy(&header[20], &Tx_Snapshot.goal.target_pose.x, 4);
-        memcpy(&header[24], &Tx_Snapshot.goal.target_pose.y, 4);
-        memcpy(&header[28], &Tx_Snapshot.goal.target_pose.theta, 4);
-
-        header[32] = Tx_Snapshot.state;
-
-        // 4. UPDATE HEALTH METRICS
-        sys_health.free_heap = esp_get_free_heap_size();
-        sys_health.min_free_heap = esp_get_minimum_free_heap_size();
-
-        // Check Stack Health (uxTaskGetStackHighWaterMark returns Words, x4 for Bytes)
-        sys_health.stack_min_tcp   = uxTaskGetStackHighWaterMark(NULL) * 4;
-        if(GPlan_Task_Handle) sys_health.stack_min_gplan = uxTaskGetStackHighWaterMark(GPlan_Task_Handle) * 4;
-        if(MPlan_Task_Handle) sys_health.stack_min_mplan = uxTaskGetStackHighWaterMark(MPlan_Task_Handle) * 4;
-        // Lidar task handle needs to be captured in setup
-        
-        // COPY HEALTH DATA INTO HEADER (Append at index 33, after 'state')
-        sys_health.last_esp2_packet_ms = millis() - last_ipc_activity_ts;
-        memcpy(&header[33], &sys_health, sizeof(SystemHealth));
-
-        if (tcpClient.connected()) {
-            tcpClient.write(header, TCP_HEADER_SIZE);
-            if(gplen > 0) tcpClient.write((uint8_t*)Tx_Snapshot.global_path.path, gplen * sizeof(Waypoint));
-            // if(lplen > 0) tcpClient.write((uint8_t*)Tx_Snapshot.local_path.path, lplen * sizeof(Waypoint));
-            
-            // 4. SEND COMPRESSED MAP 
-            if (payload_map_sz > 0) {
-                tcpClient.write(rle_buffer, payload_map_sz);
-                lastMapTime = xTaskGetTickCount();
-            }
-        }
-    }
+// Log a task event (call at start/end of task work)
+void log_event(uint8_t task_id, uint8_t type) {
+    portENTER_CRITICAL(&trace_mux);
+    uint16_t idx = trace_head % MAX_TRACE_EVENTS;
+    trace_buffer[idx].timestamp_us = micros();
+    trace_buffer[idx].task_id = task_id;
+    trace_buffer[idx].type = type;
+    trace_buffer[idx].core_id = xPortGetCoreID();
+    trace_buffer[idx].padding = 0;
+    trace_head++;
+    portEXIT_CRITICAL(&trace_mux);
 }
 
 // =============================================================
@@ -232,6 +154,8 @@ void TCP_Transmit_Task(void* parameter) {
 // =============================================================
 void IPC_Receive_Task(void* parameter) {
     while (1) {
+        log_event(ID_IPC, EVENT_START);
+        
         esp_link.poll();
         Pose2D incoming_pose;
         if (esp_link.get_pos(incoming_pose)) {
@@ -241,16 +165,17 @@ void IPC_Receive_Task(void* parameter) {
                 if (((x_diff) * (x_diff) + (y_diff) * (y_diff)) > 1.0f) {
                     // Discard obviously wrong pose
                     xSemaphoreGive(Pose_Mutex);
+                    log_event(ID_IPC, EVENT_END);
                     continue;
                 }
                 last_known_pose = incoming_pose;
-                // 1. Update Heartbeat
                 sys_health.last_esp2_packet_ms = millis(); 
-                // 2. Update Link Timer
                 last_ipc_activity_ts = millis();
                 xSemaphoreGive(Pose_Mutex);
             }
         }
+        
+        log_event(ID_IPC, EVENT_END);
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
@@ -265,59 +190,73 @@ void Lidar_Read_Task(void* parameter) {
     bool scanComplete = false;
 
     while (1) {
-        bool scanComplete = false;
+        scanComplete = false;
         lidar.build_scan(&scan, scanComplete, lastAngleESP);
-        // lidar.readScanLive(&scan, scanComplete, lastAngleESP);
 
         if (scanComplete) {
+            log_event(ID_LIDAR, EVENT_START);
+            
             if (scan.count > 10) { 
                 xQueueSend(Lidar_Buffer_Queue, &scan, 0);
+                diag_counters.lidar_scans_received++;
             }
             scan.count = 0;
-            lastAngleESP = 0.0f; 
+            lastAngleESP = 0.0f;
+            
+            log_event(ID_LIDAR, EVENT_END);
         }
         vTaskDelay(xDelay);
     }
 }
 
 // =============================================================
-// TASK 3: SYNC FUSION
+// TASK 3: SYNC FUSION (FIXED - NO BLOCKING ON MUTEX)
 // =============================================================
 void Lidar_Sync_Map_Task(void* parameter) {
-    LiDARScan* scan_buffer = new LiDARScan(); // Heap alloc for temp storage
+    LiDARScan* scan_buffer = new LiDARScan();
     SyncedScan* current_work_buffer = nullptr;
     int local_counter = 0;
 
     while (1) {
-        // 1. Get raw Lidar data (Copy from ISR/Serial task)
-        // We still copy here because LiDARScan is "only" ~1-2KB and it's safer for serial reading
         if (xQueueReceive(Lidar_Buffer_Queue, scan_buffer, portMAX_DELAY) == pdPASS) {
             
-            // Downsample: Only process every 3rd scan to save CPU
+            log_event(ID_SYNC, EVENT_START);
+            
             local_counter++;
-            if (local_counter % 3 != 0) continue;
+            if (local_counter % 3 != 0) {
+                log_event(ID_SYNC, EVENT_END);
+                continue;
+            }
 
-            // 2. Get a FREE buffer from the pool
-            // If the queue is empty, it means the Map task is too slow. 
-            // We wait 0ms (drop the frame) or small delay.
+            // Get free buffer
             if (xQueueReceive(Lidar_Pose_Queue_Free, &current_work_buffer, 0) == pdPASS) {
                 
-                // 3. Fill the buffer (Direct write to Heap, NO STACK usage)
+                // Fill scan data
                 current_work_buffer->scan = *scan_buffer;
                 
-                if (xSemaphoreTake(Pose_Mutex, portMAX_DELAY) == pdTRUE) {
+                // If we can't get it quickly, use last known pose
+                if (xSemaphoreTake(Pose_Mutex, pdMS_TO_TICKS(5)) == pdTRUE) {
                     current_work_buffer->pose = last_known_pose;
                     xSemaphoreGive(Pose_Mutex);
+                } else {
+                    // Fallback: use last known pose without mutex
+                    current_work_buffer->pose = last_known_pose;
+                    diag_counters.mutex_failures_sync++;
                 }
 
-                // 4. Send the POINTER to the consumer
-                // This copies 4 bytes (address), not 4500 bytes.
+                // Always send to map task
                 xQueueSend(Lidar_Pose_Queue_Ready, &current_work_buffer, 0);
+                diag_counters.sync_frames_processed++;
+                
+                // Update queue depths for diagnostics
+                diag_counters.queue_ready_depth = uxQueueMessagesWaiting(Lidar_Pose_Queue_Ready);
+                diag_counters.queue_free_depth = uxQueueMessagesWaiting(Lidar_Pose_Queue_Free);
+                
             } else {
-                // Serial.println("DROP: Map task too slow, no free buffers!");
-
-                vTaskDelay(pdMS_TO_TICKS(5));
+                diag_counters.sync_frames_dropped++;
             }
+            
+            log_event(ID_SYNC, EVENT_END);
         }
 
         vTaskDelay(pdMS_TO_TICKS(5));
@@ -325,39 +264,46 @@ void Lidar_Sync_Map_Task(void* parameter) {
 }
 
 // =============================================================
-// TASK 4: BAYESIAN MAPPING
+// TASK 4: BAYESIAN MAPPING (FIXED - ALWAYS LOG END)
 // =============================================================
 void Bayesian_Grid_Task(void* parameter) {
     SyncedScan* incoming_data_ptr = nullptr;
     
     while (1) {
-        // 1. Wait for a pointer to a FULL buffer
         if (xQueueReceive(Lidar_Pose_Queue_Ready, &incoming_data_ptr, pdMS_TO_TICKS(100)) == pdPASS) {
             
-            // 2. Update Map (Read directly from Heap)
+            log_event(ID_MAP, EVENT_START);
+            
+            bool map_updated = false;
+            
+            // Try to update map
             if (xSemaphoreTake(Bayesian_Grid_Mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
-                uint32_t t0 = micros(); // START TIMER
+                uint32_t t0 = micros();
                 
                 TheMap->update_map(*incoming_data_ptr); 
                 
-                sys_health.map_update_time_us = micros() - t0; // STOP TIMER
+                sys_health.map_update_time_us = micros() - t0;
+                map_updated = true;
+                diag_counters.map_updates_completed++;
                 
                 xSemaphoreGive(Bayesian_Grid_Mutex);
-                if (TCP_Task_Handle != NULL) xTaskNotifyGive(TCP_Task_Handle);
+            } else {
+                diag_counters.mutex_failures_map++;
             }
             
-            // Update Pose Snapshot
-            if(xSemaphoreTake(State_Mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+            // Update pose snapshot (non-critical, try briefly)
+            if(xSemaphoreTake(State_Mutex, pdMS_TO_TICKS(2)) == pdTRUE) {
                 last_known_pose = incoming_data_ptr->pose;
                 xSemaphoreGive(State_Mutex);
             }
 
-            // 3. RECYCLE: Return the pointer to the Free Queue
-            // The Producer can now use this memory again.
+            // ALWAYS recycle buffer
             xQueueSend(Lidar_Pose_Queue_Free, &incoming_data_ptr, 0);
-
+            log_event(ID_MAP, EVENT_END);
+            
             vTaskDelay(pdMS_TO_TICKS(5));
         } else {
+            // Queue receive timeout - this is normal, just wait
             vTaskDelay(pdMS_TO_TICKS(10));
         }
     }
@@ -369,161 +315,85 @@ void Bayesian_Grid_Task(void* parameter) {
 void Mission_Planner_Task(void* parameter) {
     InvalidGoals mission_invalid;
 
-    while (1) {
+    // Wait for first map data before starting
+    vTaskDelay(pdMS_TO_TICKS(3000));
 
+    while (1) {
+        xSemaphoreTake(xSemaphoreGOAL, portMAX_DELAY);
+
+        log_event(ID_MPLAN, EVENT_START);
 
         Pose2D current_p;
         
-        // Securely read pose
         if(xSemaphoreTake(Pose_Mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
             current_p = last_known_pose;
             xSemaphoreGive(Pose_Mutex);
         } else {
-            vTaskDelay(pdMS_TO_TICKS(10)); continue;
+            log_event(ID_MPLAN, EVENT_END);
+            xSemaphoreGive(xSemaphorePATH);
+            vTaskDelay(pdMS_TO_TICKS(100)); 
+            continue;
         }
 
-        // Securely read Planner Status
         bool planner_fail = false;
         if(xSemaphoreTake(State_Mutex, pdMS_TO_TICKS(20)) == pdTRUE) {
             planner_fail = global_path_invalid;
             xSemaphoreGive(State_Mutex);
         }
 
-        // New goal calculation + Health Monitoring
         uint32_t t0 = micros();
         if (xSemaphoreTake(Invalid_Mutex, pdMS_TO_TICKS(20)) == pdTRUE) {
             mission_invalid = invalid_goals;
             xSemaphoreGive(Invalid_Mutex);
-        } else continue;
+        } else {
+            log_event(ID_MPLAN, EVENT_END);
+            xSemaphoreGive(xSemaphorePATH);
+            continue;
+        }
 
         MissionGoal new_goal = mission_planner->update_goal(current_p, *TheMap, planner_fail, mission_invalid);
         sys_health.mission_plan_time_us = micros() - t0;
 
-        // Check if goal actually changed before taking Mutex
         if (new_goal.target_pose.x != current_mission_goal.target_pose.x || 
             new_goal.target_pose.y != current_mission_goal.target_pose.y ||
             new_goal.type != current_mission_goal.type) 
         {
             if (xSemaphoreTake(State_Mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
                 current_mission_goal = new_goal;
-                new_goal_arrived = true;       // Notify Global Planner
+                new_goal_arrived = true;
                 xSemaphoreGive(State_Mutex);
             }
         }
 
-        vTaskDelay(pdMS_TO_TICKS(500));
+        log_event(ID_MPLAN, EVENT_END);
+        
+        xSemaphoreGive(xSemaphorePATH);
+        vTaskDelay(pdMS_TO_TICKS(100));
     }
 }
 
 // =============================================================
 // GLOBAL PLANNER TASK
 // =============================================================
-// void Global_Planner_Task(void* parameter) {
-//     GlobalPlanner planner; 
-//     Pose2D local_pose;
-//     MissionGoal global_goal;
-
-//     while (1) {
-//         // Initialize explicitly to ensure length is 0 if not updated
-//         PathMessage pathMsg = {{{0}}, 0, 0, 0};      
-        
-//         if (new_goal_arrived) {
-//             if(xSemaphoreTake(State_Mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
-//                 local_pose = last_known_pose;
-//                 global_goal = current_mission_goal;
-//                 xSemaphoreGive(State_Mutex); 
-//             } else {
-//                 vTaskDelay(pdMS_TO_TICKS(100));
-//                 continue;
-//             }
-
-//             // Generate Path + Health Monitoring
-//             uint32_t t0 = micros();
-//             pathMsg = planner.generate_path(local_pose, global_goal, *TheMap, gp_workspace);
-//             sys_health.global_plan_time_us = micros() - t0;
-
-//             if (pathMsg.current_length == 0) {
-//                  // Path planning failed!
-//                  if(xSemaphoreTake(State_Mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
-//                     global_path_invalid = true;
-//                     current_global_path.current_length = 0; 
-//                     xSemaphoreGive(State_Mutex);
-//                 }
-//                 //  Serial.println("GP: A* Failed or Empty.");
-//             } else {
-//                 // Success
-//                 current_global_path = pathMsg;
-//                 esp_link.sendPath(current_global_path);
-//                 new_goal_arrived = false; 
-//             }
-//         }
-//         vTaskDelay(pdMS_TO_TICKS(500));
-//     }
-// }
-
-// void Global_Planner_Task(void* parameter) {
-//     GlobalPlanner planner; 
-//     Pose2D local_pose;
-//     MissionGoal global_goal;
-
-//     while (1) {
-//         PathMessage pathMsg = {{{0}}, 0, 0, 0};
-//         bool goal_pending = false;
-        
-//         // Read flag with mutex protection
-//         if(xSemaphoreTake(State_Mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
-//             goal_pending = new_goal_arrived;
-//             if (goal_pending) {
-//                 local_pose = last_known_pose;
-//                 global_goal = current_mission_goal;
-//             }
-//             xSemaphoreGive(State_Mutex); 
-//         }
-        
-//         if (goal_pending) {
-//             // Generate Path + Health Monitoring
-//             uint32_t t0 = micros();
-//             pathMsg = planner.generate_path(local_pose, global_goal, *TheMap, gp_workspace);
-//             sys_health.global_plan_time_us = micros() - t0;
-
-//             if (pathMsg.current_length == 0) {
-//                 if(xSemaphoreTake(State_Mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
-//                     global_path_invalid = true;
-//                     current_global_path.current_length = 0;
-//                     new_goal_arrived = false;
-//                     xSemaphoreGive(State_Mutex);
-//                 }
-//             } else {
-//                 // Success
-//                 if(xSemaphoreTake(State_Mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
-//                     current_global_path = pathMsg;
-//                     new_goal_arrived = false;
-//                     xSemaphoreGive(State_Mutex);
-//                 }
-//                 esp_link.sendPath(current_global_path);
-//             }
-//         }
-        
-//         vTaskDelay(pdMS_TO_TICKS(500));
-//     }
-// }
-
 void Global_Planner_Task(void* parameter) {
     GlobalPlanner planner; 
     Pose2D local_pose;
-    MissionGoal global_goal;
-    MissionGoal local_goal_copy; // NOUVEAU: garder une copie
+    MissionGoal local_goal_copy;
 
     while (1) {
+        xSemaphoreTake(xSemaphorePATH, portMAX_DELAY);
+
+        log_event(ID_GPLAN, EVENT_START);
+
         PathMessage pathMsg = {{{0}}, 0, 0, 0};
         bool goal_pending = false;
         
-        // Lire le flag + goal
+        // Read flag + goal
         if(xSemaphoreTake(State_Mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
             goal_pending = new_goal_arrived;
             if (goal_pending) {
                 local_pose = last_known_pose;
-                local_goal_copy = current_mission_goal; // Copie
+                local_goal_copy = current_mission_goal;
             }
             xSemaphoreGive(State_Mutex); 
         }
@@ -531,25 +401,13 @@ void Global_Planner_Task(void* parameter) {
         if (goal_pending) {
             uint32_t t0 = millis();
             
-            // A* peut prendre 300ms
+            // A* computation (can take 300ms)
             pathMsg = planner.generate_path(local_pose, local_goal_copy, *TheMap, gp_workspace);
-            if (pathMsg.current_length == 0) {
-                if (xSemaphoreTake(Invalid_Mutex, pdMS_TO_TICKS(20)) == pdTRUE) {
-                    if (invalid_goals.size >= MAX_INVALID_GOALS) invalid_goals.size = 0;
-                    invalid_goals.lasts[invalid_goals.size++] = local_goal_copy.target_pose;
-                    xSemaphoreGive(Invalid_Mutex);
-                }
-            }
-
+            
             uint32_t duration = millis() - t0;
             sys_health.global_plan_time_us = duration * 1000;
-            
-            // Log si trop long
-            if (duration > 200) {
-                // A* took too long
-            }
 
-            // VÉRIFIER: Le goal a-t-il changé pendant A*?
+            // Check if goal changed during A*
             if(xSemaphoreTake(State_Mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
                 bool goal_changed = (
                     current_mission_goal.target_pose.x != local_goal_copy.target_pose.x ||
@@ -558,16 +416,32 @@ void Global_Planner_Task(void* parameter) {
                 );
                 
                 if (goal_changed) {
-                    // Goal a changé pendant A* → Ignorer ce path
-                    Serial.println("Goal changed during A* - discarding path");
+                    // Goal changed during A* - don't update anything
                 } else {
-                    // Goal n'a pas changé → Mettre à jour
+                    // Goal is still current - process result
+                    new_goal_arrived = false;
+                    
                     if (pathMsg.current_length == 0) {
+                        // Path planning failed
                         global_path_invalid = true;
                         current_global_path.current_length = 0;
+                        
+                        if (xSemaphoreTake(Invalid_Mutex, pdMS_TO_TICKS(20)) == pdTRUE) {
+                            if (invalid_goals.size >= MAX_INVALID_GOALS) invalid_goals.size = 0;
+
+                            int gx, gy;
+                            world_to_grid(local_goal_copy.target_pose.x, local_goal_copy.target_pose.y, 
+                                        gx, gy, RESOLUTION, GRID_SIZE_X, GRID_SIZE_Y);
+                            invalid_goals.lasts[invalid_goals.size].x = (float)gx;
+                            invalid_goals.lasts[invalid_goals.size].y = (float)gy;
+
+                            invalid_goals.size++;
+                            xSemaphoreGive(Invalid_Mutex);
+                        }
                     } else {
+                        // Success
+                        global_path_invalid = false;
                         current_global_path = pathMsg;
-                        new_goal_arrived = false; // Safe maintenant
                         esp_link.sendPath(current_global_path);
                     }
                 }
@@ -576,7 +450,162 @@ void Global_Planner_Task(void* parameter) {
             }
         }
         
-        vTaskDelay(pdMS_TO_TICKS(500));
+        log_event(ID_GPLAN, EVENT_END);
+        
+        xSemaphoreGive(xSemaphoreGOAL);
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+}
+
+// =============================================================
+// TASK 5: TCP TRANSMIT (WITH DIAGNOSTICS)
+// =============================================================
+static uint8_t rle_buffer[10000];
+static TaskEvent trace_buffer_copy[MAX_TRACE_EVENTS];
+
+void TCP_Transmit_Task(void* parameter) {
+    WiFiClient tcpClient;
+    uint8_t header[TCP_HEADER_SIZE]; 
+    
+    const TickType_t TelemetryFreq = pdMS_TO_TICKS(100); 
+    const TickType_t MapFreq = pdMS_TO_TICKS(3000);
+    
+    TickType_t lastMapTime = 0;
+    TickType_t xLastWakeTime = xTaskGetTickCount();
+
+    while (1) {
+        vTaskDelayUntil(&xLastWakeTime, TelemetryFreq);
+
+        log_event(ID_TCP, EVENT_START);
+
+        if (!tcpClient || !tcpClient.connected()) {
+            WiFiClient newClient = tcpServer.available();
+            if (newClient) {
+                tcpClient = newClient;
+                tcpClient.setNoDelay(true);
+            } else {
+                log_event(ID_TCP, EVENT_END);
+                continue;
+            }
+        }
+
+        // Quick snapshot of state
+        if (xSemaphoreTake(State_Mutex, pdMS_TO_TICKS(20)) == pdTRUE) {
+            Tx_Snapshot.pose = last_known_pose;
+            Tx_Snapshot.global_path = current_global_path;
+            Tx_Snapshot.goal = current_mission_goal;
+            Tx_Snapshot.state = (uint8_t)current_mission_goal.type;
+            xSemaphoreGive(State_Mutex);
+        }
+
+        // RLE compress map
+        bool send_map_now = (xTaskGetTickCount() - lastMapTime > MapFreq);
+        uint32_t payload_map_sz = 0;
+
+        if (send_map_now) {
+            const int8_t* raw_map = TheMap->get_map_data();
+            uint32_t total_cells = TheMap->get_total_size();
+            
+            uint32_t rle_idx = 0;
+            uint32_t raw_idx = 0;
+
+            while (raw_idx < total_cells && rle_idx < RLE_BUFFER_SIZE - 2) {
+                int8_t current_val = raw_map[raw_idx];
+                uint8_t count = 0;
+
+                while (raw_idx < total_cells && raw_map[raw_idx] == current_val && count < 255) {
+                    count++;
+                    raw_idx++;
+                }
+
+                rle_buffer[rle_idx++] = count;
+                rle_buffer[rle_idx++] = (uint8_t)current_val;
+            }
+            
+            payload_map_sz = rle_idx;
+        }
+
+        // Extract trace events
+        uint16_t events_to_send = 0;
+        portENTER_CRITICAL(&trace_mux);
+        events_to_send = (trace_head < MAX_TRACE_EVENTS) ? trace_head : MAX_TRACE_EVENTS;
+        
+        if (events_to_send > 0) {
+            if (trace_head >= MAX_TRACE_EVENTS) {
+                uint16_t start_idx = trace_head % MAX_TRACE_EVENTS;
+                if (start_idx + events_to_send > MAX_TRACE_EVENTS) {
+                    uint16_t first_part = MAX_TRACE_EVENTS - start_idx;
+                    memcpy(trace_buffer_copy, &trace_buffer[start_idx], first_part * sizeof(TaskEvent));
+                    memcpy(&trace_buffer_copy[first_part], trace_buffer, (events_to_send - first_part) * sizeof(TaskEvent));
+                } else {
+                    memcpy(trace_buffer_copy, &trace_buffer[start_idx], events_to_send * sizeof(TaskEvent));
+                }
+            } else {
+                memcpy(trace_buffer_copy, trace_buffer, events_to_send * sizeof(TaskEvent));
+            }
+        }
+        trace_head = 0;
+        portEXIT_CRITICAL(&trace_mux);
+
+        // Build header
+        memset(header, 0, TCP_HEADER_SIZE);
+        header[0] = 0xBE; header[1] = 0xEF;
+        
+        memcpy(&header[2], &payload_map_sz, 4);
+        
+        uint8_t gplen = Tx_Snapshot.global_path.current_length;
+        if(gplen > MAX_PATH_LENGTH) gplen = 0;
+        uint16_t gplen_2bytes = (0 << 8) | gplen;
+        memcpy(&header[6], &gplen_2bytes, 2);
+
+        memcpy(&header[8], &Tx_Snapshot.pose.x, 4);
+        memcpy(&header[12], &Tx_Snapshot.pose.y, 4);
+        memcpy(&header[16], &Tx_Snapshot.pose.theta, 4);
+
+        memcpy(&header[20], &Tx_Snapshot.goal.target_pose.x, 4);
+        memcpy(&header[24], &Tx_Snapshot.goal.target_pose.y, 4);
+        memcpy(&header[28], &Tx_Snapshot.goal.target_pose.theta, 4);
+
+        header[32] = Tx_Snapshot.state;
+
+        // Update health metrics + DIAGNOSTICS
+        sys_health.free_heap = esp_get_free_heap_size();
+        sys_health.min_free_heap = esp_get_minimum_free_heap_size();
+
+        sys_health.stack_min_tcp   = uxTaskGetStackHighWaterMark(NULL) * 4;
+        if(GPlan_Task_Handle) sys_health.stack_min_gplan = uxTaskGetStackHighWaterMark(GPlan_Task_Handle) * 4;
+        if(MPlan_Task_Handle) sys_health.stack_min_mplan = uxTaskGetStackHighWaterMark(MPlan_Task_Handle) * 4;
+        if(Lidar_Task_Handle) sys_health.stack_min_lidar = uxTaskGetStackHighWaterMark(Lidar_Task_Handle) * 4;
+        
+        sys_health.last_esp2_packet_ms = millis() - last_ipc_activity_ts;
+        
+        // ADD DIAGNOSTIC COUNTERS TO HEALTH STRUCT
+        sys_health.lidar_frames_processed = diag_counters.lidar_scans_received;
+        sys_health.map_frames_processed = diag_counters.map_updates_completed;
+        sys_health.planner_fail_count = diag_counters.sync_frames_dropped;
+        sys_health.last_planner_status = diag_counters.mutex_failures_map; // Repurpose
+        
+        memcpy(&header[33], &sys_health, sizeof(SystemHealth));
+
+        // Send packet
+        if (tcpClient.connected()) {
+            tcpClient.write(header, TCP_HEADER_SIZE);
+            tcpClient.write((uint8_t*)&events_to_send, 2);
+            
+            if(gplen > 0) 
+                tcpClient.write((uint8_t*)Tx_Snapshot.global_path.path, gplen * sizeof(Waypoint));
+            
+            if (payload_map_sz > 0) {
+                tcpClient.write(rle_buffer, payload_map_sz);
+                lastMapTime = xTaskGetTickCount();
+            }
+            
+            if (events_to_send > 0) {
+                tcpClient.write((uint8_t*)trace_buffer_copy, events_to_send * sizeof(TaskEvent));
+            }
+        }
+
+        log_event(ID_TCP, EVENT_END);
     }
 }
 
@@ -585,62 +614,44 @@ void Global_Planner_Task(void* parameter) {
 // =============================================================
 void setup() {
     Serial.begin(115200);
-    delay(1000);
-
+    delay(2000);
 
     // --- MEMORY ALLOCATION ---
-    // Allocate the two ping-pong buffers on the HEAP (SPIRAM if available, or internal RAM)
-    // Using heap_caps_malloc ensures we don't use Stack.
     Scan_Buffer_1 = new SyncedScan();
     Scan_Buffer_2 = new SyncedScan();
     
-    // if (!Scan_Buffer_1 || !Scan_Buffer_2) {
-    //     Serial.println("FATAL: Heap alloc failed!"); while(1);
-    // }
     gp_workspace = new GlobalPlannerWorkspace();
     if (!gp_workspace) {
-        // Serial.println("FATAL: Not enough RAM for Planner!");
         while(1);
     }
 
-
     // --- QUEUES ---
-    Lidar_Buffer_Queue = xQueueCreate(2, sizeof(LiDARScan));
-    
-    // NEW: Create queues that hold POINTERS (SyncedScan*)
-    // Size is number of items * sizeof(pointer) -> 2 * 4 bytes = 8 bytes total on stack. Tiny!
+    Lidar_Buffer_Queue = xQueueCreate(3, sizeof(LiDARScan)); // Increased to 3
     Lidar_Pose_Queue_Ready = xQueueCreate(2, sizeof(SyncedScan*));
     Lidar_Pose_Queue_Free  = xQueueCreate(2, sizeof(SyncedScan*));
     
-    // Prime the Free Queue with our two buffers
     xQueueSend(Lidar_Pose_Queue_Free, &Scan_Buffer_1, 0);
     xQueueSend(Lidar_Pose_Queue_Free, &Scan_Buffer_2, 0);
 
     Path_Send_Queue = xQueueCreate(1, sizeof(PathMessage));
-
 
     // --- MUTEXES & OBJECTS ---
     Bayesian_Grid_Mutex = xSemaphoreCreateMutex();
     Pose_Mutex = xSemaphoreCreateMutex();
     State_Mutex = xSemaphoreCreateMutex();
     Invalid_Mutex = xSemaphoreCreateMutex();
+    xSemaphoreGOAL = xSemaphoreCreateBinary();
+    xSemaphorePATH = xSemaphoreCreateBinary();
+
+    xSemaphoreGive(xSemaphoreGOAL);
 
     TheMap = new BayesianOccupancyGrid(RESOLUTION, GRID_SIZE_X, GRID_SIZE_Y);
     mission_planner = new MissionPlanner({0.0f, 0.0f, 0.0f, 0});
-    
-    // if (!TheMap || !mission_planner) { 
-    //     // Serial.println("MEMORY ALLOC FAILED"); 
-    //     while(1); 
-    // }
 
     // --- WIFI SETUP ---
     WiFi.mode(WIFI_AP);
     WiFi.softAP(ssid, password);
-    delay(1000); // Give WiFi time to settle
-    // WiFi.mode(WIFI_STA);
-    // WiFi.setHostname("esp32-lidar-slamaleykoum");
-    // WiFi.begin(ssid, password);
-    // delay(3000);
+    delay(1000);
 
     // --- TCP SERVER SETUP ---
     tcpServer.begin();
@@ -650,37 +661,26 @@ void setup() {
     lidar.start(); 
     delay(1000);
 
-    // delay(50000);
-
-    // --- TASK PRIORITIES & CORE ASSIGNMENT ---
-    // Rule: Higher number = Higher Priority.
-    // Core 0: System & Comm | Core 1: Math & Sensors
-
+    // --- LED BLINK ---
     pinMode(LED_BUILTIN, OUTPUT);
-    digitalWrite(LED_BUILTIN, HIGH); // Turn off built-in LED
-    delay(500);
+    for(int i = 0; i < 5; i++) {
+        digitalWrite(LED_BUILTIN, HIGH);
+        delay(100);
+        digitalWrite(LED_BUILTIN, LOW);
+        delay(100);
+    }
 
-    digitalWrite(LED_BUILTIN, LOW); // Turn off built-in LED
-    delay(200);
-    digitalWrite(LED_BUILTIN, HIGH); // Turn off built-in LED
-    delay(200);
-    digitalWrite(LED_BUILTIN, LOW); // Turn off built-in LED
-    delay(200);
-    digitalWrite(LED_BUILTIN, HIGH); // Turn off built-in LED
-    delay(200);
-    digitalWrite(LED_BUILTIN, LOW); // Turn off built-in LED
+    // --- TASK CREATION ---
+    // Core 1 (Sensors) - Start first!
+    xTaskCreatePinnedToCore(Lidar_Read_Task, "Lidar", 3072, NULL, 4, &Lidar_Task_Handle, 1);
+    xTaskCreatePinnedToCore(Lidar_Sync_Map_Task, "Sync", 4096, NULL, 4, &Sync_Task_Handle, 1);
+    xTaskCreatePinnedToCore(Bayesian_Grid_Task, "Map", 4096, NULL, 3, &Map_Task_Handle, 1);
 
-    // -- Core 0 (Comms) --
-    xTaskCreatePinnedToCore(IPC_Receive_Task, "IPC_Rx", 2048, NULL, 3, NULL, 0);
+    // Core 0 (Comms) - Start after sensors
+    xTaskCreatePinnedToCore(IPC_Receive_Task, "IPC", 2048, NULL, 3, NULL, 0);
+    xTaskCreatePinnedToCore(TCP_Transmit_Task, "TCP", 4096, NULL, 1, &TCP_Task_Handle, 0); 
     xTaskCreatePinnedToCore(Mission_Planner_Task, "Mission", 4096, NULL, 2, &MPlan_Task_Handle, 0);
-    xTaskCreatePinnedToCore(TCP_Transmit_Task, "TCP_Tx", 4096, NULL, 1, &TCP_Task_Handle, 0); 
-    xTaskCreatePinnedToCore(Global_Planner_Task, "Global_Plan", 8192, NULL, 2, &GPlan_Task_Handle, 0);
-
-    // -- Core 1 --
-    // NOTE: Passing &MPlan_Task_Handle captures the task ID for monitoring
-    xTaskCreatePinnedToCore(Lidar_Read_Task, "Lidar_Read", 3072, NULL, 4, &Lidar_Task_Handle, 1);
-    xTaskCreatePinnedToCore(Lidar_Sync_Map_Task, "Lidar_Sync", 4096, NULL, 4, NULL, 1);
-    xTaskCreatePinnedToCore(Bayesian_Grid_Task, "Map_Comp", 4096, NULL, 2, NULL, 1);
+    xTaskCreatePinnedToCore(Global_Planner_Task, "Global", 8192, NULL, 2, &GPlan_Task_Handle, 0);
 }
 
 void loop() {}

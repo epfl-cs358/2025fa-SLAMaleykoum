@@ -8,6 +8,7 @@
 #define MAX_FRONTIER_CANDIDATES 10
 #define BFS_QUEUE_SIZE 200
 #define MIN_CLUSTER_SIZE 8
+#define MAX_CLUSTER_SIZE 30
 #define FRONTIER_NEAR_RANGE_M  1.0f
 
 class MissionPlanner {

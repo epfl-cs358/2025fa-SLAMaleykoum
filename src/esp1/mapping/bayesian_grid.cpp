@@ -23,7 +23,7 @@ BayesianOccupancyGrid::BayesianOccupancyGrid(float resolution_m,
 {
     log_odds = (int8_t*) heap_caps_malloc(
         grid_size_x * grid_size_y * sizeof(int8_t),
-        MALLOC_CAP_SPIRAM
+        MALLOC_CAP_INTERNAL
     );
     memset(log_odds, 0, grid_size_x * grid_size_y);
 
