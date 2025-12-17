@@ -87,6 +87,6 @@ This path-tracking algorithm translates the static waypoints into dynamic steeri
 ---
 
 ## architecture diagram
-//TODO: UPDATE THIS DIAGRAM.
+# //TODO: UPDATE THIS DIAGRAM.
 Here is the current architecture.
-![alt text](/docs/global-architecture-2.png)
+![alt text](/assets/docs/esp2/global-architecture-Page-2.png)
