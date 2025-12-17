@@ -147,7 +147,7 @@ void MissionPlanner::search_for_candidates(const BayesianOccupancyGrid& grid,
 MissionGoal MissionPlanner::update_goal(const Pose2D& pose, const BayesianOccupancyGrid& grid, 
     const InvalidGoals& invalid_goals)
 {
-    const int PATIENCE_LIMIT = 20; 
+    const int PATIENCE_LIMIT = 20000;
     const int NEAR_RANGE_CELLS = (int)(FRONTIER_NEAR_RANGE_M / grid.grid_resolution);
     const int NEAR_RANGE_SQ = NEAR_RANGE_CELLS * NEAR_RANGE_CELLS;
 
