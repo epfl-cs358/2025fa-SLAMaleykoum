@@ -28,25 +28,47 @@
 #define GP_PQ_SIZE   (GP_MAX_CELLS / 3) // Queue doesn't need to hold the whole map, just the frontier
 
 // --- Debugging & Profiling ---
+// Force 4-byte alignment to match Python's default struct unpacking
+#pragma pack(push, 4)
+
+enum PlannerStatus : int32_t { // Changed to int32_t for alignment
+    PLANNER_IDLE_MY_TYPE = 0,
+    PLANNER_RUNNING_MY_TYPE = 1,
+    PLANNER_SUCCESS_MY_TYPE = 2,
+    ERR_START_BLOCKED_MY_TYPE = 3,
+    ERR_GOAL_BLOCKED_MY_TYPE = 4,
+    ERR_NO_PATH_FOUND_MY_TYPE = 5,
+    ERR_TIMEOUT_MY_TYPE = 6
+};
+
 struct SystemHealth {
+    // 1. Resources
     uint32_t free_heap;
     uint32_t min_free_heap;
     
-    // Execution Times
+    // 2. Latencies (us)
     uint32_t map_update_time_us;
     uint32_t global_plan_time_us;
     uint32_t mission_plan_time_us;
     
-    // Stack Monitoring (Lowest amount of bytes ever left in the stack)
-    // If these get near 0, the CPU will reset.
-    uint16_t stack_min_tcp;
-    uint16_t stack_min_gplan;
-    uint16_t stack_min_mplan;
-    uint16_t stack_min_lidar;
+    // 3. Stack High Water Marks (bytes)
+    uint32_t stack_min_tcp;
+    uint32_t stack_min_gplan;
+    uint32_t stack_min_mplan;
+    uint32_t stack_min_lidar;
     
-    // Connectivity
-    uint32_t last_esp2_packet_ms; // Time since last packet from ESP2
+    // 4. Counters (The Debugger)
+    uint32_t lidar_frames_processed; 
+    uint32_t map_frames_processed;   
+    uint32_t planner_fail_count;     
+    
+    // 5. Status
+    int32_t  last_planner_status; // Int32 for alignment
+    uint32_t queue_load_percent;  // Int32 for alignment (0-100)
+    uint32_t last_esp2_packet_ms;
 };
+
+#pragma pack(pop)
 
 // --- Core Geometric Structures ---
 /**

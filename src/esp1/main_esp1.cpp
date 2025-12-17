@@ -49,6 +49,8 @@ SemaphoreHandle_t Pose_Mutex;
 SemaphoreHandle_t Goal_Mutex;
 SemaphoreHandle_t Path_Mutex;
 SemaphoreHandle_t Planner_State_Mutex;
+// Mutex for the blacklist
+SemaphoreHandle_t Blacklist_Mutex;
 
 // --- GLOBAL OBJECTS ---
 const int GRID_SIZE_X = 70;
@@ -282,16 +284,17 @@ void Lidar_Read_Task(void* parameter) {
     const TickType_t xDelay = pdMS_TO_TICKS(10); 
     static LiDARScan scan; 
     float lastAngleESP = 0.0f;
-    bool scanComplete = false;
+    bool scanComplete;
 
     while (1) {
-        bool scanComplete = false;
+        scanComplete = false;
         lidar.build_scan(&scan, scanComplete, lastAngleESP);
         // lidar.readScanLive(&scan, scanComplete, lastAngleESP);
 
         if (scanComplete) {
             if (scan.count > 10) { 
                 xQueueSend(Lidar_Buffer_Queue, &scan, 0);
+                sys_health.lidar_frames_processed++; // DEBUG
             }
             scan.count = 0;
             lastAngleESP = 0.0f; 
@@ -315,7 +318,7 @@ void Lidar_Sync_Map_Task(void* parameter) {
             
             // Downsample: Only process every 3rd scan to save CPU
             local_counter++;
-            if (local_counter % 7 != 0) continue;
+            if (local_counter % 9 != 0) continue;
 
             // 2. Get a FREE buffer from the pool
             // If the queue is empty, it means the Map task is too slow. 
@@ -351,6 +354,10 @@ void Bayesian_Grid_Task(void* parameter) {
     SyncedScan* incoming_data_ptr = nullptr;
     
     while (1) {
+        // Measure Queue Load roughly
+        UBaseType_t msgs_waiting = uxQueueMessagesWaiting(Lidar_Pose_Queue_Ready);
+        sys_health.queue_load_percent = (msgs_waiting * 100) / 2; // Size is 2
+
         // 1. Wait for a pointer to a FULL buffer
         if (xQueueReceive(Lidar_Pose_Queue_Ready, &incoming_data_ptr, pdMS_TO_TICKS(100)) == pdPASS) {
             
@@ -361,6 +368,7 @@ void Bayesian_Grid_Task(void* parameter) {
                 TheMap->update_map(*incoming_data_ptr);
                 
                 sys_health.map_update_time_us = micros() - t0; // STOP TIMER
+                sys_health.map_frames_processed++;
                 
                 xSemaphoreGive(Bayesian_Grid_Mutex);
                 if (TCP_Task_Handle != NULL) xTaskNotifyGive(TCP_Task_Handle);
@@ -433,13 +441,31 @@ void Mission_Planner_Task(void* parameter) {
             xSemaphoreGive(Path_Mutex);
         }
 
+        // --- CHECK START ---
+        // We don't time the "Check" because it's usually very fast (<10us)
+        // unless you want to measure overhead.
         if (is_current_goal_valid(current_p, *TheMap, current_mission_goal, path_found_mission)) {
             vTaskDelay(pdMS_TO_TICKS(500));
             continue; // Garder le même goal
         }
 
+        // --- CALCULATION START ---
+        uint32_t t0 = micros(); // Start Timer
+
+        InvalidGoals local_blacklist_copy;
+        if(xSemaphoreTake(Blacklist_Mutex, pdMS_TO_TICKS(20)) == pdTRUE) {
+            local_blacklist_copy = invalid_goals;
+            xSemaphoreGive(Blacklist_Mutex);
+        } else {
+            // If we can't get lock, just use empty to avoid crash
+            local_blacklist_copy.size = 0; 
+        }
+
         // gare aux invalid_goals qui ne sont pas reset
-        MissionGoal new_goal = mission_planner->update_goal(current_p, *TheMap, invalid_goals);
+        MissionGoal new_goal = mission_planner->update_goal(current_p, *TheMap, local_blacklist_copy);
+        
+        // --- CALCULATION END ---
+        sys_health.mission_plan_time_us = micros() - t0; // Write result to global struct
 
         if (xSemaphoreTake(Goal_Mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
             current_mission_goal = new_goal;
@@ -460,7 +486,7 @@ void Global_Planner_Task(void* parameter) {
     Pose2D local_pose;
     MissionGoal local_goal;
     PathMessage pathMsg = {{{0}}, 0, 0, 0};
-    BayesianOccupancyGrid grid_mission = {RESOLUTION, GRID_SIZE_X, GRID_SIZE_Y};
+    // Note: grid_mission was defined but unused in your snippet, removed for clarity
 
     while (1) {
         bool should_plan = false;
@@ -481,9 +507,31 @@ void Global_Planner_Task(void* parameter) {
         }
         
         if (should_plan) {
-            // A* peut prendre 300ms
+            // --- CALCULATION START ---
+            uint32_t t0 = micros();
+            sys_health.last_planner_status = PLANNER_RUNNING_MY_TYPE;
+
+            int sx, sy, gx, gy;
+            world_to_grid(local_pose.x, local_pose.y, sx, sy, RESOLUTION, 70, 70);
+            world_to_grid(local_goal.target_pose.x, local_goal.target_pose.y, gx, gy, RESOLUTION, 70, 70);
+            
+            if (TheMap->get_cell_probability(sx, sy) > 0.5f) {
+                sys_health.last_planner_status = ERR_START_BLOCKED_MY_TYPE;
+                sys_health.planner_fail_count++;
+                // Skip A*
+            } 
+            else if (TheMap->get_cell_probability(gx, gy) > 0.5f) {
+                sys_health.last_planner_status = ERR_GOAL_BLOCKED_MY_TYPE;
+                sys_health.planner_fail_count++;
+                // Skip A*
+            }
+
+            // A* Calculation
             pathMsg = planner.generate_path(local_pose, local_goal, *TheMap, gp_workspace);
             
+            // --- CALCULATION END ---
+            sys_health.global_plan_time_us = micros() - t0; 
+
             bool new_path_found = (pathMsg.current_length != 0);
 
             if (new_path_found) {
@@ -491,13 +539,26 @@ void Global_Planner_Task(void* parameter) {
                     current_global_path = pathMsg;
                     xSemaphoreGive(Path_Mutex);
                 }
+                sys_health.last_planner_status = PLANNER_SUCCESS_MY_TYPE;
                 esp_link.sendPath(current_global_path);
             } else {
                 // peut-etre mettre un mutex
-                if (invalid_goals.size >= MAX_INVALID_GOALS) invalid_goals.size = 0;
-                invalid_goals.lasts[invalid_goals.size++] = local_goal.target_pose;
+                sys_health.last_planner_status = ERR_NO_PATH_FOUND_MY_TYPE;
+                sys_health.planner_fail_count++;
+
+                // if (invalid_goals.size >= MAX_INVALID_GOALS) invalid_goals.size = 0;
+                // invalid_goals.lasts[invalid_goals.size++] = local_goal.target_pose;
             }
             
+            if (sys_health.last_planner_status != PLANNER_SUCCESS_MY_TYPE) {
+                if(xSemaphoreTake(Blacklist_Mutex, pdMS_TO_TICKS(20)) == pdTRUE) {
+                    if (invalid_goals.size < MAX_INVALID_GOALS) {
+                         invalid_goals.lasts[invalid_goals.size++] = local_goal.target_pose;
+                    }
+                    xSemaphoreGive(Blacklist_Mutex);
+                }
+            }
+
             if(xSemaphoreTake(Path_Mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
                 path_found = new_path_found; 
                 xSemaphoreGive(Path_Mutex);
@@ -513,96 +574,82 @@ void Global_Planner_Task(void* parameter) {
 // =============================================================
 void setup() {
     Serial.begin(115200);
-    delay(1000);
+    delay(2000); // Wait for Serial Monitor to catch up
+    Serial.println("--- BOOT START ---");
 
     // --- MEMORY ALLOCATION ---
-    // Allocate the two ping-pong buffers on the HEAP (SPIRAM if available, or internal RAM)
-    // Using heap_caps_malloc ensures we don't use Stack.
+    Serial.println("Allocating Buffers...");
     Scan_Buffer_1 = new SyncedScan();
     Scan_Buffer_2 = new SyncedScan();
-    
-    // if (!Scan_Buffer_1 || !Scan_Buffer_2) {
-    //     Serial.println("FATAL: Heap alloc failed!"); while(1);
-    // }
+    if (!Scan_Buffer_1 || !Scan_Buffer_2) {
+        Serial.println("FATAL: Scan Buffer Alloc Failed! Rebooting...");
+        delay(1000); ESP.restart();
+    }
+
     gp_workspace = new GlobalPlannerWorkspace();
     if (!gp_workspace) {
-        // Serial.println("FATAL: Not enough RAM for Planner!");
+        Serial.println("FATAL: Planner Workspace Alloc Failed! Rebooting...");
+        delay(1000); ESP.restart();
+    }
+
+    TheMap = new BayesianOccupancyGrid(RESOLUTION, GRID_SIZE_X, GRID_SIZE_Y);
+    if (!TheMap) {
+         Serial.println("FATAL: Map Alloc Failed! Rebooting...");
+         delay(1000); ESP.restart();
+    }
+    
+    mission_planner = new MissionPlanner({0.0f, 0.0f, 0.0f, 0});
+
+    // --- QUEUES ---
+    Serial.println("Creating Queues...");
+    Lidar_Buffer_Queue = xQueueCreate(2, sizeof(LiDARScan));
+    Lidar_Pose_Queue_Ready = xQueueCreate(2, sizeof(SyncedScan*));
+    Lidar_Pose_Queue_Free  = xQueueCreate(2, sizeof(SyncedScan*));
+    Path_Send_Queue = xQueueCreate(1, sizeof(PathMessage));
+
+    if (!Lidar_Buffer_Queue || !Lidar_Pose_Queue_Ready || !Lidar_Pose_Queue_Free) {
+        Serial.println("FATAL: Queue Creation Failed!");
         while(1);
     }
 
-    // --- QUEUES ---
-    Lidar_Buffer_Queue = xQueueCreate(2, sizeof(LiDARScan));
-    
-    // NEW: Create queues that hold POINTERS (SyncedScan*)
-    // Size is number of items * sizeof(pointer) -> 2 * 4 bytes = 8 bytes total on stack. Tiny!
-    Lidar_Pose_Queue_Ready = xQueueCreate(2, sizeof(SyncedScan*));
-    Lidar_Pose_Queue_Free  = xQueueCreate(2, sizeof(SyncedScan*));
-    
-    // Prime the Free Queue with our two buffers
+    // Prime the Free Queue
     xQueueSend(Lidar_Pose_Queue_Free, &Scan_Buffer_1, 0);
     xQueueSend(Lidar_Pose_Queue_Free, &Scan_Buffer_2, 0);
 
-    Path_Send_Queue = xQueueCreate(1, sizeof(PathMessage));
-
-    // --- MUTEXES & OBJECTS ---
+    // --- MUTEXES ---
     Bayesian_Grid_Mutex = xSemaphoreCreateMutex();
-    Pose_Mutex = xSemaphoreCreateMutex();
-    // State_Mutex = xSemaphoreCreateMutex();
-    Pose_Mutex = xSemaphoreCreateMutex();
+    Pose_Mutex = xSemaphoreCreateMutex(); 
     Goal_Mutex = xSemaphoreCreateMutex();
     Path_Mutex = xSemaphoreCreateMutex();
+    Blacklist_Mutex = xSemaphoreCreateMutex();
 
-    TheMap = new BayesianOccupancyGrid(RESOLUTION, GRID_SIZE_X, GRID_SIZE_Y);
-    mission_planner = new MissionPlanner({0.0f, 0.0f, 0.0f, 0});
-
-    // --- WIFI SETUP ---
+    // --- WIFI ---
+    Serial.println("Starting WiFi...");
     WiFi.mode(WIFI_AP);
     WiFi.softAP(ssid, password);
-    delay(1000); // Give WiFi time to settle
-    // WiFi.mode(WIFI_STA);
-    // WiFi.setHostname("esp32-lidar-slamaleykoum");
-    // WiFi.begin(ssid, password);
-    // delay(3000);
-
-    // --- TCP SERVER SETUP ---
-    tcpServer.begin();
-    tcpServer.setNoDelay(true);
-
-    esp_link.begin(); 
-    lidar.start(); 
-    delay(1000);
-
-    // delay(50000);
-
-    // --- TASK PRIORITIES & CORE ASSIGNMENT ---
-    // Rule: Higher number = Higher Priority.
-    // Core 0: System & Comm | Core 1: Math & Sensors
-
-    pinMode(LED_BUILTIN, OUTPUT);
-    digitalWrite(LED_BUILTIN, HIGH); // Turn off built-in LED
     delay(500);
 
-    digitalWrite(LED_BUILTIN, LOW); // Turn off built-in LED
-    delay(200);
-    digitalWrite(LED_BUILTIN, HIGH); // Turn off built-in LED
-    delay(200);
-    digitalWrite(LED_BUILTIN, LOW); // Turn off built-in LED
-    delay(200);
-    digitalWrite(LED_BUILTIN, HIGH); // Turn off built-in LED
-    delay(200);
-    digitalWrite(LED_BUILTIN, LOW); // Turn off built-in LED
+    tcpServer.begin();
+    tcpServer.setNoDelay(true);
+    esp_link.begin(); 
+    lidar.start(); 
 
-    // -- Core 0 (Comms) --
-    xTaskCreatePinnedToCore(IPC_Receive_Task, "IPC_Rx", 2048, NULL, 3, NULL, 0);
-    xTaskCreatePinnedToCore(Mission_Planner_Task, "Mission", 4096, NULL, 1, &MPlan_Task_Handle, 0);
-    xTaskCreatePinnedToCore(TCP_Transmit_Task, "TCP_Tx", 4096, NULL, 1, &TCP_Task_Handle, 0); 
-    xTaskCreatePinnedToCore(Global_Planner_Task, "Global_Plan", 8192, NULL, 2, &GPlan_Task_Handle, 0);
+    // --- TASKS ---
+    Serial.println("Starting Tasks...");
+    
+    // INCREASED STACK SIZES TO PREVENT CRASH
+    // Core 0 (Comms & Planning)
+    xTaskCreatePinnedToCore(IPC_Receive_Task, "IPC_Rx", 4096, NULL, 3, NULL, 0);
+    xTaskCreatePinnedToCore(Mission_Planner_Task, "Mission", 6144, NULL, 2, &MPlan_Task_Handle, 0);
+    xTaskCreatePinnedToCore(TCP_Transmit_Task, "TCP_Tx", 6144, NULL, 1, &TCP_Task_Handle, 0);
+    xTaskCreatePinnedToCore(Global_Planner_Task, "Global_Plan", 12288, NULL, 2, &GPlan_Task_Handle, 0);
 
-    // -- Core 1 --
-    // NOTE: Passing &MPlan_Task_Handle captures the task ID for monitoring
-    xTaskCreatePinnedToCore(Lidar_Read_Task, "Lidar_Read", 3072, NULL, 4, &Lidar_Task_Handle, 1);
+    // Core 1 (Sensors)
+    xTaskCreatePinnedToCore(Lidar_Read_Task, "Lidar_Read", 4096, NULL, 4, &Lidar_Task_Handle, 1);
     xTaskCreatePinnedToCore(Lidar_Sync_Map_Task, "Lidar_Sync", 4096, NULL, 4, NULL, 1);
-    xTaskCreatePinnedToCore(Bayesian_Grid_Task, "Map_Comp", 4096, NULL, 2, NULL, 1);
+    xTaskCreatePinnedToCore(Bayesian_Grid_Task, "Map_Comp", 6144, NULL, 2, NULL, 1);
+    
+    Serial.println("--- BOOT COMPLETE ---");
 }
 
 void loop() {}
