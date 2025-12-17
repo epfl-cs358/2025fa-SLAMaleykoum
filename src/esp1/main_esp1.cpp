@@ -641,6 +641,9 @@ void setup() {
     Path_Mutex = xSemaphoreCreateMutex();
     Invalid_Goals_Mutex = xSemaphoreCreateMutex();
 
+    TheMap = new BayesianOccupancyGrid(RESOLUTION, GRID_SIZE_X, GRID_SIZE_Y);
+    mission_planner = new MissionPlanner({0.0f, 0.0f, 0.0f, 0});
+
     // --- WIFI ---
     Serial.println("Starting WiFi...");
     WiFi.mode(WIFI_AP);
