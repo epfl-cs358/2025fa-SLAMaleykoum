@@ -234,3 +234,11 @@ struct InvalidGoals {
     Pose2D lasts[MAX_INVALID_GOALS];
     uint8_t size;
 };
+
+// --- BAYESIAN GRID SNAPSHOT ---
+struct OccupancyGridSnapshot {
+    float grid_resolution;
+    uint16_t grid_size_x;
+    uint16_t grid_size_y;
+    int8_t* log_odds; // buffer OWNED par le snapshot
+};

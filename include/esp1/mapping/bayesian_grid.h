@@ -57,6 +57,9 @@ public:
     int8_t* get_raw_data_pointer() { return log_odds; }
     uint32_t get_total_size() const { return grid_size_x * grid_size_y; }
 
+    // Probability lookup table
+    static float* prob_table;
+
 private:
     //  tableau interne, contigu, sans allocation dynamique
     int8_t* log_odds;
@@ -67,7 +70,5 @@ private:
     
     static bool trig_initialized;
 
-    // Probability lookup table
-    static float* prob_table;
     static bool prob_table_initialized;
 };

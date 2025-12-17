@@ -26,3 +26,28 @@ bool is_frontier_cell(const BayesianOccupancyGrid& grid, int x, int y)
 
     return false;
 }
+
+bool is_frontier_cell_snapshot(const OccupancyGridSnapshot& grid, int x, int y)
+{
+    if (get_cell_probability_snapshot(grid, x, y) > FREE_BOUND_PROB) return false;
+    
+    // Check Neighbors for Unknowns
+    static int dx[4] = {1, -1, 0, 0};
+    static int dy[4] = {0, 0, 1, -1};
+
+    for (int i = 0; i < 4; i++) {
+        float np = get_cell_probability_snapshot(grid, x + dx[i], y + dy[i]);
+        
+        if (np > FREE_BOUND_PROB && np < OCC_BOUND_PROB) return true;
+    }
+
+    return false;
+}
+
+float get_cell_probability_snapshot(const OccupancyGridSnapshot& snap, int x, int y) {
+    if (x < 0 || x >= snap.grid_size_x || y < 0 || y >= snap.grid_size_y)
+        return 1.0f;
+
+    int idx = y * snap.grid_size_x + x;
+    return BayesianOccupancyGrid::prob_table[snap.log_odds[idx] + 40];
+}

@@ -14,7 +14,9 @@ void TaskReceivePath(void *pvParameters) {
         if (esp_link.get_path(gpm)) {
             if (xSemaphoreTake(pathMutex, portMAX_DELAY)) {
                 receivedPath = gpm;
-                newPathArrived = true;
+                if(gpm.current_length > 0){
+                    newPathArrived = true;
+                }
                 xSemaphoreGive(pathMutex);
             }
             

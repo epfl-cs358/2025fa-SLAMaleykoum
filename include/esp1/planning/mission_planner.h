@@ -49,7 +49,7 @@ public:
      * 
      * @return The new goal to reach.
      */
-    MissionGoal update_goal(const Pose2D& pose, const BayesianOccupancyGrid& grid, const InvalidGoals& invalid_goals);
+    MissionGoal update_goal(const Pose2D& pose, const OccupancyGridSnapshot* grid, const InvalidGoals& invalid_goals);
 
 private:
     Pose2D home_pose_;
@@ -92,7 +92,7 @@ private:
      * form a potential cluster. Once the BFS is complete, it calls `store_candidate_if_valid()` to validate
      * and store the cluster as a candidate.
      */
-    void find_cluster(const BayesianOccupancyGrid& grid, int start_x, int start_y, int& candidate_count);
+    void find_cluster(const OccupancyGridSnapshot& grid, int start_x, int start_y, int& candidate_count);
 
     /**
      * @brief Validates the final cluster and adds it to the array if good.
@@ -121,7 +121,7 @@ private:
      * connected frontier, calculates its centroid, and adds it to the `candidates` array if it's valid.
      * * @return void
      */
-    void search_for_candidates(const BayesianOccupancyGrid& grid, 
+    void search_for_candidates(const OccupancyGridSnapshot& grid, 
                                int x_min, int x_max, int y_min, int y_max, 
                                int& candidate_count, const InvalidGoals& invalid_goals);
 
@@ -135,5 +135,5 @@ private:
      * 
      * @return true if still valid, false if it needs to be updated.
      */
-    bool is_current_goal_valid(const Pose2D& robot_pose, const BayesianOccupancyGrid& grid);
+    bool is_current_goal_valid(const Pose2D& robot_pose, const OccupancyGridSnapshot& grid);
 };

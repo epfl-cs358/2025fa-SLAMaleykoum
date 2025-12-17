@@ -14,3 +14,7 @@ void world_to_grid(float x, float y, int& grid_pos_x, int& grid_pos_y, float res
  * @return true if it is a frontiere, false if not.
  */
 bool is_frontier_cell(const BayesianOccupancyGrid& grid, int x, int y);
+
+bool is_frontier_cell_snapshot(const OccupancyGridSnapshot& grid, int x, int y);
+
+float get_cell_probability_snapshot(const OccupancyGridSnapshot& snap, int x, int y);
