@@ -17,10 +17,7 @@ Mounted at the front of the car to hold and protect the ultrasonic sensor.
   <img src="/assets/Images/CAD/ultrasonic_holder_cad_image.jpg" alt="Ultrasonic Sensor Holder" width="300"/>
 </p>
 <p align="center">
-  <img src="/assets/Images/CAD/bumper_ultrasonic_real.jpg" alt="Bumper real-life photo" width="300"/>
-</p>
-<p align="center">
-  <img src="/assets/Images/CAD/holder_ultrasonic_real.jpg" alt="Ultrasonic Sensor real-life photo" width="300"/>
+  <img src="/assets/Images/Photoshoot/IMG_2674.jpg" alt="Both in real-life photo" width="300"/>
 </p>
 
 
@@ -31,9 +28,7 @@ Placed in front of the motor to secure the encoder and its magnet.
 <p align="center">
   <img src="/assets/Images/CAD/encoder_holder_cad_image.jpg" alt="Encoder Mount " width="300"/>
 </p>
-<p align="center">
-  <img src="/assets/Images/CAD/encoder_real.jpg" alt="Encoder Mount real-life photo" width="300"/>
-</p>
+
 
 
 
