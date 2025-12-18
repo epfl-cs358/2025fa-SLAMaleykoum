@@ -20,7 +20,7 @@ PORT = 9000
 GRID_W = 70        # Width of the grid in cells
 GRID_H = 70        # Height of the grid in cells
 RESOLUTION = 0.2   # Size of one cell in meters (5cm)
-WINDOW_SCALE = 15  # Scale factor for the display window
+WINDOW_SCALE = 13  # Scale factor for the display window
 
 # Colors (RGB Tuples)
 C_BLACK  = (0, 0, 0)        # Occupied cell (Wall)
@@ -257,7 +257,7 @@ class Timeline:
 # =============================================================================
 def main():
     # CSV Logging
-    log_filename = f"telemetry_trace_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    log_filename = "telemetry_trace.csv"
     print(f"Logging trace data to: {log_filename}")
     csv_file = open(log_filename, 'w', newline='')
     csv_writer = csv.writer(csv_file)

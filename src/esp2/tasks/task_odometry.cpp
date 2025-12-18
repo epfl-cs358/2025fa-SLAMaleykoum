@@ -93,10 +93,7 @@ void TaskOdometryUnified_Stable(void *pvParameters) {
         pose.theta = yaw;
         pose.timestamp_ms = millis();
         
-        
-        // if(!isPerformingCreneau){
         esp_link.sendPos(pose);
-        // } 
         
         if (millis() - lastPrintTime > 1000) {
             Serial.printf("Pose TX: X=%.3f Y=%.3f θ=%.3f | 100Hz\n", posX, posY, yaw);

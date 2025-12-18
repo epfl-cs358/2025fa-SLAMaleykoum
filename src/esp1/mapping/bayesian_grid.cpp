@@ -63,14 +63,52 @@ BayesianOccupancyGrid::BayesianOccupancyGrid(float resolution_m,
     }
 }
 
+// Helper to check for valid finite float
+inline bool is_finite_and_valid(float val) {
+    return !isnan(val) && !isinf(val) && abs(val) < 1e6f;
+}
+
 void BayesianOccupancyGrid::update_map(const SyncedScan& lidar_scan)
 {
     const LiDARScan& scan = lidar_scan.scan;
     const Pose2D& pose = lidar_scan.pose;
 
+    // Data validation - check for NaN AND Inf
+    if (!is_finite_and_valid(pose.x) || 
+        !is_finite_and_valid(pose.y) || 
+        !is_finite_and_valid(pose.theta)) {
+        Serial.println("Map update rejected: Invalid pose (NaN/Inf)");
+        return;
+    }
+
     float pose_deg = pose.theta * (180.0f / M_PI) + 90.0f;
+    
+    // Check result of calculation
+    if (!is_finite_and_valid(pose_deg)) {
+        Serial.println("Map update rejected: Invalid pose_deg");
+        return;
+    }
+
+    // Add timeout protection
+    uint32_t start_time = millis();
+    const uint32_t MAX_UPDATE_TIME_MS = 100;  // Maximum 100ms per update
+    uint16_t points_processed = 0;
 
     for (uint16_t i = 0; i < scan.count; i++) {
+        // Watchdog: Check if we've been running too long
+        if (++points_processed % 50 == 0) {
+            if (millis() - start_time > MAX_UPDATE_TIME_MS) {
+                Serial.printf("Map update timeout after processing %d/%d points\n", 
+                             points_processed, scan.count);
+                return;
+            }
+        }
+
+        // Validate angle (check for NaN AND Inf)
+        if (!is_finite_and_valid(scan.angles[i])) {
+            continue;
+        }
+
         // Convert distance to meters
         float rayon = scan.distances[i] * 0.001f;
 
@@ -80,27 +118,62 @@ void BayesianOccupancyGrid::update_map(const SyncedScan& lidar_scan)
 
         // Calculate global angle of the measurement
         float angle_world = pose_deg - scan.angles[i];
-        if (isnan(angle_world)) continue;
+        
+        // Check for NaN AND Inf immediately
+        if (!is_finite_and_valid(angle_world)) {
+            continue;
+        }
 
-        // Normalize angle to [0, 360)
-        while (angle_world >= 360.f) angle_world -= 360.f;
-        while (angle_world <   0.f)  angle_world += 360.f;
+        // Normalize with BOUNDED iterations (prevent infinite loops)
+        // Use fmodf for safe normalization instead of while loops
+        if (angle_world >= 360.f || angle_world < 0.f) {
+            angle_world = fmodf(angle_world, 360.f);
+            if (angle_world < 0.f) {
+                angle_world += 360.f;
+            }
+        }
+
+        // Final safety check after normalization
+        if (angle_world < 0.f || angle_world >= 360.f) {
+            continue;  // Skip if still out of range
+        }
 
         int idx = (int)(angle_world * 10.f);
-        if (idx >= 3600) idx -= 3600;
-        if (idx < 0)     idx += 3600;
+        
+        // Strict bounds checking
+        if (idx < 0 || idx >= 3600) {
+            continue;  // Skip instead of clamping
+        }
 
         float sinv = sin_table[idx];
         float cosv = cos_table[idx];
 
         float hit_x = pose.x + rayon * cosv;
         float hit_y = pose.y + rayon * sinv;
+        
+        // Validate hit coordinates
+        if (!is_finite_and_valid(hit_x) || !is_finite_and_valid(hit_y)) {
+            continue;
+        }
 
         int x0, y0, x_hit_grid, y_hit_grid;
         world_to_grid(pose.x, pose.y, x0, y0,
                       grid_resolution, grid_size_x, grid_size_y);
         world_to_grid(hit_x, hit_y, x_hit_grid, y_hit_grid,
                       grid_resolution, grid_size_x, grid_size_y);
+
+        // Validate start position
+        if (x0 <= 0 || x0 >= grid_size_x - 1 ||
+            y0 <= 0 || y0 >= grid_size_y - 1) {
+            continue;  // Skip if robot is out of valid area
+        }
+
+        // Clamp hit position to prevent wrap-around
+        // If hit is out of bounds, clamp it to the border
+        if (x_hit_grid < 1) x_hit_grid = 1;
+        if (x_hit_grid >= grid_size_x - 1) x_hit_grid = grid_size_x - 2;
+        if (y_hit_grid < 1) y_hit_grid = 1;
+        if (y_hit_grid >= grid_size_y - 1) y_hit_grid = grid_size_y - 2;
 
         // Bresenham ray tracing
         int dx = abs(x_hit_grid - x0);
@@ -112,31 +185,35 @@ void BayesianOccupancyGrid::update_map(const SyncedScan& lidar_scan)
         int x = x0;
         int y = y0;
 
-        while (true) {
-            if (x <= 0 || x >= grid_size_x - 1 ||
-                y <= 0 || y >= grid_size_y - 1)
-                break;
+        int max_iter = dx + dy + 1;
 
-            int idxg = y * grid_size_x + x;
-            int v = log_odds[idxg] + L_FREE_INT;
-            log_odds[idxg] = (int8_t)(v < L_MIN_INT ? L_MIN_INT : v);
+        while (max_iter-- > 0) {
+            // If we reached the hit point, STOP.
+            // Do NOT update this cell as free.
+            if (x == x_hit_grid && y == y_hit_grid) {
+                break; 
+            }
 
-            if (x == x_hit_grid && y == y_hit_grid)
-                break;
+            // Update Free Space
+            int idx = y * grid_size_x + x;
+            if (idx >= 0 && idx < grid_size_x * grid_size_y) {
+                int v = log_odds[idx] + L_FREE_INT;
+                log_odds[idx] = (int8_t)(v < L_MIN_INT ? L_MIN_INT : v);
+            }
 
             int e2 = 2 * err;
             if (e2 > -dy) { err -= dy; x += sx; }
-            if (e2 <  dx) { err += dx; y += sy; }
+            if (e2 < dx)  { err += dx; y += sy; }
         }
 
-        // Mark occupied cell (SAFE)
-        if (is_hit &&
-            x_hit_grid >= 0 && x_hit_grid < grid_size_x &&
-            y_hit_grid >= 0 && y_hit_grid < grid_size_y)
-        {
-            int idxg = y_hit_grid * grid_size_x + x_hit_grid;
-            int v = log_odds[idxg] + L_OCC_INT;
-            log_odds[idxg] = (int8_t)(v > L_MAX_INT ? L_MAX_INT : v);
+        // --- UPDATE OCCUPIED CELL ---
+        // Only if it was a real hit (not max range)
+        if (is_hit) {
+            int idx = y_hit_grid * grid_size_x + x_hit_grid;
+            if (idx >= 0 && idx < grid_size_x * grid_size_y) {
+                int v = log_odds[idx] + L_OCC_INT;
+                log_odds[idx] = (int8_t)(v > L_MAX_INT ? L_MAX_INT : v);
+            }
         }
     }
 }
@@ -148,7 +225,18 @@ float BayesianOccupancyGrid::get_cell_probability(int x, int y) const
         return 1.0f;
 
     int idx = y * grid_size_x + x;
-    return prob_table[log_odds[idx] + 40];
+    
+    // Additional bounds check
+    if (idx < 0 || idx >= grid_size_x * grid_size_y)
+        return 1.0f;
+    
+    int prob_idx = log_odds[idx] + 40;
+    
+    // Bounds check for probability table access
+    if (prob_idx < 0 || prob_idx >= 81)
+        return 0.5f;  // Return unknown probability
+    
+    return prob_table[prob_idx];
 }
 
 int8_t* BayesianOccupancyGrid::get_map_data() const
