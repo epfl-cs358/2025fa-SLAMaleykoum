@@ -7,7 +7,6 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 
-
 void TaskMotor(void *pvParameters) {
     bool recoveryTriggered = false;
 

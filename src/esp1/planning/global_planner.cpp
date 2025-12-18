@@ -7,7 +7,7 @@ GlobalPlanner::GlobalPlanner() {}
 PathMessage GlobalPlanner::generate_path(
     const Pose2D& current_pose,
     const MissionGoal& goal,
-    const BayesianOccupancyGrid& map,
+    const OccupancyGridSnapshot& map,
     GlobalPlannerWorkspace* ws
 )
 {  
@@ -107,8 +107,13 @@ PathMessage GlobalPlanner::generate_path(
     while (ws->pq_size > 0) {
 
         loop_counter++;
-        if (loop_counter % 50 == 0) {
-            vTaskDelay(1); // Sleep for 1 tick (allows OS to breathe)
+
+        if (loop_counter % 20 == 0) {
+            taskYIELD();
+        }
+
+        if (loop_counter % 500 == 0) {
+            vTaskDelay(pdMS_TO_TICKS(1)); // Sleep for 1 tick (allows OS to breathe)
         }
 
         GlobalPlannerWorkspace::Node cur = pq_pop();
@@ -136,7 +141,7 @@ PathMessage GlobalPlanner::generate_path(
             if (ws->closed[n_idx]) continue;
 
             // Obstacle check
-            if (map.get_cell_probability(nx, ny) > FREE_BOUND_PROB) continue;
+            if (get_cell_probability_snapshot(map, nx, ny) > FREE_BOUND_PROB) continue;
 
             // Additional cost for nearby obstacles
             // Wall Buffering (Simplified for 1D)
@@ -150,7 +155,7 @@ PathMessage GlobalPlanner::generate_path(
                     if (bx >= 0 && bx < W && by >= 0 && by < H) {
                          // Note: get_cell_probability handles 1D conversion internally usually, 
                          // but here we use (x,y) API of the map class.
-                         if (map.get_cell_probability(bx, by) > FREE_BOUND_PROB) {
+                         if (get_cell_probability_snapshot(map, bx, by) > FREE_BOUND_PROB) {
                              too_close = true; buf_y = 2; break; // Break outer loop
                          }
                     }
