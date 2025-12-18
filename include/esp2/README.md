@@ -59,29 +59,22 @@ Sensor used to detect close obstacles in front of the car for safety and emergen
 
 [Open Pure Pursuit README](/include/esp2/control/pure_pursuit_readme.md)
 
-This path-tracking algorithm translates the static waypoints into dynamic steering commands.
+Local path-tracking controller responsible for converting global waypoints into low-level steering and speed commands.
 
-- **Input**: `PathMessage` (Vector of `Waypoints`) from ESP-1.
-- **Process**:
-  - **Lookahead Point Selection**: The process determines a lookahead distance ($L_d$), which is a tunable parameter controlling the aggressiveness of the steering. The algorithm searches the `PathMessage` for the `waypoint` that is $L_d$ away from the robot's current `Pose`.
-
-  - **Curvature Calculation**: Once the lookahead point is identified, the core geometry calculates the curvature ($\kappa$) of the unique circular arc that connects the robot's current position to the lookahead point while respecting the robot's current orientation.
-
-  - **Command Generation**: This curvature is converted into the necessary **Target Angular Velocity** $(\mathbf{v}_{\text{angular}})$. The **Target Linear Velocity** $(\mathbf{v}_{\text{linear}})$ should be dictated by path constraints or a fixed speed limit (//TODO: tbd).
-
-
-    $$\mathbf{v}_{\text{angular}} = \mathbf{v}_{\text{linear}} \times \kappa$$
-
-- **Output**: Motor PWM Signals (sent to motor drivers).
+- **Input**: `PathMessage` (waypoints) from ESP-1 and robot current pose
+- **Process**: selects a lookahead point on the path and computes the steering command using the Pure Pursuit bicycle model
+- **Output**: steering angle and target speed commands sent to the motor and steering hardware
 
 
 ### Recovery Maneuvers :
 
-//TODO: description
+- **Input**: `Current vehicle pose` for yaw estimation.    Global motor and steering interfaces (`MotorManager`, `DMS15`).
+- **Process**: Move backward briefly to create clearance from obstacles. Perform a sequence of alternating backward and forward motions : steer wheels to opposite angles (left/right) during each motion.  
+Insert short pauses to stabilize the vehicle and reduce mechanical stress
+Repeat the sequence a fixed number of times to achieve an approximate quarter-turn
 
-- **Input**:
-- **Process**:
-- **Output**:
+- **Output**: Vehicle reoriented to face approximately an opposite direction.
+Motors stopped and steering centered, ready to resume normal navigation.
 
 
 ---

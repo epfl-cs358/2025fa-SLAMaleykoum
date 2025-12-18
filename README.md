@@ -5,14 +5,14 @@
 1. [Project Overview](#project-overview)
 2. [Hardware Overview](#hardware-overview)
 3. [System Architecture](#system-architecture)
-4. [Hardware Platform](#hardware-platform)
-5. [Software Components](#software-components)
-6. [Data Flow and Communication](#data-flow-and-communication)
-7. [Implementation Details](#implementation-details)
-8. [Mission and Task Management](#mission-and-task-management)
-9. [Set it up](#set-it-up)
+4. [Data Flow and Communication](#data-flow-and-communication)
+5. [Set it up](#set-it-up)
+6. [Usage and Operation](#usage-and-operation)
+7. [Troubleshooting](#troubleshooting)
+8. [Problems and Recommendations](#problems-and-recommendations)
+9. [Archives](#archives)
+10. [Conclusion](#conclusion)
 
-// TODO: table of content is not up to date !
 ---
 
 ## Project Overview
@@ -40,7 +40,7 @@ Here is our original [Project proposal](https://www.overleaf.com/9942875199zgzbk
 - **Hardware**: Dual ESP32-S3 microcontrollers, LiDAR sensor, wheel encoders, IMU
 - **Operating System**: FreeRTOS for real-time multitasking
 - **Communication**: UART (inter-processor), TCP (ground station)
-- **Algorithms**: A* pathfinding, Pure-Pursuit controller, Breshmann //TODO: Santiago, fill this up
+- **Algorithms**: A* pathfinding, Pure-Pursuit controller, Bresenham for mapping, BFS for frontier clustering
 
 ## Hardware Overview
 
@@ -192,11 +192,8 @@ Here is a quick video of the car's body and roof :
 
 Note: The CAD files for the **front bumper**, **ultrasonic sensor case**, and **encoder mount** were originally designed by the group from whom we inherited the car, **TurboSLAM**.
 
-### Challenges & Recommendations
 
-# //TODO: @Cléa & @Santiago Change this. Doesn't fit.
-
-Before implementing the hardware setup, check the [Problems and Recommendations](#problems-and-recommendations) section to get a full scope of what may need to be modified.
+Before implementing the hardware setup, check the [Problems and Recommendations](#problems-and-recommendations) section (Hardware parts) to get a full scope of what may need to be modified.
 
 
 ## System Architecture
@@ -211,14 +208,12 @@ The computational load is devided over the two ESP32-S3 microcontrollers. The fi
 
 **Primary Mission**: Create and maintain a global understanding of the environment and plan high-level navigation strategies.
 
-**Operating Frequency**: 1-10 Hz (depends on task)
-
 **Core Responsibilities**:
 - Generate and maintain occupancy grid maps
 - Find the frontier cells to explore and cluster them using BFS algorithms
 - Define a temporary goal for the car to reach
 - Plan global paths using A* algorithm
-- Share telemetry with ground station via wifi (visualisation purpouses)
+- Share telemetry with ground station via wifi (visualisation purposes)
 - Send the computed path to the esp2
 
 ### ESP-2: Localization & Control
@@ -227,12 +222,10 @@ The computational load is devided over the two ESP32-S3 microcontrollers. The fi
 
 **Primary Mission**: Execute precise vehicle control and maintain high-frequency local pose tracking.
 
-**Operating Frequency**: 50-100 Hz for control loops
-
 **Core Responsibilities**:
 - Execute Pure Pursuit path following algorithm
 - Handle emergency stop commands and maneuvers to escape when stuck
-- Aggregate sensor data (odometry, IMU) and forward to ESP-1
+- Aggregate sensor data (odometry, IMU) to follow the position of the car and forward to ESP-1
 
 ### Shared mecanisms (`common/`)
 
@@ -304,7 +297,7 @@ Open in PlatformIO: Open the project folder in VS Code.
 **Upload Code:**
 Connect to the ESP1 via USB. Open the *platformio* extension in vscode (the alien logo). Click on `/esp2/General/Upload`. Repete for the ESP2.
 
-## Usage / Operation
+## Usage and Operation
 
 ### 1. Power Up Sequence
 1.  Connect the NiMH battery to the ESC.
@@ -344,29 +337,62 @@ If you encounter issues, check the list below before reaching out.
 | **ESP1 crashes imidiately** | The map size is too big | Reduce the map size. Note: The max nb of cells we managed to run with is 70x70 but if the real world size is not enough, you can increase the `RESOLUTION` value which will increase what each cell represents in the real world |
 
 ## Problems and Recommendations
-# //TODO: @Cléa :))
 
 ### Common ESP1 & ESP2
+
+#### Hardware :
+
 - **Hardware wear and wiring issues**: reused components had weak solder joints and loose connectors, causing intermittent failures (especially the encoder).  
   **Fix**: replaced fragile connectors with screw terminal blocks → stable signals.  
   **Recommendation**: inspect wiring early, re‑solder weak joints, standardize connectors, and consider a small PCB for reliability.
 
+#### Software :
+
+- **Wi-Fi communication issues**: MQTT introduced significant latency and was unable to reliably transmit the full Bayesian map, while TCP streams sometimes produced incomplete or corrupted data.       
+  **Fix**: MQTT was used only for basic hardware debugging due to its simplicity. For debugging and transmitting complex algorithms and large data structures, a TCP server was implemented and a custom Python client was used to retrieve and visualize data from the ESP32. When errors occurred in the final map, task priorities were reviewed and mutexes were added to protect shared resources in FreeRTOS.           
+  **Recommendation**: consider using UDP instead of TCP when occasional packet loss is acceptable, but ensure proper packet structuring, ordering, and validation to maintain data consistency.
+
 ### ESP1
-- The main problems encountered on the ESP1 were related to the **LiDAR**, as it's a difficult hardware component to work with.
 
-- The first problem was getting it to run by sending a command via the `RX pin` connected to the `LiDAR's TX pin`. The `RX pin` in the code must correspond to the one connected to the LiDAR's RX pin for the serial port to start correctly.
+#### Hardware :
 
-- We then had to collect the **LiDAR data**, and there were many issues. Since the initially planned MQTT connection couldn't transmit that much data, we had to configure the ESP32 to create a Wi-Fi access point and a TCP server, which we connected to via a Python file and which printed a LiDAR map in real time. It's always necessary to accept that there will be some unforeseen issues, especially when trying to obtain all the points from every scan: latency can occur.
+- **LiDAR serial initialization**: difficulty starting the LiDAR due to incorrect `RX/TX pin` configuration.   
+  **Fix**: ensured the ESP32 RX pin in the code matched the physical LiDAR TX connection.             
+  **Recommendation**: clearly document pin assignments and validate serial communication with minimal test code first. If the pins you selected don't work, it might be that they are broken on the ESP. Try other pins RX/TX.
 
-- We found a **downsampling** solution: either taking one point every five points, or one scan every three. This works much better and remains accurate. The data had to be retrieved correctly according to the buffer obtained via the LiDAR, particularly by decoding it properly. We had to pay close attention to the conversions between degrees and radians.
+#### Software :
 
-- Another problem encountered was the **Bayesian grid**. It had to be implemented efficiently enough for the algorithm to fit on the ESP32. Also, the map size and resolution had to match those defined in the Python file.
+- **High LiDAR data throughput**: MQTT could not handle the volume of scan data, causing delays and packet loss.  
+  **Fix**: configured the ESP32 as a Wi-Fi access point with a TCP server and streamed data to a Python client for real-time visualization.                     
+  **Recommendation**: evaluate data bandwidth early and choose TCP/UDP streaming over MQTT for high-frequency sensor data.
 
-- For the **Mission Planner**, the main problem was defining the correct boundaries. We ultimately chose to define a "boundary" point as a white square next to a gray square. The problem then was to cluster these points and choose the most interesting boundary to visit. We defined the best boundary as one with a minimum of 5 squares and the one closest to the SLAM (Short Land Area Map).
+- **Latency and incomplete scans**: attempting to process every LiDAR point introduced lag and instability.       
+  **Fix**: implemented downsampling (one point every 5, or one scan every 3), maintaining accuracy while reducing load.     
+  **Recommendation**: always include configurable downsampling and monitor real-time latency.
+
+- **LiDAR buffer decoding and angle conversion**: incorrect parsing and degree/radian mismatches caused distorted maps.                             
+  **Fix**: carefully decoded LiDAR buffers and standardized angle units throughout the pipeline.  
+  **Recommendation**: check the documentation of your LiDAR, centralize unit conversions and validate data using simple geometric test cases.
+
+- **Bayesian occupancy grid performance**: grid computation was initially too heavy for the ESP32.    
+  **Fix**: optimized grid size and resolution to match the Python visualization and fit ESP32 memory constraints.                       
+  **Recommendation**: design mapping resolution based on hardware limits and test memory usage early.
+  
+
+- **Mission Planner boundary detection**: defining meaningful exploration boundaries was ambiguous.     
+  **Fix**: defined boundaries as white cells adjacent to gray cells, clustered them, and selected the closest valid cluster (≥8 cells).                       
+  **Recommendation**: use simple, well-defined heuristics for boundary detection and validate them visually.
 
 - For the **Global Planner**, the problems encountered were mainly related to the efficiency of the **A-Star algorithm**. We limited the number of waypoints to a maximum of 5 and evenly distributed them along the found path. We decided to use a heursitic function with the distance from the current point to the goal to find the optimal path as quickly as possible.
 
+- **Global Planner (A STAR) efficiency**: unrestricted A* planning was computationally expensive.       
+  **Fix**: boost the heuristic function to search the path              
+  **Recommendation**: if your ESP32 can compute it, add a Local Planner to make it more precise when it detects smaller objects
+
 ### ESP2
+
+#### Hardware :
+
 - **Encoder jitter**: noisy tick timing from electrical/mechanical issues degraded velocity estimation.  
   **Fix**: used AS5600 library for error handling.  
   **Recommendation**: sample encoder at high, consistent rates; fuse with IMU data; consider wheel‑mounted encoder for higher resolution.
@@ -374,8 +400,9 @@ If you encounter issues, check the list below before reaching out.
 - **Motor PID control**: stock THW‑1060 ESC only allowed discrete throttle steps, preventing smooth PID control.  
   **Recommendation**: replace with IBT‑4 (BTS7960) for smooth PWM and closed‑loop speed control.
 
-- **IMU acceleration**: drift and bias made acceleration unreliable for odometry/EKF fusion.  
-  **Recommendation**: 
+- **IMU acceleration**: drift and bias made acceleration unreliable for odometry/EKF fusion.        
+  **Fix**: acceleration was deprioritized in favor of encoder-based velocity estimation.        
+  **Recommendation**: perform proper IMU calibration, apply bias estimation and low-pass filtering, and rely more heavily on gyroscope + encoder fusion rather than raw acceleration.
 
 
 
@@ -407,3 +434,8 @@ Each test entry point is implemented in `test_main_esp<i>`, which simply include
 The Python files are used for TCP monitoring and for displaying the received data in a structured format.
 
 ## Conclusion
+
+# TODO : revoir conclusion
+SLAMaleykoum demonstrates the transformation of a standard RC car into a fully autonomous robot capable of real-time mapping, localization, and navigation. By distributing computation across two ESP32-S3 microcontrollers and leveraging FreeRTOS, the system achieves a robust, modular, and fully self-contained architecture.
+
+The project involved addressing multiple hardware and software challenges, leading to practical design choices and algorithmic optimizations suited to embedded constraints. Overall, SLAMaleykoum provides a solid foundation for future improvements and stands as a complete and extensible SLAM platform for autonomous robotics on resource-limited hardware.

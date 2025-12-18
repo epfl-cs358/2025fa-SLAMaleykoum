@@ -60,57 +60,56 @@ uint16_t Lidar::readMeasurePoints()
 
 uint16_t Lidar::awaitStandardScan()
 {
-	uint8_t *pBuff=(uint8_t*)&DataBuffer; //Pointer to Buffer
-	uint16_t count=0;
+	uint8_t *pBuff = (uint8_t*) &DataBuffer; //Pointer to Buffer
+	uint16_t count = 0;
 	rawScanDataPoint_t point;
-	bool frameStart=false;
+	bool frameStart = false;
 
-	uint32_t startTime=millis();
-	while(millis()<(startTime+5000)) //timeout after 5 seconds
+	uint32_t startTime = millis();
+	while(millis() < (startTime + 5000)) //timeout after 5 seconds
 	{
-		if(serial.available()>=5)
+		if(serial.available() >= 5)
 		{
-			serial.readBytes((uint8_t*)&point,5);
+			serial.readBytes((uint8_t*) &point, 5);
 			
 			//search for frameStart
-			if((point.quality&0x01)&&(!(point.quality&0x02))&&!frameStart)
+			if((point.quality & 0x01) && (!(point.quality & 0x02)) && !frameStart)
 			{
-				if(point.angle_low&0x01) //check Bit
+				if(point.angle_low & 0x01) //check Bit
 				{
-					frameStart=true;
+					frameStart = true;
 				}
-			} else if(frameStart&&(point.quality&0x01)&&!(point.quality&0x02)&&count>1)
+			} else if(frameStart && (point.quality & 0x01) && !(point.quality & 0x02) && count > 1)
 			{
-				if(point.angle_low&0x01)
+				if(point.angle_low & 0x01)
 				{
 					return count;
 				}
 			}
 			else if(frameStart)
 			{
-				memmove(pBuff,(uint8_t*)&point,sizeof(point)); //copy memory from incoming buffer to DataBuffer
+				memmove(pBuff, (uint8_t*) &point, sizeof(point)); //copy memory from incoming buffer to DataBuffer
 				count++; //new point
-				if(count<sizeof(DataBuffer)/sizeof(rawScanDataPoint))
+				if(count < sizeof(DataBuffer) / sizeof(rawScanDataPoint))
 				{
-					pBuff=pBuff+5; //move pointer to next measure point in storage
+					pBuff = pBuff + 5; //move pointer to next measure point in storage
 				}
 			}
 			// else if(!frameStart)
 			// 	serial->readBytes((uint8_t*)&point,1);
-			
 		}
 	}
 	return count;
 }
 
-float Lidar::calcAngle(uint8_t _lowByte,uint8_t _highByte)
+float Lidar::calcAngle(uint8_t _lowByte, uint8_t _highByte)
 {
 	uint16_t angle = _highByte << 7;
 	angle |= _lowByte >> 1;
 	return angle / 64.0;
 }
 
-float Lidar::calcDistance(uint8_t _lowByte,uint8_t _highByte)
+float Lidar::calcDistance(uint8_t _lowByte, uint8_t _highByte)
 {
 	uint16_t distance = (_highByte) << 8;
 	distance |= _lowByte;
@@ -145,73 +144,6 @@ void Lidar::build_scan(LiDARScan* scan, bool &scanComplete_, float& lastAngleESP
         lastAngleESP_ = angle_deg;
     }
     scan->timestamp_ms = millis();
-}
-
-uint16_t Lidar::readScanLive(LiDARScan* scan, bool &scanComplete, float &lastAngle) 
-{
-    scan->count = 0;
-    rawScanDataPoint_t point;
-    bool frameStart = false;
-
-    uint32_t startTime = millis();
-	uint16_t downsampleCounter = 0;
-
-    while (millis() - startTime < 5000) {
-        if (serial.available() < DATA_SIZE) continue;
-
-        // read 5 bytes in the serial buffer
-        serial.readBytes((uint8_t*)&point, DATA_SIZE);
-
-        // detection of frame START
-        bool isStartFlag = (point.quality & 0x01) && !(point.quality & 0x02);
-
-        if (!frameStart) {
-            if (isStartFlag && (point.angle_low & 0x01)) {
-                frameStart = true;
-                scan->count = 0;
-                lastAngle = 0;
-				downsampleCounter = 0;
-            }
-            continue;
-        }
-
-        // detection of frame END
-        if (isStartFlag && scan->count > 1 && (point.angle_low & 0x01)) {
-            scanComplete = true;
-            return scan->count;
-        }
-
-        // decode point data
-        float dist_mm = calcDistance(point.distance_low, point.distance_high);
-        float angle_deg = calcAngle(point.angle_low, point.angle_high);
-
-        if (dist_mm <= 0) continue;
-
-		// downsample by 5
-		downsampleCounter++;
-        if (downsampleCounter % 5 != 0) {
-            lastAngle = angle_deg;
-            continue;
-        }
-
-        // direct storage in buffer
-        if (scan->count < MAX_LIDAR_POINTS) {
-            scan->angles[scan->count] = angle_deg;
-            scan->distances[scan->count] = dist_mm;
-            scan->qualities[scan->count] = point.quality >> 2;
-            scan->count++;
-        }
-
-        // detect full rotation
-        if (angle_deg < lastAngle) {
-            scanComplete = true;
-            return scan->count;
-        }
-
-        lastAngle = angle_deg;
-    }
-
-    return scan->count;
 }
 
 // DEBUG FUNCTIONS //

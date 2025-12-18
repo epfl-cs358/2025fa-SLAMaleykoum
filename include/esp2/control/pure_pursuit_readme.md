@@ -1,95 +1,122 @@
-# **Pure Pursuit: Path Tracker**
+# Pure Pursuit – Local Path Tracker
 
-## **Overview**
+## Overview
 
-This is a path-tracking controller that implements the Pure Pursuit algorithm. Its goal is to compute the necessary `MotionCommand` (target speed and steering angle) to make the car follow a predefined path.  
-This controller relies on a **Bicycle Kinematic Model**. It simplifies the car into a bicycle with a wheelbase L\_, a single rear wheel, and a single steerable front wheel.
+This module implements a **Pure Pursuit local path-following controller** designed to run on the ESP32.  
+Its role is to convert a **short global path** (received from ESP1) into **low-level motion commands** that allow the vehicle to follow the path smoothly and reliably.
 
-## **1\. Core Concept**
+Due to hardware limitations of the ESC, the current implementation uses a **fixed target speed** and a **fixed lookahead distance**, focusing on robust steering computation rather than full dynamic control.
 
-1. **Find Target Point:** The algorithm "looks ahead" on the path by a certain `lookahead_distance` (Ld). It finds a target waypoint on the path at this distance.  
-2. **Transform Coordinates:** This global target point is transformed into the car's local coordinate frame (using the Transforms library). This gives a local target ($x_r$, $y_r$).  
-3. **Calculate Steering:** Using the bicycle model, it calculates the circular arc needed to intercept this local target point. The steering angle $\\delta$ is calculated from this arc.  
-   * The formula is: $\delta = \arctan(2 \cdot L \cdot x_{\text{lateral}} / Ld^2)$  
-   * L is the car's wheelbase (`L_`).  
-   * x\_lateral is the lateral (side-to-side) distance to the target in the car's frame.  
-   * Ld is the lookahead distance. 
-4. **Calculate Speed:** The target speed is adapted based on the required steering angle. Sharper turns (larger $\delta$) result in a lower target speed. We want to slow down for turns to avoid slipping.
+---
 
-## **2\. Calibration**
+## Core Concept
 
-We **must** tune the following constants inside `pure_pursuit.h` for our car.
+The Pure Pursuit algorithm follows a path by continuously steering the vehicle toward a **lookahead point** located at a fixed distance ahead of the robot on the path.
 
-* **L\_ (float):** The wheelbase (distance in meters) between the front and rear axles. This is the most critical kinematic parameter.  
-* **MAX\_STEERING\_ANGLE\_RAD\_ / MIN\_STEERING\_ANGLE\_RAD\_ (float):** The physical steering limits of the car in radians. (e.g., 25.0f \* M\_PI / 180.0f).  
-* **min\_lookahead\_dist\_ / max\_lookahead\_dist\_ (float):** The clamping range for the lookahead distance.  
-* **K\_dd\_ (float):** The lookahead gain.
-* **min\_speed\_ / max\_speed\_ (float):** The clamping range for the output target speed.
-* **K\_v\_ (float):** The velocity gain.  
+The algorithm works as follows:
 
-## **4\. API Functions**
+1. **Path Update**  
+   A new path is frequently received from ESP1 and **completely overwrites** the previous one.  
+   Since paths are always recomputed from the robot’s current position, no path continuity is required.
 
-### **void PurePursuit::set\_path(const GlobalPathMessage& path\_msg)**
+2. **Lookahead Point Selection**  
+   - The algorithm searches forward along the path starting from the last valid index.
+   - It computes the intersection between path segments and a **lookahead circle** centered on the robot.
+   - If multiple intersections exist, the **furthest valid one** along the path is selected.
+   - If no intersection is found, the closest point on the path is used as a fallback.
 
-* **Purpose:** Clears the old path and loads a new one for the controller to follow.  
-* **Input:** path\_msg: A message/struct containing an array of Waypoint objects and the path length.  
-* **Note:** This also resets the path-following index, so the controller will start tracking from the beginning of the new path.
+3. **Coordinate Transformation**  
+   The selected lookahead point is transformed from the **global frame** to the **robot frame** using the `Transforms` utility.
 
-### **MotionCommand PurePursuit::compute\_command(const Pose2D& current\_pose, const Velocity& vel)**
+4. **Steering Computation (Bicycle Model)**  
+   The curvature is computed using the Pure Pursuit formula:
+   $(\mathbf{curvature = 2 * x}_{\text{lateral}} \mathbf{/ Ld²})$
+  where:
+  - `x_lateral` is the lateral offset of the lookahead point in robot coordinates
+  - `Ld` is the fixed lookahead distance    
+  The steering angle is then computed as:   
+  $(\mathbf{steering\_angle} \mathbf{= atan(curvature * L)})$      
+  where `L` is the vehicle wheelbase.
 
-* **Purpose:** This is the main update function. It performs the full Pure Pursuit calculation.  
-* **Inputs:**  
-  * **current\_pose**: The car's current position and heading from localization EKF.  
-  * **vel**: The car's current velocity.  
-* **Returns:** A MotionCommand struct containing:  
-  * **target\_velocity**: The calculated adaptive speed.  
-  * **steering\_angle**: The calculated steering angle (in radians), clamped to the vehicle's limits.
+5. **Command Output**  
+- The steering angle is clamped to the physical limits of the vehicle.
+- It is converted to **servo degrees** (`0–180`, with `90` as straight).
+- A fixed forward speed is applied.
 
-## **5\. Usage Example (Conceptual Control Loop)**
+---
 
-This example shows how to integrate the PurePursuit controller into a typical robot control loop.
+## Design Choices & Constraints
 
-```
-#include "pure_pursuit.h"
-#include "ekf_localizer.h"
-#include "motor_controller.h"
-#include "common/data_types.h"
+- **Fixed Speed and Lookahead**  
+Adaptive speed and lookahead are disabled due to ESC limitations.
 
-// 1. Initialize hardware and controller
-PurePursuit tracker;
-EKFLocalizer ekf;
-MotorController motors;
+- **Forward Progress Enforcement**  
+A sliding index ensures the robot always follows points ahead of its current position and never tracks backward along the path.
 
-// 2. Create and set a path (Will be "automated" in final version of slamcar)
-GlobalPathMessage my_path;
-my_path.current_length = 3;
-my_path.path[0] = {0.0f, 5.0f};  // Go 5m fwd
-my_path.path[1] = {5.0f, 5.0f};  // Go 5m right
-my_path.path[2] = {5.0f, 10.0f}; // Go 5m fwd
-// ... (load a real path)
+- **Continuous Path Refresh**  
+The controller assumes paths are continuously updated and does not rely on explicit “path completed” events.
 
-tracker.set_path(my_path);
-bool is_following = true;
+---
 
-// 3. Start the main control loop
-while (is_following) {
-    // Get current state from sensors
-    Pose2D current_pose = ekf.get_pose();
-    Velocity current_vel = ekf.get_velocity(); // Or from odometry ?
+## Key Parameters
 
-    // Compute the control command
-    MotionCommand cmd = tracker.compute_command(current_pose, current_vel);
+Defined in `pure_pursuit.h`:
 
-    // Send commands to hardware
-    motors.set_steering(cmd.steering_angle);   // Assumes radians
-    motors.set_speed(cmd.target_velocity);     // Assumes m/s
+- `L_` – Vehicle wheelbase (meters)
+- `Ld_fixed_` – Fixed lookahead distance
+- `fixed_speed_` – Fixed target speed
+- `k_p` – Proportional gain applied to curvature
+- `MIN_STEERING_ANGLE_RAD_ / MAX_STEERING_ANGLE_RAD_` – Steering limits
+- `goal_tolerance_` – Distance threshold for goal detection
+---
 
-    // Check if we reached the end of the path (add some logic)
-    // if (tracker.is_path_complete(current_pose)) {
-    //     is_following = false;
-    //     motors.stop();
-    // }
+## Public API
 
-    // sleep_ms(20); // Wait for the next control cycle
-}
-```
+### `void set_path(const PathMessage& path_msg)`
+
+**Purpose**  
+Loads a new path to follow.
+
+**Behavior**
+- Copies the received waypoints into an internal buffer
+- Resets the lookahead index
+- Overwrites any previously active path
+
+---
+
+### `MotionCommand compute_command(const Pose2D& current_pose, const Velocity& vel)`
+
+**Purpose**  
+Main control function, called at each control cycle.
+
+**Inputs**
+- `current_pose`: current robot pose from localization
+- `vel`: current robot velocity (currently unused)
+
+**Output**
+- `MotionCommand` containing:
+- Fixed target speed (m/s)
+- Steering command in **servo degrees**
+
+If no valid path exists or the goal is reached, a **stop command** is returned.
+
+---
+
+### `bool is_path_complete()`
+
+Checks whether the robot is within a tolerance radius of the final waypoint.  
+Currently not critical, as paths are continuously refreshed.
+
+---
+
+## Limitations & Future Improvements
+
+- Replace fixed speed with proper **velocity PID control**
+- Enable **adaptive lookahead distance**
+- Add a **local obstacle-aware planner** on ESP2
+- Improve steering smoothness and curvature-based speed modulation
+
+
+
+
+
