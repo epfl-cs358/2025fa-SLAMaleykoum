@@ -67,10 +67,11 @@ Pose2D last_known_pose = {0,0,0,0};
 PathMessage current_global_path = {{{0.f, 0.f}}, 1, 0, 0};
 MissionGoal current_mission_goal = {{0.0f, 0.f, 0.f, 0}, EXPLORATION_MODE};
 bool path_found = false;
-bool first_map_ready = false;
 
 InvalidGoals invalid_goals = {{}, 0};
-OccupancyGridSnapshot grid_snapshot;
+OccupancyGridSnapshot grid_snapshot_mission;
+OccupancyGridSnapshot grid_snapshot_global;
+OccupancyGridSnapshot grid_snapshot_goal_check;
 
 // --- SYSTEM HEALTH MONITOR ---
 SystemHealth sys_health = {0, 0, 0, 0, 0, 0};
@@ -113,6 +114,7 @@ void log_event(uint8_t task_id, uint8_t type) {
     if (trace_head >= MAX_TRACE_EVENTS && (trace_head % MAX_TRACE_EVENTS) == 0) {
         trace_wrap_count++;
     }
+    if (trace_head >= 65000) trace_head = 0;
     portEXIT_CRITICAL(&trace_mux);
 }
 
@@ -121,7 +123,6 @@ void log_event(uint8_t task_id, uint8_t type) {
 // Runs continuously at high frequency, sends scan to sync task via queue
 // ============================================================================
 void Lidar_Read_Task(void* parameter) {
-    const TickType_t xDelay = pdMS_TO_TICKS(10); 
     static LiDARScan scan; 
     float lastAngleESP = 0.0f;
     bool scanComplete;
@@ -141,7 +142,7 @@ void Lidar_Read_Task(void* parameter) {
             lastAngleESP = 0.0f; 
             log_event(ID_LIDAR, EVENT_END);
         }
-        vTaskDelay(xDelay);
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
 
@@ -151,31 +152,37 @@ void Lidar_Read_Task(void* parameter) {
 // ============================================================================
 void IPC_Receive_Task(void* parameter) {
     Pose2D incoming_pose; 
+    bool skip;
 
     while (1) {
+        skip = false;
         log_event(ID_IPC, EVENT_START);
         esp_link.poll();
 
-        if (esp_link.get_pos(incoming_pose)) {
-            if (xSemaphoreTake(Pose_Mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
-                float x_diff = incoming_pose.x -  last_known_pose.x;
-                float y_diff = incoming_pose.y -  last_known_pose.y;
-                
-                if (((x_diff) * (x_diff) + (y_diff) * (y_diff)) > 0.7f) {
-                    // Discard obviously wrong pose
-                    xSemaphoreGive(Pose_Mutex);
-                    continue;
+        if (!esp_link.get_pos(incoming_pose)) continue;
+
+        if (xSemaphoreTake(Pose_Mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+            float x_diff = incoming_pose.x -  last_known_pose.x;
+            float y_diff = incoming_pose.y -  last_known_pose.y;
+            
+            if (((x_diff) * (x_diff) + (y_diff) * (y_diff)) > 0.7f) {
+                skip = true;
+                // Discard obviously wrong pose
+            } else {
                 last_known_pose = incoming_pose;
                 sys_health.last_esp2_packet_ms = millis(); 
                 last_ipc_activity_ts = millis();
-                xSemaphoreGive(Pose_Mutex);
-            } else continue;
-
-            // Notify goal validator that pose changed
-            if(Goal_Validator_Handle != NULL)
-                xTaskNotify(Goal_Validator_Handle, NOTIFY_POSE_UPDATED, eSetBits);
             }
-        }
+
+            xSemaphoreGive(Pose_Mutex);
+        } else continue;
+
+        if (skip) continue;
+
+        // Notify goal validator that pose changed
+        if(Goal_Validator_Handle != NULL)
+            xTaskNotify(Goal_Validator_Handle, NOTIFY_POSE_UPDATED, eSetBits);
+
         log_event(ID_IPC, EVENT_END);
         vTaskDelay(pdMS_TO_TICKS(10));
     }
@@ -196,9 +203,9 @@ void Lidar_Sync_Map_Task(void* parameter) {
             
             log_event(ID_SYNC, EVENT_START);
 
-            // Downsample: Only process every 7th scan to save CPU
+            // Downsample
             local_counter++;
-            if (local_counter % 6 == 0) {
+            if (local_counter % 5 == 0) {
                 // Get free buffer (non-blocking, drop frame if none available)
                 if (xQueueReceive(Lidar_Pose_Queue_Free, &current_work_buffer, 0) == pdPASS) {
                     
@@ -212,9 +219,8 @@ void Lidar_Sync_Map_Task(void* parameter) {
 
                     // Send to map task
                     xQueueSend(Lidar_Pose_Queue_Ready, &current_work_buffer, 0);
-                    // if(i<10) ++i;
                     
-                    if (Map_Task_Handle != NULL) // && (i == 10)
+                    if (Map_Task_Handle != NULL)
                         xTaskNotify(Map_Task_Handle, NOTIFY_NEW_SCAN, eSetBits);
                 }
             }
@@ -231,6 +237,7 @@ void Lidar_Sync_Map_Task(void* parameter) {
 void Bayesian_Grid_Task(void* parameter) {
     SyncedScan* incoming_data_ptr = nullptr;
     uint32_t notification_bits;
+    bool first_map_ready = false;
     // const TickType_t CHECK_PERIOD = pdMS_TO_TICKS(10000); // Check every 2s
 
     while (1) {
@@ -243,9 +250,7 @@ void Bayesian_Grid_Task(void* parameter) {
         );
 
         // Si timeout, on FORCE le bit
-        if (ret == pdFALSE) {
-            notification_bits |= NOTIFY_NEW_SCAN;
-        }
+        if (ret == pdFALSE) notification_bits |= NOTIFY_NEW_SCAN;
 
         if (!(notification_bits & NOTIFY_NEW_SCAN)) continue;
 
@@ -272,15 +277,8 @@ void Bayesian_Grid_Task(void* parameter) {
             if (!first_map_ready) {
                 first_map_ready = true;
                 // Notify mission planner it can start
-                if (MPlan_Task_Handle != NULL) {
+                if (MPlan_Task_Handle != NULL)
                     xTaskNotify(MPlan_Task_Handle, NOTIFY_FIRST_MAP_READY, eSetBits);
-                }
-            }
-            
-            // Update Pose Snapshot
-            if(xSemaphoreTake(Pose_Mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
-                last_known_pose = incoming_data_ptr->pose;
-                xSemaphoreGive(Pose_Mutex);
             }
 
             // Recycle buffer
@@ -296,7 +294,7 @@ void Bayesian_Grid_Task(void* parameter) {
 // Periodically checks if current goal is still valid
 // Woken up by pose updates or timer
 // ============================================================================
-bool is_current_goal_valid(const Pose2D& robot_pose, const BayesianOccupancyGrid& grid, 
+bool is_current_goal_valid(const Pose2D& robot_pose, const OccupancyGridSnapshot& grid, 
     const MissionGoal& current_target_, bool path_found_flag) 
 {
     if (!path_found_flag) 
@@ -313,11 +311,11 @@ bool is_current_goal_valid(const Pose2D& robot_pose, const BayesianOccupancyGrid
     world_to_grid(current_target_.target_pose.x, current_target_.target_pose.y, 
                   gx, gy, grid.grid_resolution, grid.grid_size_x, grid.grid_size_y);
 
-    if (grid.get_cell_probability(gx, gy) > OCC_BOUND_PROB) 
+    if (get_cell_probability_snapshot(grid, gx, gy) > OCC_BOUND_PROB) 
         return false;
 
     // Still a frontier ?
-    if (!is_frontier_cell(grid, gx, gy)) 
+    if (!is_frontier_cell_snapshot(grid, gx, gy)) 
         return false;
     
     return true;
@@ -326,6 +324,9 @@ bool is_current_goal_valid(const Pose2D& robot_pose, const BayesianOccupancyGrid
 void Goal_Validator_Task(void* parameter) {
     const TickType_t CHECK_PERIOD = pdMS_TO_TICKS(500); // Check every 0.5s
     uint32_t notification_bits;
+    Pose2D current_p;
+    bool path_found_local;
+    MissionGoal current_goal_local = {{0.0f, 0.f, 0.f, 0}, EXPLORATION_MODE};
 
     while (1) {
         // Wait for notification OR timeout
@@ -336,40 +337,56 @@ void Goal_Validator_Task(void* parameter) {
             CHECK_PERIOD             // Timeout
         );
 
-        log_event(ID_VALIDATOR, EVENT_START);
-
         // Si timeout, on FORCE le bit
         if (ret == pdFALSE)
             notification_bits |= NOTIFY_POSE_UPDATED;
 
         if (!(notification_bits & NOTIFY_POSE_UPDATED)) continue;
         
-        Pose2D current_p;
-        bool path_found_local;
-        MissionGoal current_goal_local = {{0.0f, 0.f, 0.f, 0}, EXPLORATION_MODE};
+        log_event(ID_VALIDATOR, EVENT_START);
 
         // Read current state
         if (xSemaphoreTake(Pose_Mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
             current_p = last_known_pose;
             xSemaphoreGive(Pose_Mutex);
-        } else continue;
+        } else {
+            log_event(ID_VALIDATOR, EVENT_END);
+            continue;
+        }
         
         if (xSemaphoreTake(Path_Mutex, pdMS_TO_TICKS(20)) == pdTRUE) {
             path_found_local = path_found;
             xSemaphoreGive(Path_Mutex);
-        } else continue;
+        } else {
+            log_event(ID_VALIDATOR, EVENT_END);
+            continue;
+        }
 
         if (xSemaphoreTake(Goal_Mutex, pdMS_TO_TICKS(20)) == pdTRUE) {
             current_goal_local = current_mission_goal;
             xSemaphoreGive(Goal_Mutex);
-        } else continue;
+        } else {
+            log_event(ID_VALIDATOR, EVENT_END);
+            continue;
+        }
         
+        if (xSemaphoreTake(Bayesian_Grid_Mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+            memcpy(
+                grid_snapshot_goal_check.log_odds,
+                TheMap->get_raw_data_pointer(),
+                grid_snapshot_goal_check.grid_size_x * grid_snapshot_goal_check.grid_size_y
+            );
+            xSemaphoreGive(Bayesian_Grid_Mutex);
+        } else {
+            log_event(ID_VALIDATOR, EVENT_END);
+            continue;
+        }
+
         // Check if goal is still valid
-        if (!is_current_goal_valid(current_p, *TheMap, current_goal_local, path_found_local)) {
+        if (!is_current_goal_valid(current_p, grid_snapshot_goal_check, current_goal_local, path_found_local)) {
             // Goal invalid - notify mission planner to compute new one
-            if (MPlan_Task_Handle != NULL) {
+            if (MPlan_Task_Handle != NULL)
                 xTaskNotify(MPlan_Task_Handle, NOTIFY_GOAL_INVALID, eSetBits);
-            }
         }
 
         log_event(ID_VALIDATOR, EVENT_END);
@@ -383,10 +400,10 @@ void Goal_Validator_Task(void* parameter) {
 void Mission_Planner_Task(void* parameter) {
     MissionGoal new_goal;
     uint32_t notification_bits;
+    Pose2D current_p;
+    InvalidGoals invalid_goals_local = {{}, 0};
 
     while (1) {
-        OccupancyGridSnapshot grid_snapshot;
-
         // WAIT for FIRST_MAP_READY or GOAL_INVALID bits
         xTaskNotifyWait(
             0x00,                                              // Don't clear on entry
@@ -405,25 +422,38 @@ void Mission_Planner_Task(void* parameter) {
         // --- CALCULATION START ---
         uint32_t t0 = micros(); // Start Timer
 
-        Pose2D current_p;
         if(xSemaphoreTake(Pose_Mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
             current_p = last_known_pose;
             xSemaphoreGive(Pose_Mutex);
-        } else continue;
+        } else {
+            sys_health.mission_plan_time_us = micros() - t0;
+            log_event(ID_MPLAN, EVENT_END);
+            continue;
+        }
 
-        if (xSemaphoreTake(Bayesian_Grid_Mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+        if (xSemaphoreTake(Bayesian_Grid_Mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
             memcpy(
-                grid_snapshot.log_odds,
+                grid_snapshot_mission.log_odds,
                 TheMap->get_raw_data_pointer(),
-                grid_snapshot.grid_size_x * grid_snapshot.grid_size_y
+                grid_snapshot_mission.grid_size_x * grid_snapshot_mission.grid_size_y
             );
             xSemaphoreGive(Bayesian_Grid_Mutex);
-        } else continue;
+        } else {
+            sys_health.mission_plan_time_us = micros() - t0;
+            log_event(ID_MPLAN, EVENT_END);
+            continue;
+        }
 
         if(xSemaphoreTake(Invalid_Goals_Mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
-            new_goal = mission_planner->update_goal(current_p, &grid_snapshot, invalid_goals); // ------- changer en pointeur
+            invalid_goals_local = invalid_goals;
             xSemaphoreGive(Invalid_Goals_Mutex);
-        } else continue;
+        } else {
+            sys_health.mission_plan_time_us = micros() - t0;
+            log_event(ID_MPLAN, EVENT_END);
+            continue;
+        }
+
+        new_goal = mission_planner->update_goal(current_p, &grid_snapshot_mission, invalid_goals_local);
 
         // --- CALCULATION END ---
         sys_health.mission_plan_time_us = micros() - t0; // Write result to global struct
@@ -431,7 +461,11 @@ void Mission_Planner_Task(void* parameter) {
         if (xSemaphoreTake(Goal_Mutex, pdMS_TO_TICKS(20)) == pdTRUE) {
             current_mission_goal = new_goal;
             xSemaphoreGive(Goal_Mutex);
-        } else continue;
+        } else {
+            sys_health.mission_plan_time_us = micros() - t0;
+            log_event(ID_MPLAN, EVENT_END);
+            continue;
+        }
 
         // NOTIFY Global Planner: New goal ready
         if (GPlan_Task_Handle != NULL)
@@ -449,7 +483,7 @@ void Global_Planner_Task(void* parameter) {
     GlobalPlanner planner; 
     Pose2D local_pose;
     MissionGoal local_goal;
-    PathMessage pathMsg = {{{0}}, 0, 0, 0};
+    PathMessage pathMsg = {{}, 0, 0, 0};
     uint32_t notification_bits;
     // const TickType_t CHECK_PERIOD = pdMS_TO_TICKS(10000); // Check every 0.5s
 
@@ -470,34 +504,49 @@ void Global_Planner_Task(void* parameter) {
 
         log_event(ID_GPLAN, EVENT_START); // Start Trace
 
+        if(xSemaphoreTake(Path_Mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+            path_found = false;
+            xSemaphoreGive(Path_Mutex);
+        }
+
         // --- CALCULATION START ---
         uint32_t t0 = micros();
         sys_health.last_planner_status = PLANNER_RUNNING_MY_TYPE;
-
-        // if (TheMap->get_cell_probability(sx, sy) > 0.5f) {
-        //     sys_health.last_planner_status = ERR_START_BLOCKED_MY_TYPE;
-        //     sys_health.planner_fail_count++;
-        //     // Skip A*
-        // } 
-        // else if (TheMap->get_cell_probability(gx, gy) > 0.5f) {
-        //     sys_health.last_planner_status = ERR_GOAL_BLOCKED_MY_TYPE;
-        //     sys_health.planner_fail_count++;
-        //     // Skip A*
-        // }
 
         // Read current state
         if(xSemaphoreTake(Goal_Mutex, pdMS_TO_TICKS(20)) == pdTRUE) {
             local_goal = current_mission_goal;
             xSemaphoreGive(Goal_Mutex); 
-        } else continue;
+        } else {
+            sys_health.global_plan_time_us = micros() - t0; 
+            log_event(ID_GPLAN, EVENT_END);
+            continue;
+        }
 
         if(xSemaphoreTake(Pose_Mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
             local_pose = last_known_pose;
             xSemaphoreGive(Pose_Mutex);
-        } else continue;
+        } else {
+            sys_health.global_plan_time_us = micros() - t0; 
+            log_event(ID_GPLAN, EVENT_END);
+            continue;
+        }
+
+        if (xSemaphoreTake(Bayesian_Grid_Mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+            memcpy(
+                grid_snapshot_global.log_odds,
+                TheMap->get_raw_data_pointer(),
+                grid_snapshot_global.grid_size_x * grid_snapshot_global.grid_size_y
+            );
+            xSemaphoreGive(Bayesian_Grid_Mutex);
+        } else {
+            sys_health.global_plan_time_us = micros() - t0; 
+            log_event(ID_GPLAN, EVENT_END);
+            continue;
+        }
         
         // Generate path (expensive operation ~300ms)
-        pathMsg = planner.generate_path(local_pose, local_goal, *TheMap, gp_workspace);
+        pathMsg = planner.generate_path(local_pose, local_goal, grid_snapshot_global, gp_workspace);
         
         // --- CALCULATION END ---
         sys_health.global_plan_time_us = micros() - t0; 
@@ -510,12 +559,12 @@ void Global_Planner_Task(void* parameter) {
                 current_global_path = pathMsg;
                 path_found = true;
                 xSemaphoreGive(Path_Mutex);
-            } else continue;
+            }
 
             sys_health.last_planner_status = PLANNER_SUCCESS_MY_TYPE;
 
             // Send to ESP2
-            esp_link.sendPath(current_global_path);
+            esp_link.sendPath(pathMsg);
 
         } else {
             sys_health.last_planner_status = ERR_NO_PATH_FOUND_MY_TYPE;
@@ -601,9 +650,18 @@ void TCP_Transmit_Task(void* parameter) {
         bool send_map_now = (xTaskGetTickCount() - lastMapTime > MapFreq);
         uint32_t payload_map_sz = 0;
 
-        if (send_map_now) {
-            const int8_t* raw_map = TheMap->get_map_data();
-            uint32_t total_cells = TheMap->get_total_size();
+        bool skip = false;
+        if (send_map_now) { // ------------------------- caca
+            const int8_t* raw_map;
+            uint32_t total_cells;
+            if (xSemaphoreTake(Bayesian_Grid_Mutex, pdMS_TO_TICKS(30)) == pdTRUE) {
+                raw_map = TheMap->get_map_data();
+                total_cells = TheMap->get_total_size();
+                xSemaphoreGive(Bayesian_Grid_Mutex);
+            } else {
+                skip = true;
+                continue;
+            }
 
             uint32_t rle_idx = 0;
             uint32_t raw_idx = 0;
@@ -623,6 +681,8 @@ void TCP_Transmit_Task(void* parameter) {
 
             payload_map_sz = rle_idx;
         }
+
+        if (skip) continue;
 
         // Trace Data Extraction (Atomic Copy) - FIXED
         uint16_t events_to_send = 0;
@@ -713,7 +773,7 @@ void setup() {
     // --- QUEUES ---
     Lidar_Buffer_Queue = xQueueCreate(3, sizeof(LiDARScan));
     Lidar_Pose_Queue_Ready = xQueueCreate(2, sizeof(SyncedScan*));
-    Lidar_Pose_Queue_Free  = xQueueCreate(2, sizeof(SyncedScan*));
+    Lidar_Pose_Queue_Free  = xQueueCreate(2, sizeof(SyncedScan*));   
     
     xQueueSend(Lidar_Pose_Queue_Free, &Scan_Buffer_1, 0);
     xQueueSend(Lidar_Pose_Queue_Free, &Scan_Buffer_2, 0);
@@ -730,14 +790,32 @@ void setup() {
 
     size_t total = GRID_SIZE_X * GRID_SIZE_Y;
     
-    grid_snapshot.grid_size_x = GRID_SIZE_X;
-    grid_snapshot.grid_size_y = GRID_SIZE_Y;
-    grid_snapshot.grid_resolution = RESOLUTION;
-    grid_snapshot.log_odds = (int8_t*) heap_caps_malloc(
-        grid_snapshot.grid_size_x * grid_snapshot.grid_size_y * sizeof(int8_t),
+    grid_snapshot_mission.grid_size_x = GRID_SIZE_X;
+    grid_snapshot_mission.grid_size_y = GRID_SIZE_Y;
+    grid_snapshot_mission.grid_resolution = RESOLUTION;
+    grid_snapshot_mission.log_odds = (int8_t*) heap_caps_malloc(
+        grid_snapshot_mission.grid_size_x * grid_snapshot_mission.grid_size_y * sizeof(int8_t),
         MALLOC_CAP_SPIRAM
     );
-    memset(grid_snapshot.log_odds, 0, grid_snapshot.grid_size_x * grid_snapshot.grid_size_y);
+    memset(grid_snapshot_mission.log_odds, 0, grid_snapshot_mission.grid_size_x * grid_snapshot_mission.grid_size_y);
+
+    grid_snapshot_global.grid_size_x = GRID_SIZE_X;
+    grid_snapshot_global.grid_size_y = GRID_SIZE_Y;
+    grid_snapshot_global.grid_resolution = RESOLUTION;
+    grid_snapshot_global.log_odds = (int8_t*) heap_caps_malloc(
+        grid_snapshot_global.grid_size_x * grid_snapshot_global.grid_size_y * sizeof(int8_t),
+        MALLOC_CAP_SPIRAM
+    );
+    memset(grid_snapshot_global.log_odds, 0, grid_snapshot_global.grid_size_x * grid_snapshot_global.grid_size_y);
+
+    grid_snapshot_goal_check.grid_size_x = GRID_SIZE_X;
+    grid_snapshot_goal_check.grid_size_y = GRID_SIZE_Y;
+    grid_snapshot_goal_check.grid_resolution = RESOLUTION;
+    grid_snapshot_goal_check.log_odds = (int8_t*) heap_caps_malloc(
+        grid_snapshot_goal_check.grid_size_x * grid_snapshot_goal_check.grid_size_y * sizeof(int8_t),
+        MALLOC_CAP_SPIRAM
+    );
+    memset(grid_snapshot_goal_check.log_odds, 0, grid_snapshot_goal_check.grid_size_x * grid_snapshot_goal_check.grid_size_y);
 
     // --- WIFI ---
     Serial.println("Starting WiFi...");
@@ -777,13 +855,13 @@ void setup() {
     // 1-2: Background (TCP, Mission Planning)
 
     // CORE 1 (Sensor Processing)
-    xTaskCreatePinnedToCore(Lidar_Read_Task, "Lidar", 3072, NULL, 4, &Lidar_Task_Handle, 1);
+    xTaskCreatePinnedToCore(Lidar_Read_Task, "Lidar", 3072, NULL, 5, &Lidar_Task_Handle, 1);
     xTaskCreatePinnedToCore(Lidar_Sync_Map_Task, "Sync", 4096, NULL, 4, &Sync_Task_Handle, 1);
     xTaskCreatePinnedToCore(Bayesian_Grid_Task, "Map", 4096, NULL, 3, &Map_Task_Handle, 1);
-    xTaskCreatePinnedToCore(Goal_Validator_Task, "Validator", 3072, NULL, 3, &Goal_Validator_Handle, 1);
+    xTaskCreatePinnedToCore(Goal_Validator_Task, "Validator", 3072, NULL, 2, &Goal_Validator_Handle, 1);
 
     // CORE 0 (Communication & Planning)
-    xTaskCreatePinnedToCore(IPC_Receive_Task, "IPC", 2048, NULL, 6, NULL, 0);
+    xTaskCreatePinnedToCore(IPC_Receive_Task, "IPC", 2048, NULL, 5, NULL, 0);
     xTaskCreatePinnedToCore(Global_Planner_Task, "GPlanner", 8192, NULL, 4, &GPlan_Task_Handle, 0);
     xTaskCreatePinnedToCore(Mission_Planner_Task, "Mission", 4096, NULL, 3, &MPlan_Task_Handle, 0);
     xTaskCreatePinnedToCore(TCP_Transmit_Task, "TCP", 4096, NULL, 1, &TCP_Task_Handle, 0);
