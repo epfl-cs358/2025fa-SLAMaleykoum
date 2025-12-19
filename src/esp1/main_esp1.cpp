@@ -116,16 +116,6 @@ InvalidGoals invalid_goals;
 #define EVENT_START  1
 #define EVENT_END    0
 
-#define MAX_TRACE_EVENTS 200
-
-struct TaskEvent {
-    uint32_t timestamp_us;
-    uint8_t task_id;
-    uint8_t type;
-    uint8_t core_id;
-    uint8_t padding;
-} __attribute__((packed));
-
 TaskEvent trace_buffer[MAX_TRACE_EVENTS];
 volatile uint16_t trace_head = 0;
 portMUX_TYPE trace_mux = portMUX_INITIALIZER_UNLOCKED;

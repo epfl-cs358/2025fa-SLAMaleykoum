@@ -32,31 +32,6 @@ static bool is_point_safe(const BayesianOccupancyGrid& grid, int gx, int gy)
 }
 
 /**
- * @brief determines if a cell is frontier or not
- * A frontier is a free (explored) space that has at least one unknown (between free 
- * and occupied) cell around her.
- * 
- * @return true if it is a frontiere, false if not.
- */
-static bool is_frontier_cell(const BayesianOccupancyGrid& grid, int x, int y)
-{
-    // Check that the cell is in the map bounds
-    if (grid.get_cell_probability(x, y) > FREE_BOUND_PROB) return false;
-    
-    // Check Neighbors for Unknowns
-    static int dx[4] = {1, -1, 0, 0};
-    static int dy[4] = {0, 0, 1, -1};
-
-    for (int i = 0; i < 4; i++) {
-        float np = grid.get_cell_probability(x + dx[i], y + dy[i]);
-        
-        if (np > FREE_BOUND_PROB && np < OCC_BOUND_PROB) return true;
-    }
-
-    return false;
-}
-
-/**
  * @brief determines if a point is in the invalid goals
  * 
  * @return true if the point is an invalid goal
@@ -182,7 +157,7 @@ void MissionPlanner::find_cluster(const BayesianOccupancyGrid& grid, int start_x
             // Boundary Check
             if (nx < 0 || ny < 0 || nx >= grid.grid_size_x || ny >= grid.grid_size_y) continue;
             
-            if (!is_visited(nx, ny) && is_frontier_cell_snapshot(grid, nx, ny)) {
+            if (!is_visited(nx, ny) && is_frontier_cell(grid, nx, ny)) {
                 int next_tail = (tail + 1) % BFS_QUEUE_SIZE;
                 if (next_tail != head) {
                     bfs_q[tail] = {(int16_t)nx, (int16_t)ny};
@@ -195,14 +170,6 @@ void MissionPlanner::find_cluster(const BayesianOccupancyGrid& grid, int start_x
     store_candidate_if_valid(sum_x, sum_y, size, candidate_count);
 }
 
-static bool invalid(int x, int y, InvalidGoals invalid_goals) {
-    for (int i = 0; i < invalid_goals.size; ++i) {
-        if (invalid_goals.lasts[i].x == x && invalid_goals.lasts[i].y == y)
-            return true;
-    }
-
-    return false;
-}
 
 void MissionPlanner::search_for_candidates(const BayesianOccupancyGrid& grid, 
                                            int x_min, int x_max, int y_min, int y_max, 
@@ -215,7 +182,7 @@ void MissionPlanner::search_for_candidates(const BayesianOccupancyGrid& grid,
             if (is_visited(x, y) || invalid(x, y, invalid_goals)) continue;
             
             // Found a new frontier? Expand it.
-            if (is_frontier_cell_snapshot(grid, x, y)) {
+            if (is_frontier_cell(grid, x, y)) {
                 if (candidate_count >= MAX_FRONTIER_CANDIDATES) return;
                 
                 find_cluster(grid, x, y, candidate_count);

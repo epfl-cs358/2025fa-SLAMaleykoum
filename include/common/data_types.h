@@ -13,7 +13,7 @@
 #define MAX_PATH_LENGTH 15
 #define MAX_LOCAL_PATH_LENGTH 10
 #define MAX_LIDAR_POINTS 500
-#define MAX_INVALID_GOALS 5
+#define MAX_INVALID_GOALS 10
 #define ROBOT_RADIUS 0.3f
 #define SEARCH_BOUND_M 3.0f
 #define GOAL_REACHED 0.4f
@@ -28,7 +28,7 @@
 #define GP_PQ_SIZE   (GP_MAX_CELLS / 3) // Queue doesn't need to hold the whole map, just the frontier
 
 // --- Debugging & Profiling ---
-#define MAX_TRACE_EVENTS 512
+#define MAX_TRACE_EVENTS 200
 #define EVENT_START 1
 #define EVENT_END   0
 
@@ -48,12 +48,12 @@ enum TaskID : uint8_t {
 
 // Represents one "mark" on the timeline
 struct TaskEvent {
-    uint32_t timestamp_us; // When it happened
-    uint8_t  task_id;      // Which task
-    uint8_t  type;         // Start or End
-    uint8_t  core_id;      // 0 or 1
-    uint8_t  padding;      // Alignment
-};
+    uint32_t timestamp_us;  // When it happened
+    uint8_t task_id;        // Which task
+    uint8_t type;           // Start or End
+    uint8_t core_id;        // 0 or 1
+    uint8_t padding;        // Alignment
+} __attribute__((packed));
 
 enum PlannerStatus : int32_t { // Changed to int32_t for alignment
     PLANNER_IDLE_MY_TYPE = 0,
@@ -249,8 +249,6 @@ enum MsgId : uint8_t {
   MSG_PATH = 1,       // PathMessage ESP1->ESP2
   MSG_POSE = 2,       // Pose2D ESP2->ESP1
 };
-
-#define MAX_INVALID_GOALS 10
 
 struct InvalidGoals {
     uint8_t size = 0;

@@ -135,7 +135,7 @@ PathMessage GlobalPlanner::generate_path(
             if (ws->closed[n_idx]) continue;
 
             // Obstacle check
-            if (get_cell_probability_snapshot(map, nx, ny) > FREE_BOUND_PROB) continue;
+            if (map.get_cell_probability(nx, ny) > FREE_BOUND_PROB) continue;
 
             // Additional cost for nearby obstacles
             // Wall Buffering (Simplified for 1D)

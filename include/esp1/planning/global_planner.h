@@ -54,6 +54,6 @@ public:
      */
     PathMessage generate_path(const Pose2D& current_pose,
                               const MissionGoal& goal,
-                              const OccupancyGridSnapshot& map,
+                              const BayesianOccupancyGrid& map,
                               GlobalPlannerWorkspace* ws);
 };
