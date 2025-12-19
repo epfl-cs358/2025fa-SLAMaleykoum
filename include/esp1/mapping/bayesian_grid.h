@@ -9,11 +9,6 @@
 #include "../../common/data_types.h"
 #include <stdint.h>
 
-// TODO: UPGRADE -> using a Hash Map (or a fast custom hash table)
-//      could be a V2/V3 upgrade to achieve virtually unlimited map size,
-//      as we would only pay for the explored space.
-// However, for now, keep it as a fixed-size map.
-
 /**
  * @brief Manages the occupancy map using Bayesian filtering.
  */

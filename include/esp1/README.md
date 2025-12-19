@@ -15,19 +15,14 @@ ESP-1 is responsible for the **global understanding** of the robot's environment
 - **Process**: Each raw point of 5 bytes is converted into a LiDAR point containing : an angle (in degrees), a distance (in millimeters), a quality (between 0 and 255).
 Then, we put all the points of a "scan" (which corresponds to a 360° turn of the LiDAR) into a `LiDARScan`, which contains each points, the count of the scan and a timestamp to know when the scan has been calculated.
 
-- **Output**: `LiDARScan` with a maximum of 100 points.
+- **Output**: `LiDARScan` with a maximum of 500 points.
 
 ## Mapping
 ### The Bayesian Grid :
 
-The **BayesianOccupancyGrid** class implements a 2D probabilistic occupancy grid used to build a persistent map of the environment from LiDAR data.
-Each grid cell stores a log-odds representation of the probability of being occupied, allowing robust incremental updates over time.
+The **BayesianOccupancyGrid** class implements a 2D log-odds occupancy grid for building a persistent map of the environment from LiDAR data on an ESP32.
 
-Each cell represents a square area of the world with a given metric resolution (meters per cell) and stores:
-- Low probability → free space
-- High probability → obstacle
-
-This module is designed to run on an ESP32, with strict memory and performance constraints.
+Each grid cell stores an **int8 log-odds** value, clamped between predefined bounds, representing the belief that the cell is occupied.
 
 **Bayesian Occupancy Grid Update**
 - **Input**:
@@ -35,45 +30,110 @@ This module is designed to run on an ESP32, with strict memory and performance c
      - The Global `Pose2D` of the car from ESP-2.
      - A full `LiDARScan` data (distances, angles and qualities).
 
-- **Process**: The **BayesianOccupancyGrid** module:
-     1. Uses the Global Pose to accurately determine the origin and orientation of the LiDAR scan in the global coordinate frame.
-     2. Grid borders are initialized as occupied in order to guarantee:
-     - Safe behavior for planners
-     - No out-of-bounds exploration
-     3. Applies a **Bresenham ray tracing** algorithm to project the LiDAR beams onto the grid. All traversed cells are converted to free cells.
-     4. Uses **Bayes' theorem** to probabilistically update the log-odds ratio of each cell being occupied, integrating certainty over time and smoothing out transient noise.
+- **Strict input validation**:
+     - Rejects NaN or infinite pose, angles, or coordinates
+     - Ensures bounded angle normalization
+     - Skips updates if the robot pose is outside valid grid bounds
 
-- **Output**: A grid of size `size_x × size_y` and of resolution `grid_resolution` (meters per cell). This grid is the dense, persistent map used by the Global Planner to find collision-free paths to the mission goal.
+- **Ray tracing**:
+     - Applies a Bresenham line algorithm from the robot position to the hit point
+     - Traversed cells are updated as free space
+     - The final hit cell is updated as occupied only if the measurement is within valid range
+
+- **Log-odds update**:
+     - Free cells: additive negative log-odds update
+     - Occupied cells: additive positive log-odds update
+     - Values are clamped to predefined minimum and maximum limits
+
+- **Real-time safety**:
+     - A watchdog aborts the update if processing exceeds a fixed time budget (100 ms)
+
+- **Output**: 
+     - A grid of size `size_x × size_y` and of resolution `grid_resolution` (meters per cell). This grid is the dense, persistent map used by the Global Planner to find collision-free paths to the mission goal.
 
 ## Planning
 ### Mission Planner :
-The Mission Manager module is responsible for:
-- **Finding the frontiers**: Selecting all the frontieres of the map. We begin by searching close to the robot and if nothing is found we extend the research to the whole map. These are the limits between what we have explored and what needs to be visited. Visually it corresponds to the white cells that have at least one gray cell as neighbour. 
+The **MissionPlanner** module selects high-level exploration goals based on the current Bayesian occupancy grid and robot state.
+It bridges the gap between mapping and global path planning.
 
-- **Goal Selection**: Finding the next region to explore depending on the frontieres. We regroup the ones that are close to each other in clusters using a BFS algorithm. Then we select the closest cluster that is big enough.
+- **Finding the frontiers**: 
+     - A **frontier** is defined as a free cell (`p ≤ FREE_BOUND_PROB`) that has at least one unknown neighbor (`FREE < p < OCC`).
+     - Frontier detection uses 4-connected neighbors.
+     - The planner first searches for frontiers near the robot, then expands to the full map if none are found.
 
-- **State Management**: Tracking the robot's current mode (`EXPLORATION_MODE` or `RETURN_HOME`). It is in `EXPLORATION_MODE` by default, and changes to return home when no more frontiers are left unexplored. Once in the `RETURN_HOME` mode it stays this way, unless it is changed manually via the `set_mission_state` function.
+- **Frontier Clustering**:
+     - Adjacent frontier cells are grouped into clusters using a BFS algorithm.
+     - Each cluster stores:
+          - Size
+          - Centroid
+          - First discovered frontier cell (fallback)
+     - Clusters smaller than `MIN_CLUSTER_SIZE` are discarded.
 
-It acts as the intermediary between the high-level system (Bayesian grid) and the low-level planner (A*).
+- **Goal Selection**: 
+     - Among valid clusters, the planner selects the closest sufficiently large cluster.
+     - If the cluster centroid lies in an unsafe or unknown cell, the planner falls back to the first frontier point.
+     - A safety padding step ensures the final goal is surrounded by free space, accounting for the robot’s physical radius
 
-- **Output**: `MissionGoal`, it is packaged with coordinates, defining the target for the `GlobalPlanner`.
+- **Safety and Validity Checks**:
+     - Goals are rejected if:
+          - They overlap occupied or unknown cells
+          - They violate robot clearance constraints
+          - They are listed in the invalid-goal blacklist
+     - The planner continuously verifies whether the current goal is still valid as the map evolves.
+
+- **Failure Handling and State Management**:
+     - The planner operates in two modes:
+          - `EXPLORATION_MODE` (default)
+          - `RETURN_HOME`
+     - If no valid frontiers are found:
+          - The planner waits and retries for a limited number of cycles
+          - A patience counter prevents premature failure at startup
+     - After repeated failures, the planner switches permanently to `RETURN_HOME`
+
+- **Output**:
+     - The planner outputs a MissionGoal, containing:
+     - Target pose (world coordinates)
+     - Mission type
+     - This goal is consumed by the GlobalPlanner for path computation.
 
 
 ### Global Planner :
 **D. GlobalPlanner (A\*)**
 
-The **GlobalPlanner** module computes a global, collision-free path on a Bayesian occupancy grid using the A* search algorithm.
-It is designed to be deterministic, memory-safe, and compatible with real-time constraints.
+The **GlobalPlanner** module computes a global, grid-based path on a Bayesian occupancy grid using a constrained A*-style search.
+It is designed to be deterministic, memory-safe, and suitable for real-time embedded systems.
 
 - **Input**: The `BayesianOccupancyGrid`, the `MissionGoal` (the target coordinates) and the `Pose2D` of the car. The `GlobalPlannerWorkspace` is a pre-allocated memory buffer that stores A* state.
 
-- **Process**: The robot pose and mission goal are converted from world coordinates to grid indices. The `GlobalPlanner` runs the **A\*** search algorithm on the grid, finding the shortest, collision-free route from the robot's current pose to the target.
-We've got two functions that we sum to know what is the better path to follow : 
-     - g(n) → accumulated path cost
-     - h(n) → Euclidean distance to the goal (admissible heuristic)
+- **Process**: 
+     1. Coordinate conversion
+          - Start and goal poses are converted from world coordinates to grid indices.
+          - Planning aborts if either lies outside the grid or on invalid cells.
+     2. A*-style search
+          - Search is performed on a 4-connected grid (no diagonal motion).
+          - Movement cost g(n) is uniform for each grid step.
+          - Heuristic h(n) is a weighted Manhattan distance, favoring straighter paths over strict optimality.
+          - The heuristic is intentionally non-admissible for faster convergence.
+     3. Collision and clearance handling
+          - Cells are rejected if occupied or unknown.
+          - Additional safety buffering is enforced: a cell is considered invalid if any of its 8 neighbors is occupied or unknown.
+          - This implicitly inflates obstacles to preserve clearance around walls.
+     4. Search limits
+          - The search enforces strict limits on:
+               - Maximum grid size
+               - Priority queue size
+               - Total A* iterations
+          - If any limit is exceeded, planning fails gracefully.
 
-- **Output**: A list of coordinates, packaged as a `PathMessage` (a vector of `Waypoint` structs).
-Note: The `GlobalPlanner` hands this path message to the UART Sender task on ESP-1.
+- **Path Reconstruction**:
+     - Parent indices are stored during search.
+     - The path is reconstructed from goal to start and reversed.
+     - If the full path exceeds `MAX_PATH_LENGTH`, it is downsampled while preserving start and end points.
+
+- **Output**: 
+     - A list of coordinates, packaged as a `PathMessage` (a vector of `Waypoint` structs).
+     - If no valid path is found, an empty path message is returned.
+     - The path is forwarded to the UART sender task on ESP-1.
 
 ---
 

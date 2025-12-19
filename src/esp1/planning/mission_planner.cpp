@@ -40,9 +40,7 @@ static bool is_point_safe(const BayesianOccupancyGrid& grid, int gx, int gy)
  */
 static bool is_frontier_cell(const BayesianOccupancyGrid& grid, int x, int y)
 {
-    // TODO: SAFETY CHECK
     // Check that the cell is in the map bounds
-
     if (grid.get_cell_probability(x, y) > FREE_BOUND_PROB) return false;
     
     // Check Neighbors for Unknowns
@@ -58,7 +56,11 @@ static bool is_frontier_cell(const BayesianOccupancyGrid& grid, int x, int y)
     return false;
 }
 
-//TODO: Check if this is actually an equality since grid world conversion.
+/**
+ * @brief determines if a point is in the invalid goals
+ * 
+ * @return true if the point is an invalid goal
+ */
 static bool invalid(int x, int y, InvalidGoals invalid_goals) {
     for (int i = 0; i < invalid_goals.size; ++i) {
         if (invalid_goals.lasts[i].x == x && invalid_goals.lasts[i].y == y) 
@@ -66,7 +68,6 @@ static bool invalid(int x, int y, InvalidGoals invalid_goals) {
     }
     return false;
 }
-
 
 // Helper to find a safe neighbor (surrounded by free space)
 static void get_safe_neighbor(const BayesianOccupancyGrid& grid, int& gx, int& gy) {
@@ -108,7 +109,7 @@ static void get_safe_neighbor(const BayesianOccupancyGrid& grid, int& gx, int& g
     // If no safe spot found, we keep original (better than nothing)
 }
 
-// ------------------------------------------------------------------------------------
+// END STATIC FUNCTIONS ------------------------------------------------------------------------------------
 
 MissionPlanner::MissionPlanner(const Pose2D& initial_home_pose) : home_pose_(initial_home_pose) {
     current_target_.target_pose = initial_home_pose;
@@ -174,7 +175,7 @@ void MissionPlanner::find_cluster(const BayesianOccupancyGrid& grid, int start_x
         static int dx8[8] = { 1,-1, 0, 0, 1, 1,-1,-1 };
         static int dy8[8] = { 0, 0, 1,-1, 1,-1, 1,-1 };
 
-        for(int k=0; k<8; k++){
+        for(int k = 0; k < 8; k++){
             int nx = current.x + dx8[k]; 
             int ny = current.y + dy8[k];
 
@@ -217,13 +218,13 @@ void MissionPlanner::search_for_candidates(const BayesianOccupancyGrid& grid,
 
 
 bool MissionPlanner::is_current_goal_valid(const Pose2D& robot_pose, const BayesianOccupancyGrid& grid) {
-    // 1. Check if reached
+    // Check if reached
     float dx = robot_pose.x - current_target_.target_pose.x;
     float dy = robot_pose.y - current_target_.target_pose.y;
     if ((dx*dx + dy*dy) < GOAL_REACHED * GOAL_REACHED) 
         return false; // Reached, so "invalid" (needs update)
     
-    // 2. Check Map Integrity
+    // Check Map Integrity
     int gx, gy;
     world_to_grid(current_target_.target_pose.x, current_target_.target_pose.y, 
                   gx, gy, grid.grid_resolution, grid.grid_size_x, grid.grid_size_y);
@@ -232,8 +233,7 @@ bool MissionPlanner::is_current_goal_valid(const Pose2D& robot_pose, const Bayes
     if (grid.get_cell_probability(gx, gy) > FREE_BOUND_PROB)
         return false;
 
-    // 3. Frontier Integrity
-    // Is it still relevant? (Are there unknown cells nearby?)
+    // Frontier Integrity
     // If the whole area is now explored/free, we should move on.
     bool still_frontier = false;
     for (int y = -2; y <= 2; y++) {
@@ -292,11 +292,9 @@ MissionGoal MissionPlanner::update_goal(const Pose2D& pose, const BayesianOccupa
         if (fail_count > PATIENCE_LIMIT) {
             current_target_.type = RETURN_HOME;
             current_target_.target_pose = home_pose_;
-            Serial.println("MPLAN: Patience exhausted -> Returning Home");
         } else {
             // Wait here.
             current_target_.target_pose = pose; 
-            Serial.printf("MPLAN: No frontiers found (%d/%d)\n", fail_count, PATIENCE_LIMIT);
         }
         return current_target_;
     }
@@ -335,7 +333,6 @@ MissionGoal MissionPlanner::update_goal(const Pose2D& pose, const BayesianOccupa
         if (grid.get_cell_probability(final_gx, final_gy) > FREE_BOUND_PROB) {
             final_gx = candidates[best_idx].first_x;
             final_gy = candidates[best_idx].first_y;
-            Serial.println("MPLAN: Centroid blocked, using first frontier point");
         }
 
         // Apply Safety Padding

@@ -206,7 +206,7 @@ void BayesianOccupancyGrid::update_map(const SyncedScan& lidar_scan)
             if (e2 < dx)  { err += dx; y += sy; }
         }
 
-        // --- UPDATE OCCUPIED CELL ---
+        // Update occupied cell
         // Only if it was a real hit (not max range)
         if (is_hit) {
             int idx = y_hit_grid * grid_size_x + x_hit_grid;
