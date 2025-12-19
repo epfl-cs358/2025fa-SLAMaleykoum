@@ -39,9 +39,7 @@ Main body layer where most hardware components (ESP boards, lidar, buck converte
 <p align="center">
   <img src="/assets/Images/CAD/body_cad_image.jpg" alt="Car Body" width="300"/>
 </p>
-<p align="center">
-  <img src="/assets/Images/CAD/body_real.jpg" alt="Car Body real-life photo" width="300"/>
-</p>
+
 
 
 
@@ -53,9 +51,7 @@ It also secures the battery in place.
 <p align="center">
   <img src="/assets/Images/CAD/roof_cad_image.jpg" alt="Roof" width="300"/>
 </p>
-<p align="center">
-  <img src="/assets/Images/CAD/roof_real.jpg" alt="Roof real-life photo" width="300"/>
-</p>
+
 
 
 

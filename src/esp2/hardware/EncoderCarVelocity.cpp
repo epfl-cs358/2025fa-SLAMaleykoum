@@ -31,7 +31,7 @@ bool EncoderCarVelocity::begin() {
 
 float EncoderCarVelocity::getFilteredAngularVelocity() {
 
-     static float emaVel = 0.0f;
+    static float emaVel = 0.0f;
     static float buffer[5] = {0};
     static int idx = 0;
 

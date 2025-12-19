@@ -21,21 +21,20 @@ void performMultiPointTurn() {
         //Start by moving backwards to have enough space to turn around without crashing into the wall
         servo_dir.setAngle(90);
         
-        //delay(100);
         uint32_t start = millis();
         while (millis() - start < 100) {}
         for (int i = 0; i < 10; i++) {
             motor.backward(0.25f);
             motor.update();
         }
-        //delay(300); 
+      
         start = millis();
         while (millis() - start < 300) {}
         for(int i = 0; i<3; i++){
             motor.stop();
             motor.update();
         }
-        //delay(200);
+       
         start = millis();
         while (millis() - start < 200) {}
         
@@ -47,12 +46,12 @@ void performMultiPointTurn() {
             servo_dir.setAngle(120);
             start = millis();
             while (millis() - start < 100) {}
-            //delay(100);
+    
             for (int i = 0; i < 8; i++) {
                 motor.backward(0.25f);
                 motor.update();
             }
-            //delay(300);
+            
             start = millis();
             while (millis() - start < 300) {}
 
@@ -61,7 +60,7 @@ void performMultiPointTurn() {
                 motor.stop();
                 motor.update();
             }
-            //delay(200);
+            
             start = millis();
             while (millis() - start < 200) {}
             
@@ -69,12 +68,12 @@ void performMultiPointTurn() {
             servo_dir.setAngle(60);
             start = millis();
             while (millis() - start < 100) {}
-            //delay(100);
+            
             for (int i = 0; i < 8; i++) {
                 motor.forward(0.17f);
                 motor.update();
             }
-            //delay(500);
+            
             start = millis();
             while (millis() - start < 500) {}
 
@@ -83,7 +82,7 @@ void performMultiPointTurn() {
                 motor.stop();
                 motor.update();
             }
-            //delay(200);
+            
             start = millis();
             while (millis() - start < 200) {}
         }
@@ -94,7 +93,7 @@ void performMultiPointTurn() {
             motor.stop();
             motor.update();
         }
-        //delay(200);
+        
         uint32_t start1 = millis();
         while (millis() - start1 < 200) {}
         

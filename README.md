@@ -45,21 +45,21 @@ Here is our original [Project proposal](https://www.overleaf.com/9942875199zgzbk
 ## Hardware Overview
 
 ### Component List
+| Component                              | Reference Links                                                                                                                                                                                                 | Price (CHF) |
+|----------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------|
+| Tamiya Blitzer Beetle                  | [Manual](https://www.tamiyausa.com/media/files/58502ml-829-5367.pdf)                                                                                                                                             | 129.00      |
+| RPLIDAR C1                             | [Datasheet](https://d229kd5ey79jzj.cloudfront.net/3157/SLAMTEC_rplidar_datasheet_C1_v1.0_en.pdf), [SDK](https://github.com/Slamtec/rplidar_sdk), [Wiki](https://www.waveshare.com/wiki/RPLIDAR_C1)              | 79.90       |
+| ESP32-S3-WROOM-1 Microcontroller (x2)  | [Datasheet](https://cdn-shop.adafruit.com/product-files/5477/esp32-s3_datasheet_en.pdf)                                                                                                                         | 50.90       |
+| DMS15 Servo                            | [Wiki](https://wiki.dfrobot.com/DSS-M15S_270%C2%B0_15KG_DF_Metal_Servo_with_Analog_Feedback_SKU__SER0044)                                                                                                         | 5.00        |
+| BNO086 IMU                             | [Datasheet](https://docs.sparkfun.com/SparkFun_VR_IMU_Breakout_BNO086_QWIIC/assets/component_documentation/BNO080_085-Datasheet_v1.16.pdf)                                                                      | 19.90       |
+| AS5600 Encoder                         | [Datasheet](https://files.seeedstudio.com/wiki/Grove-12-bit-Magnetic-Rotary-Position-Sensor-AS5600/res/Magnetic%20Rotary%20Position%20Sensor%20AS5600%20Datasheet.pdf)                                          | 2.00        |
+| HC-SR04 Ultrasonic Sensor              | [Datasheet](https://handsontec.com/dataspecs/sensor/SR-04-Ultrasonic.pdf)                                                                                                                                       | 2.00        |
+| 540J Motor                             | [Datasheet](https://asset.conrad.com/media10/add/160267/c1/-/en/001385115DS01/adatlap-1385115-540-es-motor-reely-532114c.pdf)                                                                                   | —           |
+| THW-1060-RTR ESC                       | [Datasheet](https://www.hobbywing.com/en/uploads/file/20221015/f60b7ebe160a7b283927ae8916d36763.pdf)                                                                                                            | —           |
+| LM2596 Buck Converter                  | [Datasheet](https://www.ti.com/lit/ds/symlink/lm2596.pdf)                                                                                                                                                       | —           |
+| 7.2V Battery                           | [Product Page](https://www.galaxus.ch/fr/s5/product/gens-ace-modelisme-dune-batterie-720-v-5000-mah-batterie-rc-9459930)                                                                                        | 32.90       |
+| **Total Cost**                         |                                                                                                                                                                                                                 | **321.60**  |
 
-| Component                     | Reference Links                                                                                                                                                                                                 | Buy Link                                                                                                                                                                                                 | Price (CHF) |
-|-------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------|
-| Tamiya Blitzer Beetle         | [Manual](https://www.tamiyausa.com/media/files/58502ml-829-5367.pdf)                                                                                                                                             | [Galaxus](https://www.galaxus.ch/fr/s5/product/tamiya-blitzer-beetle-kit-rc-vehicle-12900000)                                                                                                           | 129.00      |
-| RPLIDAR C1                    | [Datasheet](https://d229kd5ey79jzj.cloudfront.net/3157/SLAMTEC_rplidar_datasheet_C1_v1.0_en.pdf), [SDK](https://github.com/Slamtec/rplidar_sdk), [Wiki](https://www.waveshare.com/wiki/RPLIDAR_C1)              | [Bastelgarage](https://www.bastelgarage.ch/rplidar-c1-12m-scanner-lidar-laser-360-degres)                                                                                                               | 79.90       |
-| ESP32-S3-WROOM-1 Microcontroller (x2) | [Datasheet](https://cdn-shop.adafruit.com/product-files/5477/esp32-s3_datasheet_en.pdf)                                                                                                                        | [Galaxus](https://www.galaxus.ch/en/s1/product/espressif-esp32-s3-devkitm-1-n8-development-board-development-boards-kits-24505914)                                                                     | 25.45 ×2    |
-| DMS15 Servo                   | [Wiki](https://wiki.dfrobot.com/DSS-M15S_270%C2%B0_15KG_DF_Metal_Servo_with_Analog_Feedback_SKU__SER0044)                                                                                                      | —                                                                                                                                                                                                       | 5.00           |
-| BNO086 IMU                    | [Datasheet](https://docs.sparkfun.com/SparkFun_VR_IMU_Breakout_BNO086_QWIIC/assets/component_documentation/BNO080_085-Datasheet_v1.16.pdf)                                                                     | [Bastelgarage](https://www.bastelgarage.ch/bno055-capteur-intelligent-a-9-axes?search=9dof)                                                                                                             | 19.90       |
-| AS5600 Encoder                | [Datasheet](https://files.seeedstudio.com/wiki/Grove-12-bit-Magnetic-Rotary-Position-Sensor-AS5600/res/Magnetic%20Rotary%20Position%20Sensor%20AS5600%20Datasheet.pdf)                                         | —                                                                                                                                                                                                       | 2.00       |
-| HC-SR04 Ultrasonic sensor     | [Datasheet](https://handsontec.com/dataspecs/sensor/SR-04-Ultrasonic.pdf)                                                                                                                                    | —                                                                                                                                                                                                       | 2.00           |
-| 540J Motor                    | [Datasheet](https://asset.conrad.com/media10/add/160267/c1/-/en/001385115DS01/adatlap-1385115-540-es-motor-reely-532114c.pdf)                                                                                  | —                                                                                                                                                                                                       | —           |
-| THW-1060-RTR ESC              | [Datasheet](https://www.hobbywing.com/en/uploads/file/20221015/f60b7ebe160a7b283927ae8916d36763.pdf)                                                                                                           | —                                                                                                                                                                                                       | —           |
-| LM2596 Buck converter         | [Datasheet](https://www.ti.com/lit/ds/symlink/lm2596.pdf)                                                                                                                                                      | —                                                                                                                                                                                                       | —           |
-| 7.2V Battery                  | [Product Page](https://www.galaxus.ch/fr/s5/product/gens-ace-modelisme-dune-batterie-720-v-5000-mah-batterie-rc-9459930)                                                                                       | [Galaxus](https://www.galaxus.ch/fr/s5/product/gens-ace-modelisme-dune-batterie-720-v-5000-mah-batterie-rc-9459930)                                                                                      | 32.90       |
-| **Total Cost**                |                                                                                                                                                                                                                |                                                                                                                                                                                                         | **321.6**   |
 
 
 Alongside the listed components, you will also need:
@@ -70,7 +70,6 @@ Alongside the listed components, you will also need:
 - Hot air/heat gun (for shrinking tubing)
 - Screw set (M3 and M6 as used in mounts)
 
-# //TODO: @Cléa should we do a separate readme for this ?
 
 ### How to Assemble
 
@@ -83,6 +82,7 @@ We only need the minimal mechanical build so the car can drive, skip the decorat
 - Ensure the servo cables are routed through the rectangular opening so they can later connect to the ESP.  
 
 <p align="center"><img src="/assets/Images/tamiya blitzer chassis.jpg" alt="Chassis" width="200"/></p>
+
 **Step 2: Encoder Mount + Magnet**  
 - 3D‑print the encoder mount (CAD file available in /assets/CAD/).  
 - Attach the mount in front of the motor.  
@@ -133,7 +133,7 @@ We only need the minimal mechanical build so the car can drive, skip the decorat
 
 <p align="center"><img src="/assets/Images/Photoshoot/IMG_2668.jpg" alt="Side view open" width="200"/></p>
 
----
+
 
 ### Soldering & Wiring
 
@@ -182,7 +182,7 @@ This folder contains:
 For detailed descriptions, images, and design notes, see the dedicated CAD documentation: 
 [CAD README](assets/CAD/README.md)
 
-Here is a quick video of the car's body and roof :
+Here is a quick video of the car's body and roof : [CAD Video ](/assets/CAD/fast_cad_video.mp4)
 
 <p align="center">
   <video width="500" controls>
@@ -328,13 +328,13 @@ If you encounter issues, check the list below before reaching out.
 
 | Problem | Possible Cause | Solution |
 | :--- | :--- | :--- |
-| **Map has "fuzzy" walls** | The environment might contain windows, or reflective surfaces, maybe even the obstacles are too thin or the walls have wholes in them (mesh / fence) | Since the lidar can't correctly detect those kinds of objects, try mapping something else |
+| **Map has "fuzzy" walls** | The environment might contain windows, or reflective surfaces, maybe even the obstacles are too thin or the walls have holes in them (mesh / fence) | Since the lidar can't correctly detect those kinds of objects, try mapping something else |
 | **Wifi doesn't appear** | You can not flasht the ESP32 from the left port, hence the code was never uploaded OR you might have uploaded the code of the ESP2 on the ESP1, it happens way too often | Flash the ESPs again, with their respective code on their RIGHT port (In our setup, it's the center ports, since the esp1 is upside-down) |
-| **Wheels turn, car doesn't moove** | The motor doesn't get any power | The ESC must be switched on imidiatly after connecting the battery |
+| **Wheels turn, car doesn't move** | The motor doesn't get any power | The ESC must be switched on immediately after connecting the battery |
 | **ESP doesn't initialize or crashes often** | Cables might have come loose | Double check the pin connections |
 | **ESP keeps crashing** | Battery might be to low | Check the battery level, charge it |
 | **Map is not displaying but python code is up** | Incoherent map sizes | Double check the values in the `ground_station.py` file and the rest of the code, for the size of the map (grid size) and their max bounds are the same |
-| **ESP1 crashes imidiately** | The map size is too big | Reduce the map size. Note: The max nb of cells we managed to run with is 70x70 but if the real world size is not enough, you can increase the `RESOLUTION` value which will increase what each cell represents in the real world |
+| **ESP1 crashes immediately** | The map size is too big | Reduce the map size. Note: The max nb of cells we managed to run with is 70x70 but if the real world size is not enough, you can increase the `RESOLUTION` value which will increase what each cell represents in the real world |
 
 ## Problems and Recommendations
 
@@ -396,13 +396,17 @@ If you encounter issues, check the list below before reaching out.
 - **Encoder jitter**: noisy tick timing from electrical/mechanical issues degraded velocity estimation.  
   **Fix**: used AS5600 library for error handling.  
   **Recommendation**: sample encoder at high, consistent rates; fuse with IMU data; consider wheel‑mounted encoder for higher resolution.
+  
 
-- **Motor PID control**: stock THW‑1060 ESC only allowed discrete throttle steps, preventing smooth PID control.  
+- **Motor PID control**: stock THW‑1060 ESC only allowed discrete throttle steps, preventing smooth PID control so we were't able to implement it.  
   **Recommendation**: replace with IBT‑4 (BTS7960) for smooth PWM and closed‑loop speed control.
 
 - **IMU acceleration**: drift and bias made acceleration unreliable for odometry/EKF fusion.        
   **Fix**: acceleration was deprioritized in favor of encoder-based velocity estimation.        
   **Recommendation**: perform proper IMU calibration, apply bias estimation and low-pass filtering, and rely more heavily on gyroscope + encoder fusion rather than raw acceleration.
+- **Odometry**: When trying to estimate the car's position at higher speeds, due to the lack of smooth incrementations, the values become wrong and the car can no longer locate itself 
+  **Fix**: no fixes, we just give the car a constant slow speed which is one of its slowest ones.  
+  **Recommendation**: Review if the issue is because the odo,etry task isn't being computed fast enough or if there are jitters related to encoder and imu readings.
 
 
 
