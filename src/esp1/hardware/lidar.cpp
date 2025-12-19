@@ -7,6 +7,8 @@
  * 
  *  @job: Run the raw data through Feature Extraction to create a
  *        simplified version of the scan.
+ * 
+ *  FIXED: Corrected scan completion logic to prevent duplicate data
  */
 
 #include "esp1/hardware/lidar.h"
@@ -27,24 +29,13 @@ bool Lidar::start()
 {
 	serial.setRxBufferSize(LIDAR_SERIAL_BUFFER_SIZE);
     serial.begin(LIDAR_BAUDRATE, SERIAL_8N1, LIDAR_RX_PIN, LIDAR_TX_PIN);
-
-    // Reset the device
 	serial.write(req_message[rq_reset], 2);
 	delay(1000);
-    
-    // Clear serial buffer
-    while(serial.available()) // read as long the hardware buffer is not empty
-    {
-        serial.read();
-    }
-
-    // Start scan
-    serial.write((uint8_t*) &req_message[rq_scan], 2); // standard scan request
+    while(serial.available()) serial.read();
+    serial.write((uint8_t*) &req_message[rq_scan], 2);
 
 	rp_descriptor_t descr;
-
-	if(!checkForTimeout(5000, 7)) // wait for response
-	{
+	if(!checkForTimeout(5000, 7)) {
 		serial.readBytes((uint8_t*) &descr, 7);
         return compareDescriptor(descr, resp_descriptor[startScan]);
 	}
@@ -53,9 +44,7 @@ bool Lidar::start()
 
 uint16_t Lidar::readMeasurePoints()
 {
-	uint16_t count=0;
-	count=awaitStandardScan();
-	return count;
+	return awaitStandardScan();
 }
 
 uint16_t Lidar::awaitStandardScan()
@@ -117,32 +106,45 @@ float Lidar::calcDistance(uint8_t _lowByte, uint8_t _highByte)
 }
 
 void Lidar::build_scan(LiDARScan* scan, bool &scanComplete_, float& lastAngleESP_) {
-	if (scanComplete_) {
-		scan->count = 0;
-	}
+    // Read raw packets
+    uint16_t raw_count = this->readMeasurePoints();
 
-    // read lidar data
-    uint16_t count = this->readMeasurePoints();
-
-    for (uint16_t i = 0; i < MIN(count, MAX_LIDAR_POINTS) && !scanComplete_; i++) {
+    // Loop through raw data
+    for (uint16_t i = 0; i < raw_count; i++) {
+        if (scanComplete_) break;
+        
         rawScanDataPoint_t dataPoint = this->DataBuffer[i];
 
-        uint16_t dist_mm = this->calcDistance(dataPoint.distance_low, dataPoint.distance_high);
-        if (dist_mm <= 0) continue;
-        uint16_t angle_deg = this->calcAngle(dataPoint.angle_low, dataPoint.angle_high);
+        // Standard RPLIDAR Logic: Distance 0 usually means error/invalid
+        float dist_mm = this->calcDistance(dataPoint.distance_low, dataPoint.distance_high);
+        if (dist_mm == 0.0f) continue; 
+        
+        float angle_deg = this->calcAngle(dataPoint.angle_low, dataPoint.angle_high);
         uint8_t quality = dataPoint.quality >> 2;
 
-        // Store in buffer
-        scan->angles[scan->count] = angle_deg;
-        scan->distances[scan->count] = dist_mm;
-        scan->qualities[scan->count] = quality;
-		scan->count++;
+        // Skip very low quality points if necessary (e.g., quality < 10)
+        // But for now, we keep them to see "everything"
+        if (quality == 0) continue; 
 
-        if (angle_deg < lastAngleESP_) {
+        if (scan->count < MAX_LIDAR_POINTS) {
+            scan->angles[scan->count] = angle_deg;
+            scan->distances[scan->count] = dist_mm;
+            scan->qualities[scan->count] = quality;
+            scan->count++;
+        } else {
+            scanComplete_ = true;
+            break;
+        }
+
+        // Detect full rotation (360 -> 0 wrap)
+        // Using strict hysteresis to avoid triggering on jitter around 0
+        if (angle_deg < lastAngleESP_ - 20.0f && lastAngleESP_ > 340.0f) {
             scanComplete_ = true;
         }
+        
         lastAngleESP_ = angle_deg;
     }
+    
     scan->timestamp_ms = millis();
 }
 
@@ -152,6 +154,7 @@ bool Lidar::checkForTimeout(uint32_t _time, size_t _size)
 	float startTime = millis();
 	while(!(serial.available() >= _size))
 	{
+        vTaskDelay(1); // FIX: Yield here too
 		if(millis() > (startTime + _time)){
 			Serial.println("Lidar Timeout");
 			return true;

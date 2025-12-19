@@ -5,6 +5,8 @@ import numpy as np
 import math
 import time
 import sys
+import csv
+from datetime import datetime
 
 # =============================================================================
 # CONFIGURATION & CONSTANTS
@@ -17,8 +19,8 @@ PORT = 9000
 # Map & Rendering Settings
 GRID_W = 70        # Width of the grid in cells
 GRID_H = 70        # Height of the grid in cells
-RESOLUTION = 0.2   # Size of one cell in meters (5cm)
-WINDOW_SCALE = 15  # Scale factor for the display window
+RESOLUTION = 0.15   # Size of one cell in meters (5cm)
+WINDOW_SCALE = 13  # Scale factor for the display window
 
 # Colors (RGB Tuples)
 C_BLACK  = (0, 0, 0)        # Occupied cell (Wall)
@@ -28,6 +30,23 @@ C_RED    = (255, 50, 50)    # Robot Position
 C_GREEN  = (50, 255, 50)    # Current Navigation Goal
 C_YELLOW = (255, 200, 0)    # Planned Path & HUD Text
 C_CYAN   = (0, 255, 255)    # Detected Frontier Points
+
+# Task Colors for Timeline
+TASK_COLORS = {
+    1: (180, 0, 255),   # LIDAR (Purple)
+    2: (0, 0, 255),     # SYNC (Blue)
+    3: (255, 165, 0),   # MAP (Orange)
+    4: (0, 255, 255),   # IPC (Cyan)
+    5: (255, 255, 0),   # GPLAN (Yellow)
+    6: (255, 0, 0),     # MPLAN (Red)
+    7: (128, 128, 128), # TCP (Grey)
+    8: (0, 255, 0)      # VALIDATOR (Green)
+}
+
+TASK_NAMES = {
+    0: "IDLE", 1: "LIDAR", 2: "SYNC", 3: "MAP",
+    4: "IPC", 5: "GPLAN", 6: "MPLAN", 7: "TCP", 8: "VALID"
+}
 
 # =============================================================================
 # HELPER FUNCTIONS: COORDINATE TRANSFORMS
@@ -139,16 +158,128 @@ def find_frontiers_python(grid):
     return frontiers
 
 # =============================================================================
+# TIMELINE VISUALIZER CLASS
+# =============================================================================
+
+class Timeline:
+    def __init__(self, x, y, w, h):
+        self.rect = pygame.Rect(x, y, w, h)
+        self.history = [] # List of dicts: {'start', 'end', 'core', 'id'}
+        self.active_tasks = {} # Key: task_id, Value: start_time
+        self.max_history_us = 1000000 # Show last 1 second of data
+        self.font = pygame.font.SysFont("Arial", 11)
+        
+    def add_events(self, events):
+        """
+        Process trace events: list of (timestamp_us, task_id, event_type, core_id)
+        event_type: 1=START, 0=END
+        """
+        for ts, tid, typ, core in events:
+            if typ == 1: # START
+                self.active_tasks[tid] = ts
+            elif typ == 0: # END
+                if tid in self.active_tasks:
+                    start = self.active_tasks.pop(tid)
+                    duration = ts - start
+                    # Filter outliers (duration must be positive and reasonable)
+                    if 0 < duration < 5000000:
+                        self.history.append({
+                            'start': start, 
+                            'end': ts, 
+                            'core': core, 
+                            'id': tid
+                        })
+
+        # Prune old history (keep only last max_history_us worth of data)
+        if self.history:
+            self.history.sort(key=lambda x: x['end'])
+            latest = self.history[-1]['end']
+            limit = latest - self.max_history_us
+            self.history = [e for e in self.history if e['end'] > limit]
+
+    def draw(self, surface):
+        """Draw the timeline visualization"""
+        # Background
+        pygame.draw.rect(surface, (20, 20, 20), self.rect)
+        pygame.draw.rect(surface, (255, 255, 255), self.rect, 2) # Border
+
+        # Core Separator Line
+        mid_y = self.rect.centery
+        pygame.draw.line(surface, (100, 100, 100), 
+                        (self.rect.left, mid_y), 
+                        (self.rect.right, mid_y))
+        
+        # Core Labels
+        core0_label = self.font.render("CORE 0 (Comms/Plan)", True, (200, 200, 200))
+        core1_label = self.font.render("CORE 1 (Sensors)", True, (200, 200, 200))
+        surface.blit(core0_label, (self.rect.left + 5, self.rect.top + 5))
+        surface.blit(core1_label, (self.rect.left + 5, mid_y + 5))
+
+        if not self.history: 
+            return
+
+        latest_time = self.history[-1]['end']
+        # Scale: pixels per microsecond
+        scale = self.rect.width / float(self.max_history_us)
+        
+        for e in self.history:
+            # Calculate position relative to the right edge (latest time)
+            time_ago = latest_time - e['end']
+            duration = e['end'] - e['start']
+            
+            width = max(2, duration * scale)
+            x_end = self.rect.right - (time_ago * scale)
+            x_start = x_end - width
+            
+            # Skip if off-screen left
+            if x_end < self.rect.left: 
+                continue
+
+            # Determine Y position based on Core
+            row_height = (self.rect.height / 2) - 25
+            if e['core'] == 0:
+                y = self.rect.top + 25
+            else:
+                y = mid_y + 25
+            
+            col = TASK_COLORS.get(e['id'], (255, 255, 255))
+            
+            # Draw Task Block
+            task_rect = pygame.Rect(x_start, y, width, row_height)
+            
+            # Clip to timeline view
+            draw_rect = task_rect.clip(self.rect)
+            if draw_rect.width > 0:
+                pygame.draw.rect(surface, col, draw_rect)
+
+# =============================================================================
 # MAIN
 # =============================================================================
 def main():
+    # CSV Logging
+    log_filename = "telemetry_trace.csv"
+    print(f"Logging trace data to: {log_filename}")
+    csv_file = open(log_filename, 'w', newline='')
+    csv_writer = csv.writer(csv_file)
+    csv_writer.writerow(["Timestamp_PC", "ESP_Time_us", "Task_ID", "Core", "Event_Type"])
+
     # --- Pygame Setup ---
     pygame.init()
-    screen = pygame.display.set_mode((GRID_W * WINDOW_SCALE, GRID_H * WINDOW_SCALE))
-    pygame.display.set_caption("ESP32 Mission Control")
-    font = pygame.font.SysFont("Consolas", 16, bold=True)
     
-    trail_surface = pygame.Surface((GRID_W * WINDOW_SCALE, GRID_H * WINDOW_SCALE), pygame.SRCALPHA)
+    # Increase window height for timeline
+    timeline_height = 150
+    screen_height = GRID_H * WINDOW_SCALE + timeline_height
+    screen = pygame.display.set_mode((GRID_W * WINDOW_SCALE, screen_height))
+    pygame.display.set_caption("ESP32 Mission Control + Timeline")
+    
+    font = pygame.font.SysFont("Consolas", 16, bold=True)
+    small_font = pygame.font.SysFont("Consolas", 12)
+    
+    trail_surface = pygame.Surface((GRID_W * WINDOW_SCALE, GRID_H * WINDOW_SCALE), 
+                                   pygame.SRCALPHA)
+
+    # Create Timeline at bottom of screen
+    timeline = Timeline(0, GRID_H * WINDOW_SCALE, GRID_W * WINDOW_SCALE, timeline_height)
 
     # --- Network Connection ---
     client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -159,6 +290,7 @@ def main():
         print("Connected!")
     except Exception as e: 
         print(f"Connection Failed: {e}")
+        csv_file.close()
         return
 
     rx_buffer = b''
@@ -179,13 +311,18 @@ def main():
     map_surface = None
     detected_frontiers = [] 
 
+    # Performance tracking
+    last_packet_time = time.time()
+    packets_received = 0
+
     running = True
     while running:
         for event in pygame.event.get():
-            if event.type == pygame.QUIT: running = False
+            if event.type == pygame.QUIT: 
+                running = False
             if event.type == pygame.KEYDOWN and event.key == pygame.K_c:
                 history_trail = []
-                trail_surface.fill((0,0,0,0))
+                trail_surface.fill((0, 0, 0, 0))
 
         try:
             chunk = client.recv(65536)
@@ -204,16 +341,29 @@ def main():
                 
                 if len(rx_buffer) < HEADER_SIZE: break
                 
-                # Read Sizes
+                # Read Sizes from header
                 map_bytes_size = struct.unpack('<I', rx_buffer[2:6])[0]
                 global_len = struct.unpack('<H', rx_buffer[6:8])[0]
                 
-                total_packet_size = HEADER_SIZE + (global_len * 8) + map_bytes_size
+                # NEW: Read trace count (comes right after header)
+                if len(rx_buffer) < HEADER_SIZE + 2: break
+                trace_count = struct.unpack('<H', rx_buffer[HEADER_SIZE:HEADER_SIZE+2])[0]
+                
+                # Calculate total packet size
+                # Header(96) + TraceCount(2) + Path + Map + TraceEvents
+                trace_bytes = trace_count * 8  # 8 bytes per event
+                total_packet_size = HEADER_SIZE + 2 + (global_len * 8) + map_bytes_size + trace_bytes
 
                 if len(rx_buffer) < total_packet_size: break 
                 
                 packet = rx_buffer[:total_packet_size]
                 rx_buffer = rx_buffer[total_packet_size:] 
+                packets_received += 1
+
+                # Track packet timing
+                now = time.time()
+                packet_interval_ms = (now - last_packet_time) * 1000.0
+                last_packet_time = now
 
                 # --- DECODING ---
                 
@@ -223,11 +373,13 @@ def main():
                 
                 robot_state_idx = packet[32] 
                 
+                # Health Data
                 try:
-                    health_data = packet[33:33+32]
-                    h_free, h_min, t_map, t_gplan, t_mplan, s_tcp, s_gplan, s_mplan, s_lidar, t_esp2 = struct.unpack('<IIIIIHHHHI', health_data)
+                    health_data = packet[33:33+64]  # Updated to 64 bytes
+                    h_free, h_min, t_map, t_gplan, t_mplan, s_tcp, s_gplan, s_mplan, s_lidar, t_esp2 = \
+                        struct.unpack('<IIIIIHHHHI', health_data[:32])
                 except:
-                    print("Packet size mismatch")
+                    print("Health data decode error")
                     continue
 
                 car_pose = {'x': cx, 'y': cy, 'theta': ct}
@@ -240,9 +392,9 @@ def main():
                     pt = world_to_screen(cx, cy)
                     if pt: pygame.draw.circle(trail_surface, (0, 150, 255, 50), pt, 4)
 
-                # Path
-                offset = HEADER_SIZE
-                path_payload = packet[offset : offset + (global_len * 8)]
+                # Path (comes after trace count)
+                path_offset = HEADER_SIZE + 2
+                path_payload = packet[path_offset : path_offset + (global_len * 8)]
                 path_points = []
                 for i in range(global_len):
                     px, py = struct.unpack('<ff', path_payload[i*8 : (i+1)*8])
@@ -250,7 +402,8 @@ def main():
 
                 # Map
                 if map_bytes_size > 0:
-                    map_payload = packet[HEADER_SIZE + (global_len * 8) :]
+                    map_offset = path_offset + (global_len * 8)
+                    map_payload = packet[map_offset : map_offset + map_bytes_size]
                     rle_data = np.frombuffer(map_payload, dtype=np.uint8)
                     try:
                         grid_log_odds = rle_decode(rle_data, GRID_W * GRID_H).reshape((GRID_H, GRID_W))
@@ -265,27 +418,55 @@ def main():
                         rgb_map[unk_mask] = C_GREY
                         
                         surf = pygame.surfarray.make_surface(np.transpose(rgb_map, (1, 0, 2)))
-                        map_surface = pygame.transform.scale(surf, (GRID_W * WINDOW_SCALE, GRID_H * WINDOW_SCALE))
+                        map_surface = pygame.transform.scale(surf, 
+                                                            (GRID_W * WINDOW_SCALE, 
+                                                             GRID_H * WINDOW_SCALE))
                         
                         detected_frontiers = find_frontiers_python(grid_log_odds)
 
-                    except Exception as e: print(f"Map Error: {e}")
+                    except Exception as e: 
+                        print(f"Map Error: {e}")
+
+                # NEW: Decode Trace Events
+                trace_offset = HEADER_SIZE + 2 + (global_len * 8) + map_bytes_size
+                trace_payload = packet[trace_offset : trace_offset + trace_bytes]
+                
+                parsed_events = []
+                for i in range(trace_count):
+                    event_bytes = trace_payload[i*8 : (i+1)*8]
+                    # Format: uint32 timestamp, uint8 task_id, uint8 type, uint8 core, uint8 padding
+                    ts, tid, typ, core, _ = struct.unpack('<IBBBB', event_bytes)
+                    parsed_events.append((ts, tid, typ, core))
+                    
+                    # Log to CSV
+                    csv_writer.writerow([now, ts, tid, core, typ])
+                
+                # Add events to timeline
+                if parsed_events:
+                    timeline.add_events(parsed_events)
 
             # --- RENDERING ---
             screen.fill(C_GREY)
-            if map_surface: screen.blit(map_surface, (0, 0))
             
+            # 1. Map
+            if map_surface: 
+                screen.blit(map_surface, (0, 0))
+            
+            # 2. Frontiers
             for fx, fy in detected_frontiers:
                 fpt = world_to_screen(fx, fy)
                 if fpt: pygame.draw.circle(screen, C_CYAN, fpt, 2)
 
-            screen.blit(trail_surface, (0,0))
+            # 3. Trail
+            screen.blit(trail_surface, (0, 0))
             
+            # 4. Path
             pts_screen = [world_to_screen(p[0], p[1]) for p in path_points]
             valid_pts = [p for p in pts_screen if p is not None]
-            for pt in valid_pts: pygame.draw.circle(screen, C_YELLOW, pt, 3)
+            for pt in valid_pts: 
+                pygame.draw.circle(screen, C_YELLOW, pt, 3)
 
-            # Goal
+            # 5. Goal
             gx_s, gy_s = world_to_screen(goal_pose['x'], goal_pose['y'])
             if gx_s:
                 pygame.draw.circle(screen, C_GREEN, (gx_s, gy_s), 8, 2) 
@@ -293,7 +474,7 @@ def main():
                 ge_y = gy_s - 20 * math.cos(goal_pose['theta'])
                 pygame.draw.line(screen, C_GREEN, (gx_s, gy_s), (ge_x, ge_y), 2)
 
-            # Robot
+            # 6. Robot
             cx_s, cy_s = world_to_screen(car_pose['x'], car_pose['y'])
             if cx_s:
                 pygame.draw.circle(screen, C_RED, (cx_s, cy_s), 7)
@@ -301,8 +482,35 @@ def main():
                 ce_y = cy_s - 20 * (math.cos(car_pose['theta']))
                 pygame.draw.line(screen, C_RED, (cx_s, cy_s), (ce_x, ce_y), 3)
 
-            # HUD
+            # 7. Timeline
+            timeline.draw(screen)
+
+            # 8. Task Legend (below timeline)
+            legend_y = GRID_H * WINDOW_SCALE + 5
+            legend_x = 10
+            for tid, name in TASK_NAMES.items():
+                if tid == 0: continue  # Skip IDLE
+                col = TASK_COLORS.get(tid, (255, 255, 255))
+                pygame.draw.rect(screen, col, (legend_x, legend_y, 12, 12))
+                screen.blit(small_font.render(name, True, (200, 200, 200)), 
+                           (legend_x + 16, legend_y - 2))
+                legend_x += 70
+
+            # 9. HUD (Performance Stats)
             state_str = STATE_NAMES.get(robot_state_idx, "UNKNOWN")
+            
+            # DIAGNOSTIC: Extract extended health data
+            try:
+                if len(health_data) >= 64:
+                    extended_health = struct.unpack('<IIIIIIIIIIIIIIII', health_data)
+                    lidar_rx = extended_health[10] if len(extended_health) > 10 else 0
+                    map_updates = extended_health[11] if len(extended_health) > 11 else 0
+                    sync_drops = extended_health[12] if len(extended_health) > 12 else 0
+                    mutex_fails = extended_health[13] if len(extended_health) > 13 else 0
+                else:
+                    lidar_rx = map_updates = sync_drops = mutex_fails = 0
+            except:
+                lidar_rx = map_updates = sync_drops = mutex_fails = 0
             
             status_lines = [
                 f"POS   : X{car_pose['x']:5.2f} Y{car_pose['y']:5.2f}",
@@ -312,104 +520,37 @@ def main():
                 f"MAP UPDATE : {t_map}",
                 f"GLOB PLAN  : {t_gplan}",
                 f"MISS PLAN  : {t_mplan}",
+                f"--- CORE 1 DIAG ---",
+                f"LIDAR RX  : {lidar_rx}",
+                f"MAP UPDT  : {map_updates}",
+                f"SYNC DROP : {sync_drops}",
+                f"MTX FAIL  : {mutex_fails}",
                 f"--- MEM (KB) ---",
-                f"FREE HEAP  : {h_free / 1024:.1f} KB",
-                f"MIN HEAP   : {h_min / 1024:.1f} KB",
-                f"--- STACKS (Bytes) ---",
-                f"TCP : {s_tcp}  GPL : {s_gplan}",
-                f"MPL : {s_mplan}  LID : {s_lidar}",
-                f"ESP2 LINK: {t_esp2} ms ago"
+                f"FREE HEAP : {h_free / 1024:.1f} KB",
+                f"MIN HEAP  : {h_min / 1024:.1f} KB",
+                f"--- STACKS ---",
+                f"TCP:{s_tcp} GP:{s_gplan} MP:{s_mplan} LI:{s_lidar}",
+                f"ESP2:{t_esp2}ms PKT:{packets_received}",
+                f"TRACE: {trace_count} events",
             ]
 
-            # --- LOGGING SECTION ---
-
-            # --- 1. CONFIGURATION & THRESHOLDS ---
-            # CPU Time (microseconds) - High is Bad
-            WARN_MAP, CRIT_MAP     = 3000, 10000
-            WARN_GPLAN, CRIT_GPLAN = 8000, 50000
-            WARN_MPLAN, CRIT_MPLAN = 5000, 20000
-
-            # Heap Memory (Bytes) - Low is Bad
-            # Note: 10KB is dangerously low for ESP32 with WiFi
-            WARN_HEAP, CRIT_HEAP   = 20000, 10000  
-
-            # Stack High Water Mark (Bytes) - Low is Bad
-            # If this hits < 200, a stack overflow is imminent
-            WARN_STACK, CRIT_STACK = 1000, 300 
-
-            # ESP2 Link Latency (ms) - High is Bad
-            WARN_LINK, CRIT_LINK   = 200, 2000
-
-            # --- 2. COLORS ---
-            C_RST_l = "\033[0m"
-            C_RED_l = "\033[91m"
-            C_YEL_l = "\033[93m"
-            C_GRN_l = "\033[92m"
-            C_GRY_l = "\033[90m"
-            C_CYN_l = "\033[96m"
-
-            # Helper: Determines color based on value vs thresholds
-            def col(val, warn, crit, inverse=False):
-                if inverse: # For Memory/Stacks (Lower is Worse)
-                    return C_RED_l if val < crit else (C_YEL_l if val < warn else C_GRN_l)
-                else:       # For Time/Latency (Higher is Worse)
-                    return C_RED_l if val > crit else (C_YEL_l if val > warn else C_GRN_l)
-
-            # --- 3. FORMATTING DATA ---
-
-            # A. State & Position (Cyan/Grey)
-            # Shorten state to 3 chars to save space: EXP, RET, IDL
-            st_short = state_str[:3].upper() 
-            pos_str = f"{C_CYN_l}[{st_short}]{C_RST_l} {car_pose['x']:>5.1f},{car_pose['y']:>5.1f}"
-
-            # B. Performance (us)
-            c_map = col(t_map, WARN_MAP, CRIT_MAP)
-            c_gpl = col(t_gplan, WARN_GPLAN, CRIT_GPLAN)
-            c_mpl = col(t_mplan, WARN_MPLAN, CRIT_MPLAN)
-            perf_str = f"M{c_map}{t_map:>5}{C_RST_l} G{c_gpl}{t_gplan:>5}{C_RST_l} P{c_mpl}{t_mplan:>5}{C_RST_l}"
-
-            # C. Heap (KB) - Using Min Heap is often more useful for leak detection
-            h_min_kb = h_min / 1024.0
-            c_heap = col(h_min, WARN_HEAP, CRIT_HEAP, inverse=True)
-            mem_str = f"H_Min{c_heap}{h_min_kb:>5.1f}k{C_RST_l}"
-
-            # D. Stacks (Bytes) - The "Canary in the coal mine"
-            # We abbreviate: TCP, GPL (Global), MPL (Mission), LID (Lidar)
-            c_stcp = col(s_tcp, WARN_STACK, CRIT_STACK, inverse=True)
-            c_sgpl = col(s_gplan, WARN_STACK, CRIT_STACK, inverse=True)
-            c_smpl = col(s_mplan, WARN_STACK, CRIT_STACK, inverse=True)
-            c_slid = col(s_lidar, WARN_STACK, CRIT_STACK, inverse=True)
-            
-            stk_str = (f"Stk:{C_GRY_l}T{C_RST_l}{c_stcp}{s_tcp:>4}{C_RST_l} "
-                       f"{C_GRY_l}G{C_RST_l}{c_sgpl}{s_gplan:>4}{C_RST_l} "
-                       f"{C_GRY_l}M{C_RST_l}{c_smpl}{s_mplan:>4}{C_RST_l} "
-                       f"{C_GRY_l}L{C_RST_l}{c_slid}{s_lidar:>4}{C_RST_l}")
-
-            # E. Link Age (ms)
-            # Assuming t_esp2 is a timestamp from ESP. 
-            # If t_esp2 represents "ms since boot when packet arrived", 
-            # we might just want to display the raw value to see if it freezes.
-            # OR if t_esp2 is "ms ago", use that. 
-            # Based on your previous code, let's assume t_esp2 is "Time since last packet"
-            # If t_esp2 is actually a timestamp, you need: age = current_esp_time - t_esp2
-            # Let's just print the raw value you sent for now.
-            c_link = col(t_esp2, WARN_LINK, CRIT_LINK)
-            link_str = f"Lnk{c_link}{t_esp2:>4}ms{C_RST_l}"
-
-            # --- 4. FINAL PRINT ---
-            # Using | separators for clarity
-            print(f"{pos_str} | {perf_str} | {mem_str} | {stk_str} | {link_str}")
-            # --- END LOGGING SECTION ---
-
+            # Draw HUD with shadow
             for i, line in enumerate(status_lines):
                 screen.blit(font.render(line, True, C_BLACK), (12, 12 + i * 20))
                 screen.blit(font.render(line, True, C_YELLOW), (10, 10 + i * 20))
 
             pygame.display.flip()
 
-        except socket.timeout: pass 
-        except Exception as e: print(e); break
+        except socket.timeout: 
+            pass 
+        except Exception as e: 
+            print(f"Error: {e}")
+            break
 
-    client.close(); pygame.quit()
+    csv_file.close()
+    client.close()
+    pygame.quit()
+    print(f"\nSession complete. Log saved to: {log_filename}")
 
-if __name__ == "__main__": main()
+if __name__ == "__main__": 
+    main()

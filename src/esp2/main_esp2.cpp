@@ -73,7 +73,7 @@ void setup() {
     // digitalWrite(LED_BUILTIN, LOW); // Turn off built-in LED
 
     // --- FreeRTOS Tasks Creation ---
-    xTaskCreatePinnedToCore(TaskReceivePath,            "RX_Path",      6144, NULL, 3, &receiveTask,    0);
+    xTaskCreatePinnedToCore(TaskReceivePath,            "RX_Path",       6144, NULL, 3, &receiveTask,    0);
     xTaskCreatePinnedToCore(TaskOdometryUnified_Stable, "Odom",         10240, NULL, 3, &odomTask,       0);
     xTaskCreatePinnedToCore(TaskMotor,                  "Motor",         6144, NULL, 2, &motorTask,      1); 
     xTaskCreatePinnedToCore(TaskUltrasonic,             "Ultrasonic",    6144, NULL, 2, &ultrasonicTask, 1); 

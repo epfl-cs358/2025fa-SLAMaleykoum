@@ -7,7 +7,7 @@ GlobalPlanner::GlobalPlanner() {}
 PathMessage GlobalPlanner::generate_path(
     const Pose2D& current_pose,
     const MissionGoal& goal,
-    const OccupancyGridSnapshot& map,
+    const BayesianOccupancyGrid& map,
     GlobalPlannerWorkspace* ws
 )
 {  
@@ -102,19 +102,13 @@ PathMessage GlobalPlanner::generate_path(
 
     bool found = false;
     int loop_counter = 0;
+    
+    // Add iteration limit to prevent extremely long searches
+    const int MAX_ITERATIONS = 10000;
 
     // Main A* Loop
-    while (ws->pq_size > 0) {
-
+    while (ws->pq_size > 0 && loop_counter < MAX_ITERATIONS) {
         loop_counter++;
-
-        if (loop_counter % 20 == 0) {
-            taskYIELD();
-        }
-
-        if (loop_counter % 500 == 0) {
-            vTaskDelay(pdMS_TO_TICKS(1)); // Sleep for 1 tick (allows OS to breathe)
-        }
 
         GlobalPlannerWorkspace::Node cur = pq_pop();
         int c_idx = cur.idx;
@@ -153,9 +147,7 @@ PathMessage GlobalPlanner::generate_path(
                     int bx = nx + buf_x;
                     int by = ny + buf_y;
                     if (bx >= 0 && bx < W && by >= 0 && by < H) {
-                         // Note: get_cell_probability handles 1D conversion internally usually, 
-                         // but here we use (x,y) API of the map class.
-                         if (get_cell_probability_snapshot(map, bx, by) > FREE_BOUND_PROB) {
+                         if (map.get_cell_probability(bx, by) > FREE_BOUND_PROB) {
                              too_close = true; buf_y = 2; break; // Break outer loop
                          }
                     }
@@ -172,10 +164,16 @@ PathMessage GlobalPlanner::generate_path(
                 ws->parent_index[n_idx] = (int16_t)c_idx; // Store 1D index
                 
                 // Euclidean Heuristic
-                float dist = 2 * (abs(gx - nx) + abs(gy - ny)); // Weighted to favor straight paths
+                float dist = 1.3 * (abs(gx - nx) + abs(gy - ny)); // Weighted to favor straight paths
                 pq_push((int16_t)n_idx, new_g + dist);
             }
         }
+    }
+
+    // Check if we exceeded iteration limit
+    if (loop_counter >= MAX_ITERATIONS) {
+        Serial.printf("A* search exceeded %d iterations - path too complex\n", MAX_ITERATIONS);
+        return msg;  // Return empty path
     }
 
     if (!found) return msg;

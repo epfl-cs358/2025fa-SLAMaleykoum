@@ -136,7 +136,7 @@ def plot_gantt(filename):
     ax0.set_ylabel("Task", fontsize=12)
     ax0.set_ylim(3.5, 8.5)
     ax0.set_yticks([4, 5, 6, 7, 8])
-    # ax0.set_yticklabels([TASK_NAMES.get(i, str(i)) for i in [4,5,6,7,8]])
+    ax0.set_yticklabels([TASK_NAMES.get(i, str(i)) for i in [4,5,6,7,8]])
     ax0.grid(True, which='both', axis='x', linestyle='--', alpha=0.3)
     ax0.set_xlim(df['Rel_Time_ms'].min(), df['Rel_Time_ms'].max())
 
@@ -146,7 +146,7 @@ def plot_gantt(filename):
     ax1.set_xlabel("Time (ms since start of capture)", fontsize=12)
     ax1.set_ylim(0.5, 3.5)
     ax1.set_yticks([1, 2, 3])
-    # ax1.set_yticklabels([TASK_NAMES.get(i, str(i)) for i in [1,2,3]])
+    ax1.set_yticklabels([TASK_NAMES.get(i, str(i)) for i in [1,2,3]])
     ax1.grid(True, which='both', axis='x', linestyle='--', alpha=0.3)
     ax1.set_xlim(df['Rel_Time_ms'].min(), df['Rel_Time_ms'].max())
 

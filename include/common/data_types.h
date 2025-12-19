@@ -78,13 +78,14 @@ struct SystemHealth {
     uint32_t stack_min_mplan;
     uint32_t stack_min_lidar;
     
-    uint32_t lidar_frames_processed; 
-    uint32_t map_frames_processed;   
-    uint32_t planner_fail_count;     
-    
-    int32_t  last_planner_status;
-    uint32_t queue_load_percent;
-    uint32_t last_esp2_packet_ms;
+    // Connectivity
+    uint32_t last_esp2_packet_ms; // Time since last packet from ESP2
+
+    // Diag counts
+    uint32_t lidar_frames_processed;
+    uint32_t map_frames_processed;
+    uint32_t planner_fail_count;
+    uint32_t last_planner_status;
 };
 
 #pragma pack(pop)
@@ -249,15 +250,9 @@ enum MsgId : uint8_t {
   MSG_POSE = 2,       // Pose2D ESP2->ESP1
 };
 
-struct InvalidGoals {
-    Pose2D lasts[MAX_INVALID_GOALS];
-    uint8_t size;
-};
+#define MAX_INVALID_GOALS 10
 
-// --- BAYESIAN GRID SNAPSHOT ---
-struct OccupancyGridSnapshot {
-    float grid_resolution;
-    uint16_t grid_size_x;
-    uint16_t grid_size_y;
-    int8_t* log_odds; // buffer OWNED par le snapshot
+struct InvalidGoals {
+    uint8_t size = 0;
+    Pose2D lasts[MAX_INVALID_GOALS];
 };
