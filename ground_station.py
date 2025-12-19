@@ -19,7 +19,7 @@ PORT = 9000
 # Map & Rendering Settings
 GRID_W = 70        # Width of the grid in cells
 GRID_H = 70        # Height of the grid in cells
-RESOLUTION = 0.2   # Size of one cell in meters (5cm)
+RESOLUTION = 0.1   # Size of one cell in meters (5cm)
 WINDOW_SCALE = 13  # Scale factor for the display window
 
 # Colors (RGB Tuples)

@@ -55,7 +55,7 @@ SemaphoreHandle_t Token_Path_Planner; // Start with 0
 // --- GLOBAL OBJECTS ---
 const int GRID_SIZE_X = 70;
 const int GRID_SIZE_Y = 70;
-const float RESOLUTION = 0.2f;
+const float RESOLUTION = 0.1f;
 
 const uint32_t RLE_BUFFER_SIZE = 10000;
 
@@ -175,15 +175,19 @@ void IPC_Receive_Task(void* parameter) {
             if (xSemaphoreTake(Pose_Mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
                 float x_diff = incoming_pose.x -  last_known_pose.x;
                 float y_diff = incoming_pose.y -  last_known_pose.y;
-                float theta_diff = incoming_pose.theta * incoming_pose.theta - last_known_pose.theta * last_known_pose.theta;
+                float theta_diff = incoming_pose.theta - last_known_pose.theta;
                 if (((x_diff) * (x_diff) + (y_diff) * (y_diff)) > 1.0f) {
                     // Discard obviously wrong pose
                     xSemaphoreGive(Pose_Mutex);
                     continue;
                 }
-                if (theta_diff * theta_diff > 0.25) {
+                // Normalize to [-π, π]
+                while (theta_diff > M_PI) theta_diff -= 2.0f * M_PI;
+                while (theta_diff < -M_PI) theta_diff += 2.0f * M_PI;
+
+                if (fabsf(theta_diff) > 0.25f) {  // Max 28.6° per update
                     xSemaphoreGive(Pose_Mutex);
-                    continue;
+                continue;
                 }
                 last_known_pose = incoming_pose;
                 sys_health.last_esp2_packet_ms = millis(); 
@@ -435,7 +439,7 @@ void Global_Planner_Task(void* parameter) {
         xSemaphoreGive(Token_Goal_Planner);
         
         // Give it a second to run
-        vTaskDelay(pdMS_TO_TICKS(1000)); 
+        vTaskDelay(pdMS_TO_TICKS(1500)); 
     }
 }
 
