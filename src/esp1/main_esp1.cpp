@@ -55,7 +55,7 @@ SemaphoreHandle_t Token_Path_Planner; // Start with 0
 // --- GLOBAL OBJECTS ---
 const int GRID_SIZE_X = 70;
 const int GRID_SIZE_Y = 70;
-const float RESOLUTION = 0.1f;
+const float RESOLUTION = 0.15f;
 
 const uint32_t RLE_BUFFER_SIZE = 10000;
 
