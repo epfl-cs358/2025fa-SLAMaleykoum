@@ -53,7 +53,7 @@ void setup() {
 
     if (!servo_dir.begin()) { Serial.println("Servo init failed!"); while (true); }
     else { Serial.println("Servo initialized"); }
-    servo_dir.setAngle(90);
+    servo_dir.setAngle(Config::STRAIGHT_ANGLE);
     
     if (!ultrasonic.begin()) { Serial.println("WARNING: US init failed"); } 
     else { Serial.println("Ultra Sonic initialized"); }

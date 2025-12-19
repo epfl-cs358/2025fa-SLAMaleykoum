@@ -29,7 +29,6 @@ public:
      */
     MotionCommand compute_command(const Pose2D& current_pose, const Velocity& vel);
 
-    // TODO: Do we actually need this???? Seems useless since we shouldn't ever "finish" a path...
     /**
      * @brief Check if the end of the path has been reached.
      */

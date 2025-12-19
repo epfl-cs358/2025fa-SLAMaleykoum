@@ -27,7 +27,7 @@ void TaskMotor(void *pvParameters) {
             //recoveryTriggered = true;
 
             motor.stop();
-            servo_dir.setAngle(90);
+            servo_dir.setAngle(Config::STRAIGHT_ANGLE);
 
             isPerformingCreneau = true;
             Control::performMultiPointTurn();
@@ -50,7 +50,7 @@ void TaskMotor(void *pvParameters) {
             motor.forward(Config::MOTOR_POWER_DRIVE);
         } else {
             motor.stop();
-            servo_dir.setAngle(90);
+            servo_dir.setAngle(Config::STRAIGHT_ANGLE);
         }
 
         motor.update();

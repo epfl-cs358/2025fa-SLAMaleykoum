@@ -29,31 +29,6 @@ bool EncoderCarVelocity::begin() {
     return true;
 }
 
-float EncoderCarVelocity::getFilteredAngularVelocity() {
-
-    static float emaVel = 0.0f;
-    static float buffer[5] = {0};
-    static int idx = 0;
-
-    const float alpha = 0.02f;
-
-    // Update EMA
-    float rawVel = getMotorAngularVelocity();
-    emaVel = alpha * rawVel + (1 - alpha) * emaVel;
-
-    // Update buffer
-    buffer[idx] = emaVel;
-    idx = (idx + 1) % 5;
-
-
-    // Compute small moving average
-    float sum = 0;
-    for (int i = 0; i < 5; i++) sum += buffer[i];
-
-
-    return sum / 5.0f;
-}
-
 float EncoderCarVelocity::getDistance() {
 
     int32_t current = as5600.getCumulativePosition();

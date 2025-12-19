@@ -71,69 +71,10 @@ Alongside the listed components, you will also need:
 - Screw set (M3 and M6 as used in mounts)
 
 
-### How to Assemble
+### How to Assemble the Robot
+The robot is built on a Tamiya Blitzer Beetle chassis with custom 3D‑printed mounts for the LiDAR, ESP32 boards, encoder, ultrasonic sensor, and battery. Assembly is straightforward: build the base chassis, install the encoder and magnet on the motor shaft, mount the electronics platform, attach the sensors, and finish with wiring.
 
-To begin, assemble the mechanical base of the car following the official [Tamiya Blitzer Beetle manual](https://www.tamiyausa.com/media/files/58502ml-829-5367.pdf).
-We only need the minimal mechanical build so the car can drive, skip the decorative carcass.
-
-**Step 1: Build the Car**  
-- Assemble the chassis according to the manual.  
-- Mount the steering servo inside the chassis.  
-- Ensure the servo cables are routed through the rectangular opening so they can later connect to the ESP.  
-
-<p align="center"><img src="/assets/Images/tamiya blitzer chassis.jpg" alt="Chassis" width="200"/></p>
-
-**Step 2: Encoder Mount + Magnet**  
-- 3D‑print the encoder mount (CAD file available in /assets/CAD/).  
-- Attach the mount in front of the motor.  
-- Fix the encoder magnet directly onto the motor shaft as shown in the provided image.  
-- This ensures accurate rotation measurement.  
-- Then screw down the encoder on its mount.
-
-<p align="center"><img src="/assets/Images/Photoshoot/IMG_2678.jpg" alt="Encoder + Magnet" width="200"/></p>
-
-**Step 3: Layer Platform (ESP + Lidar Holder)**  
-- Place the 3D‑printed platform on the chassis.  
-- This platform integrates holders for both ESP boards and the lidar.  
-- Screw the lidar onto its holder first (space is tight, so it’s easier to mount before other components).  
-- Then screw down the buck converter and IMU onto their designated spots.  
-
-
-<p align="center"><img src="/assets/Images/Photoshoot/IMG_2671.jpg" alt="Lidar" width="200"/></p>
-
-**Step 4: Mount the ESP Boards**  
-- Place ESP1 and ESP2 onto the platform.  
-*Improovement note: mount both microcontrollers facing **upwards** so their LEDs and reset buttons are visible.*
-- Our current ESP1 faces down, which hides the LEDs and complicates troubleshooting.  
-
-
-<p align="center"><img src="/assets/Images/circuit_images/IMG_2675.jpg" alt="ESPs" width="200"/></p>
-
-**Step 5: Ultrasonic Sensor Mount**  
-- Attach the front 3D‑printed piece designed for the ultrasonic sensor at the front of the car.  
-- Screw the sensor securely into the mount.  
-
-<p align="center"><img src="/assets/Images/Photoshoot/IMG_2674.jpg" alt="Ultrasonic mount" width="200"/></p>
-<p align="center"><img src="/assets/Images/Photoshoot/IMG_2673.jpg" alt="Ultrasonic mount" width="200"/></p>
-
-**Step 6: Final Assembly**  
-- Place the hood/top of the car back on.  
-- Insert the battery into its dedicated slot the hood design holds it firmly and stabilizes it during motion.  
-- Double‑check that all mounts are secure and cables are routed cleanly for wiring.  
-
-<p align="center"><img src="/assets/Images/Photoshoot/IMG_2669.jpg" alt="Front open view" width="200"/></p>
-<p align="center"><img src="assets/Images/Photoshoot/IMG_2666.jpg" alt="Front closed" width="200"/></p>
-<p align="center"><img src="assets/Images/Photoshoot/IMG_2667.jpg" alt="Back with battery" width="200"/></p>
-
-
-**Step 7: Wiring**  
-- Once the mechanical build is complete, proceed to the [Soldering & Wiring](#soldering--wiring) section.  
-- Follow the circuit [diagram](/assets/circuit/slamaleykoum_electrical_circuit.drawio.png) for all connections.  
-
-
-<p align="center"><img src="/assets/Images/Photoshoot/IMG_2668.jpg" alt="Side view open" width="200"/></p>
-
-
+[Full step‑by‑step assembly guide (with photos, CAD files, wiring diagrams)](/assets/docs/hardware/ASSEMBLE_GUIDE.md )
 
 ### Soldering & Wiring
 
@@ -143,7 +84,7 @@ Use heat shrink tubing to insulate exposed connections and ensure long-term reli
 **Electrical Diagram**
 
 <p align="center">
-  <img src="/assets/circuit/slamaleykoum_electrical_circuit.drawio.png" alt="Electrical Circuit" width="1100"/>
+  <img src="/assets/docs/hardware/circuit/slamaleykoum_electrical_circuit.drawio.png" alt="Electrical Circuit" width="1100"/>
 </p>
 
 **⚠️ Important Wiring Notes (Do Not Skip)**
@@ -169,24 +110,18 @@ Use heat shrink tubing to insulate exposed connections and ensure long-term reli
 
 **Detailed Wiring & Soldering Guide**
 
-For step-by-step soldering instructions, connector types, power distribution details, and close-up photos, see : [Detailed wiring explaination ](/assets/circuit/README.md)
+For step-by-step soldering instructions, connector types, power distribution details, and close-up photos, see : [Detailed wiring explaination ](/assets/docs/hardware/circuit/README.md)
 
 
 ### CAD Files
 
 You can explore all STL files directly in the [CAD folder](/assets/CAD).  
 
-This folder contains:
-- STL files for every custom part
-- Preview images of the CAD designs
-For detailed descriptions, images, and design notes, see the dedicated CAD documentation: 
-[CAD README](assets/CAD/README.md)
-
-Here is a quick video of the car's body and roof : [CAD Video ](/assets/CAD/fast_cad_video.mp4)
+Here is a quick video of the car's body and roof : [CAD Video ](/assets/docs/hardware/CAD/fast_cad_video.mp4)
 
 <p align="center">
   <video width="500" controls>
-    <source src="assets/CAD/fast_cad_video.mp4" type="video/mp4">
+    <source src="assets/docs/hardware/CAD/fast_cad_video.mp4" type="video/mp4">
   </video>
 </p>
 
@@ -391,24 +326,38 @@ If you encounter issues, check the list below before reaching out.
 
 ### ESP2
 
+
 #### Hardware :
+  - **Encoder jitter**: The encoder produced noisy tick timing due to electrical noise, slight mechanical misalignment, and (before switching connectors) intermittent contact. This caused unstable velocity estimates, especially at higher speeds.
 
-- **Encoder jitter**: noisy tick timing from electrical/mechanical issues degraded velocity estimation.  
-  **Fix**: used AS5600 library for error handling.  
-  **Recommendation**: sample encoder at high, consistent rates; fuse with IMU data; consider wheel‑mounted encoder for higher resolution.
-  
+    **Fix**: The AS5600 library (Rob Tillaart) was used to reject obviously invalid readings. While it does not smooth data, it prevented major miscalculations and improved low‑speed velocity estimation.
 
-- **Motor PID control**: stock THW‑1060 ESC only allowed discrete throttle steps, preventing smooth PID control so we were't able to implement it.  
-  **Recommendation**: replace with IBT‑4 (BTS7960) for smooth PWM and closed‑loop speed control.
+    **Recommendation**: sample encoder at high, consistent rates; Use screw terminal blocks. Consider a wheel‑mounted encoder for higher effective resolution (gearbox ratio ≈ 1:10 reduces motor‑shaft resolution at the wheel).
 
-- **IMU acceleration**: drift and bias made acceleration unreliable for odometry/EKF fusion.        
-  **Fix**: acceleration was deprioritized in favor of encoder-based velocity estimation.        
-  **Recommendation**: perform proper IMU calibration, apply bias estimation and low-pass filtering, and rely more heavily on gyroscope + encoder fusion rather than raw acceleration.
-- **Odometry**: When trying to estimate the car's position at higher speeds, due to the lack of smooth incrementations, the values become wrong and the car can no longer locate itself 
-  **Fix**: no fixes, we just give the car a constant slow speed which is one of its slowest ones.  
-  **Recommendation**: Review if the issue is because the odo,etry task isn't being computed fast enough or if there are jitters related to encoder and imu readings.
+  - **Motor PID control not feasable**:The stock THW‑1060‑RTR ESC only provides discrete throttle steps. Small PWM changes often produced no     speed change, then suddenly jumped to a higher speed. This made PID velocity control impossible, hence the controller oscillated and never converged.
 
+    **Fix**: PID control was abandoned; the car was operated at a constant low throttle.
 
+    **Recommendation**: Replace the ESC with an IBT‑4 (BTS7960) motor driver for smooth PWM.
+
+  - **IMU acceleration Unreliable for Odometry and EFK**: drift and bias made acceleration unreliable for odometry/EKF fusion.        
+
+    **Fix**: acceleration was deprioritized in favor of encoder-based velocity estimation. 
+
+    **Recommendation**: perform proper IMU calibration, apply bias estimation and low-pass filtering, and rely more heavily on gyroscope + encoder fusion rather than raw acceleration.
+
+#### Software
+  - **Odometry Breakdown at Higher Speeds**: At higher speeds, the combination of encoder jitter, IMU drift, and discrete ESC   throttle steps caused odometry to diverge. The car eventually lost track of its position.
+
+    **Fix**: No full fix was possible with the existing hardware. The car was limited to one of its slowest stable speeds.
+
+    **Recommendation**: Verify whether the odometry task is running fast enough and with high priority.
+
+  - **IMU Yaw Jump Filtering**: The IMU occasionally produced sudden yaw jumps, which corrupted the estimated pose sent to ESP1 and affected how the bayesian map was built.
+
+    **Fix**: A yaw‑stability filter was implemented: ESP2 only stores and transmits its position if the yaw change is ≤ 15° between updates. This prevented corrupted odometry packets from polluting the global map.
+    
+    **Recommendation**: Always include sanity checks on IMU orientation.
 
 ## Archives
 The purpose of this directory is to save our previous work, and keep track of the tests we made.

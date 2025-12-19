@@ -1,7 +1,7 @@
 # SLAM Car Electrical Diagram
 
 <p align="center">
-  <img src="/assets/circuit/slamaleykoum_electrical_circuit.drawio.png" alt="Electrical Circuit" width="1000"/>
+  <img src="/assets/docs/hardware/circuit/slamaleykoum_electrical_circuit.drawio.png" alt="Electrical Circuit" width="1000"/>
 </p>
 
 
@@ -26,7 +26,7 @@ The colors mostly match the real car wiring, with a few adjustments made for cla
   Connect the black wire to the converter’s VIN (–) and the red wire to VIN (+).
 
 <p align="center">
-  <img src="\assets\Images\circuit_images\battery_buck_esc_soldering.jpeg" alt="Battery power split" width="200"/>
+  <img src="/assets/Images/circuit_images/battery_buck_esc_soldering.jpeg" alt="Battery power split" width="200"/>
 </p>
 
 - **Motor Driver / ESC**:  
@@ -61,7 +61,7 @@ Both the encoder and the IMU are powered by the **3V3 pin of ESP2**, using two c
 
 - **Encoder**:  
   - Use 3‑pin and 4‑pin screw terminal blocks soldered to the encoder.  
-  - Power the encoder through its **VCC** pin using a cable screwed into the terminal block and connected to the **3V3 pin of ESP2** via a female connector (see [diagram](/assets/circuit/slamaleykoum_electrical_circuit.drawio.png)).  
+  - Power the encoder through its **VCC** pin using a cable screwed into the terminal block and connected to the **3V3 pin of ESP2** via a female connector (see [diagram](/assets/docs/hardware/circuit/slamaleykoum_electrical_circuit.drawio.png)).  
   - Ground (GND) is connected to the buck converter’s ground harness as described above.
 
 <p align="center">
@@ -69,13 +69,13 @@ Both the encoder and the IMU are powered by the **3V3 pin of ESP2**, using two c
 </p>
 
 - **IMU**:  
-  - Powered from the **3V3 pin of ESP2**, using a male connector on the IMU side and a female connector to ESP2 (see [diagram](/assets/circuit/slamaleykoum_electrical_circuit.drawio.png)).  
+  - Powered from the **3V3 pin of ESP2**, using a male connector on the IMU side and a female connector to ESP2 (see [diagram](/assets/docs/hardware/circuit/slamaleykoum_electrical_circuit.drawio.png)).  
   - Ground (GND) is connected via a male connector on the IMU and a female connector on ESP2, both tied into the buck converter’s ground harness as described above.
 
 #### Data Connections
 
 - **Both ESPs**  
-  - Communication via UART: connect pin 12 of ESP1 to pin 13 of ESP2, and pin 13 of ESP1 to pin 12 of ESP2 (light pink and blue cables on the [diagram](/assets/circuit/slamaleykoum_electrical_circuit.drawio.png)).
+  - Communication via UART: connect pin 12 of ESP1 to pin 13 of ESP2, and pin 13 of ESP1 to pin 12 of ESP2 (light pink and blue cables on the [diagram](/assets/docs/hardware/circuit/slamaleykoum_electrical_circuit.drawio.png)).
 
 <p align="center">
   <img src="/assets/Images/circuit_images/IMG_2675.jpg" alt="Both ESPs with their respective cables" width="200"/>
@@ -83,25 +83,25 @@ Both the encoder and the IMU are powered by the **3V3 pin of ESP2**, using two c
 
 - **ESP1**  
   - **Lidar**  
-    - **TX**: male‑to‑female cable connected to pin 4 on ESP2 (green cable on [diagram](/assets/circuit/slamaleykoum_electrical_circuit.drawio.png)).  
-    - **RX**: male‑to‑female cable connected to pin 5 on ESP2 (yellow cable on [diagram](/assets/circuit/slamaleykoum_electrical_circuit.drawio.png)).
+    - **TX**: male‑to‑female cable connected to pin 4 on ESP2 (green cable on [diagram](/assets/docs/hardware/circuit/slamaleykoum_electrical_circuit.drawio.png)).  
+    - **RX**: male‑to‑female cable connected to pin 5 on ESP2 (yellow cable on [diagram](/assets/docs/hardware/circuit/slamaleykoum_electrical_circuit.drawio.png)).
 
 - **ESP2**  
   - **Motor Driver**  
-    - **PWM**: male‑to‑female cable connected to pin 15 on ESP2 (grey cable on [diagram](/assets/circuit/slamaleykoum_electrical_circuit.drawio.png)).  
+    - **PWM**: male‑to‑female cable connected to pin 15 on ESP2 (grey cable on [diagram](/assets/docs/hardware/circuit/slamaleykoum_electrical_circuit.drawio.png)).  
 
   - **Servo**  
-    - **Pulse**: male‑to‑female cable connected to pin 6 on ESP2 (orange cable on [diagram](/assets/circuit/slamaleykoum_electrical_circuit.drawio.png)).  
+    - **Pulse**: male‑to‑female cable connected to pin 6 on ESP2 (orange cable on [diagram](/assets/docs/hardware/circuit/slamaleykoum_electrical_circuit.drawio.png)).  
 
   - **Encoder**  
-    - **DIR**: male‑to‑female cable connected to GND on ESP2 (yellow cable on [diagram](/assets/circuit/slamaleykoum_electrical_circuit.drawio.png)).  
+    - **DIR**: male‑to‑female cable connected to GND on ESP2 (yellow cable on [diagram](/assets/docs/hardware/circuit/slamaleykoum_electrical_circuit.drawio.png)).  
 
   - **IMU**  
-    - **INT**: male‑to‑female cable connected to pin 4 on ESP2 (black cable on [diagram](/assets/circuit/slamaleykoum_electrical_circuit.drawio.png)).  
+    - **INT**: male‑to‑female cable connected to pin 4 on ESP2 (black cable on [diagram](/assets/docs/hardware/circuit/slamaleykoum_electrical_circuit.drawio.png)).  
 
   - **I²C Bus (shared between Encoder & IMU)**  
-    - **SDA**: two male cables (encoder + IMU) soldered together into a female connector, attached to pin 8 on ESP2 (purple cable on [diagram](/assets/circuit/slamaleykoum_electrical_circuit.drawio.png)).  
-    - **SCL**: two male cables (encoder + IMU) soldered together into a female connector, attached to pin 9 on ESP2 (green cable on [diagram](/assets/circuit/slamaleykoum_electrical_circuit.drawio.png)).
+    - **SDA**: two male cables (encoder + IMU) soldered together into a female connector, attached to pin 8 on ESP2 (purple cable on [diagram](/assets/docs/hardware/circuit/slamaleykoum_electrical_circuit.drawio.png)).  
+    - **SCL**: two male cables (encoder + IMU) soldered together into a female connector, attached to pin 9 on ESP2 (green cable on [diagram](/assets/docs/hardware/circuit/slamaleykoum_electrical_circuit.drawio.png)).
   - **Ultrasonic Sensor (HC‑SR04) — Voltage Divider on Echo Pin**  
     - The HC‑SR04 must be powered at **5V** (from the buck converter).  
     - Its **ECHO pin outputs 5V**, which is too high for the ESP32’s 3.3V GPIO.  
@@ -116,7 +116,7 @@ Both the encoder and the IMU are powered by the **3V3 pin of ESP2**, using two c
       - **Result**: the divider steps the 5V ECHO signal down to ~3.3V, safe for the ESP32.
 
     - ***Summary:***  
-      - **Trig**: male‑to‑female cable connected directly to **ESP2 pin 5** (green cable on [diagram](/assets/circuit/slamaleykoum_electrical_circuit.drawio.png)).  
+      - **Trig**: male‑to‑female cable connected directly to **ESP2 pin 5** (green cable on [diagram](/assets/docs/hardware/circuit/slamaleykoum_electrical_circuit.drawio.png)).  
       - **Echo**: routed through the resistor voltage divider before reaching **ESP2 pin 19** (female connector).
 <p align="center">
   <img src="/assets/Images/circuit_images/IMG_2672.jpg" alt="Ultra sonic cables" width="200"/>

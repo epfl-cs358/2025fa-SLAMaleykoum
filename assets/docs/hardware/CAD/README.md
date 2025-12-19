@@ -3,8 +3,6 @@
 This folder contains the STL files for all custom 3D‑printed parts used in the car build.  
 Each part has its STL file and a reference photo of the real‑life assembly.
 
-
-
 ### Front Bumper & Ultrasonic Sensor Case
 Mounted at the front of the car to hold and protect the ultrasonic sensor.
 - [bumper_and_carattach.stl](\assets\CAD\bumper_and_carattach.stl)  
@@ -57,10 +55,6 @@ It also secures the battery in place.
 
 ### Body & Roof Cover
 
-<p align="center">
-  <img src="/assets/Images/CAD/body_roof_cad_image.jpg
-" alt="Body & Roof" width="300"/>
-</p>
 
 <p align="center">
   <video width="500" controls>

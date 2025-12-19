@@ -57,18 +57,6 @@ public:
      */
     float getMotorAngularVelocity() {return as5600.getAngularSpeed(AS5600_MODE_RADIANS, true);}
     
-    /**
-     * @brief Gets filtered motor angular velocity using dual-stage filtering.
-     * 
-     * Filtering stages:
-     * 1. Exponential Moving Average (EMA) with alpha=0.02 (98% historical weight)
-     * 2. 5-sample moving average for additional smoothing
-     * 
-     * This provides stable velocity estimates with minimal lag.
-     * 
-     * @return Filtered motor angular velocity in radians per second.
-     */
-    float getFilteredAngularVelocity();
 
     /**
      * @brief Gets the wheel angular velocity (accounts for gear ratio).

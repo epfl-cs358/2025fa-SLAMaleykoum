@@ -23,6 +23,7 @@ namespace Config {
     constexpr float MOTOR_POWER_DRIVE = 0.18f;      // 18% throttle
     constexpr float EMERGENCY_DISTANCE = 0.30f;     // meters
     constexpr float GOAL_TOLERANCE = 0.05f;         // 5 cm
+    constexpr int STRAIGHT_ANGLE = 90;              //writing 90 degrees into the front wheels servo = straight
     
     // ===================================================================
     // TASK TIMING (milliseconds)
