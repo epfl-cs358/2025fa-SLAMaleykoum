@@ -5,11 +5,12 @@
 ![Alt](assets/Images/Design_after_left_side.jpeg)
 
 **Live Demo - 19.12.2025**
-_logged data_
-<p align="center"><img src="assets/Demo/DLL-run.gif" width=700></p>
+<p align="center">
+  <img src="assets/Demo/DLL-run.gif" width="54%" />
+  <img src="assets/Demo/DLL-run-whatsapp-video.gif" width="30%" />
+</p>
 
-_Video of that same run, real speed:_
-<p align="center"><img src="assets/Demo/DLL-run-whatsapp-video.gif" width=700></p>
+_Screen recording sped up x3, video in real speed (for reference)_
 
 ## Project Context
 
