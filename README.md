@@ -718,7 +718,34 @@ This project continues to evolve beyond the course timeline (Automn Semester 202
 
 ## Credits
 
+#### Project Team
+
 SLAMaleykoum was develeped as part of the [**Making Intelligent Things** (CS-358)](https://edu.epfl.ch/coursebook/en/making-intelligent-things-a-CS-358-A) course at **EPFL** (École Polytechnique Fédérale de Lausanne). Building on the foundation laid by the [**TurboSLAM**](https://github.com/epfl-cs358/2025sp-turboslam) team who designed the original electrical circuit, encoder mount, and ultrasonic sensor case.
+
+#### Use of AI Tools in Development
+
+This project was developed with the assistance of AI-powered development tools, in accordance with EPFL's academic integrity guidelines.
+
+**AI Tools Used:**
+- **Claude (Anthropic)** & **Gemini Pro (Google)**: Code debugging, algorithm optimization, and technical documentation
+
+**Scope of AI Assistance:**
+
+**AI Assisted With:**
+- Optimizing Bayesian grid updates and A* search
+- Code review and identifying edge cases
+- Structuring documentation and improving technical writing
+- Troubleshooting hardware integration issues (encoder noise, IMU drift, ESC limitations)
+
+**AI Did NOT:**
+- Define project goals or system architecture
+- Make engineering decisions or trade-off evaluations
+- Perform hardware assembly, wiring, or physical testing
+- Collect experimental data or validate performance in real-world conditions
+
+**Validation:** All AI-generated code was manually reviewed, tested on actual hardware, and adapted to meet project-specific constraints.
+
+**Team Contribution:** Core system design, algorithmic implementation, hardware integration, and experimental validation were performed by the project team. AI tools accelerated development but **did not** replace the hands-on engineering work, domain expertise, and hundreds of hours of testing and debugging required to build a working autonomous robot.
 
 #### Key Technologies & Libraries
 
