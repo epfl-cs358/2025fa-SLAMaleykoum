@@ -2,17 +2,11 @@
 
 > An autonomous mobile robot that transforms an RC car into an intelligent mapping and navigation platform using dual ESP32-S3 microcontrollers.
 
-<p align="center">
-  <video width="500" controls>
-    <source src="assets/Demo/DLLEL_run_19-dec-2025.mp4" type="video/mp4">
-  </video>
-</p>
+**Live Demo - 19.12.2025**
+https://github.com/user-attachments/assets/d4a06337-416c-4b0a-bd08-1f48589c06ec
 
-<p align="center">
-  <video width="500" controls>
-    <img src="assets/Demo/whatsapp_DLLEL_run_19-dec-2025.mp4" type="video/mp4"/>
-  </video>
-</p>
+_video speed x3_
+https://github.com/user-attachments/assets/dfc7d750-06f8-44fe-8237-a04feaf75517
 
 ![Alt](assets/Images/Design_after_left_side.jpeg)
 ## Project Context
