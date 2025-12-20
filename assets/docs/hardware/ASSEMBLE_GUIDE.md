@@ -1,3 +1,6 @@
+
+🏠 [Backlink to the main README](/README.md)
+
 # How to Assemble
 
 To begin, assemble the mechanical base of the car following the official [Tamiya Blitzer Beetle manual](https://www.tamiyausa.com/media/files/58502ml-829-5367.pdf).
@@ -49,8 +52,8 @@ We only need the minimal mechanical build so the car can drive, skip the decorat
 - Double‑check that all mounts are secure and cables are routed cleanly for wiring.  
 
 <p align="center"><img src="/assets/Images/Photoshoot/IMG_2669.jpg" alt="Front open view" width="200"/></p>
-<p align="center"><img src="assets/Images/Photoshoot/IMG_2666.jpg" alt="Front closed" width="200"/></p>
-<p align="center"><img src="assets/Images/Photoshoot/IMG_2667.jpg" alt="Back with battery" width="200"/></p>
+<p align="center"><img src="/assets/Images/Photoshoot/IMG_2666.jpg" alt="Front closed" width="200"/></p>
+<p align="center"><img src="/assets/Images/Photoshoot/IMG_2667.jpg" alt="Back with battery" width="200"/></p>
 
 
 **Step 7: Wiring**  

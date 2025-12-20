@@ -1,3 +1,6 @@
+
+🏠 [Backlink to the main README](/README.md)
+
 # ESP-2: Real-Time Control & Actuation Module
 
 ESP-2 is dedicated to real-time execution, low-latency control, and sensor management.
@@ -5,6 +8,9 @@ It operates at a high frequency (50-100 Hz) to ensure stable actuation and preci
 
 > **Core Mission**: Execute the global path plan stably, maintain smooth velocity control, and gather high-frequency sensor data for both local and global localization.
 
+## architecture diagram
+_Here is the current architecture._
+![alt text](/assets/docs/esp2/esp2-diagram.png)
 
 ## Hardware
 
@@ -75,11 +81,3 @@ Repeat the sequence a fixed number of times to achieve an approximate quarter-tu
 
 - **Output**: Vehicle reoriented to face approximately an opposite direction.
 Motors stopped and steering centered, ready to resume normal navigation.
-
-
----
-
-## architecture diagram
-# //TODO: UPDATE THIS DIAGRAM.
-Here is the current architecture.
-![alt text](/assets/docs/esp2/global-architecture-Page-2.png)

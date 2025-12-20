@@ -276,20 +276,23 @@ This project uses two ESP32s. You must flash them individually.
 - Screw set (M3 and M6 as used in mounts)
 
 ### Assembly Overview
+Clicky link: [Full Step-by-step Assembly guide here](/assets/docs/hardware/ASSEMBLE_GUIDE.md)
 
 The robot is built on a Tamiya Blitzer Beetle chassis with custom 3D-printed mounts for the LiDAR, ESP32 boards, encoder, ultrasonic sensor, and battery. Assembly is straightforward: build the base chassis, install the encoder and magnet on the motor shaft, mount the electronics platform, attach the sensors, and finish with wiring.
 
 **Assembly phases:**
-1. **Chassis** (30 min) - Build base chassis & install motor/encoder
-2. **3D-printed mounts** (10 min) - Install LiDAR platform, ESP32 holders, sensor brackets
-3. **Electronics mounting** (20 min) - Secure ESPs, buck converter, IMU
-4. **Wiring** (60 min) - Follow electrical diagram, install voltage divider
-5. **Final assembly** (30 min) - Install battery, route cables, verify connections
+1. **Chassis** - Build base chassis & install motor/encoder
+2. **3D-printed mounts** - Install LiDAR platform, ESP32 holders, sensor brackets
+3. **Electronics mounting** - Secure ESPs, buck converter, IMU
+4. **Wiring** - Follow electrical diagram, install voltage divider
+5. **Final assembly** - Install battery, route cables, verify connections
 
 **📘 Full step-by-step assembly guide (with photos, CAD files, wiring diagrams):**  
 → [**Complete Assembly Instructions**](/assets/docs/hardware/ASSEMBLE_GUIDE.md)
 
 ### Wiring & Electrical
+
+Clicky link: [Full wiring explanation HERE](/assets/docs/hardware/circuit/README.md)
 
 **Electrical Diagram:**
 

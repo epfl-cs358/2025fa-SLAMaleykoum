@@ -1,8 +1,14 @@
+
+🏠 [Backlink to the main README](/README.md)
+
 # ESP-1: Mapping & Global Planning Module
 ESP-1 is responsible for the **global understanding** of the robot's environment and mission. It maintains the authoritative map, and makes high-level navigation decisions. Operating at lower frequencies (1-10 Hz) but with higher computational complexity.
 
 >**Core Mission**: Build accurate map depending on the position given by ESP-2, decide where to go next.
 
+## architecture diagram
+Here is the current architecture.
+![ESP-1 Diagram](/assets/docs/esp1/esp1-diagram.png)
 
 ---
 
@@ -96,12 +102,6 @@ It bridges the gap between mapping and global path planning.
      - Mission type
      - This goal is consumed by the GlobalPlanner for path computation.
 
-# // TODO: @Blanche & @Santiago
-### Goal Validation :
-...
-![FSM](/assets/docs/esp1/goal-validation-fsm.png)
-
-### Global Planner :
 **D. GlobalPlanner (A\*)**
 
 The **GlobalPlanner** module computes a global, grid-based path on a Bayesian occupancy grid using a constrained A*-style search.
@@ -138,10 +138,3 @@ It is designed to be deterministic, memory-safe, and suitable for real-time embe
      - A list of coordinates, packaged as a `PathMessage` (a vector of `Waypoint` structs).
      - If no valid path is found, an empty path message is returned.
      - The path is forwarded to the UART sender task on ESP-1.
-
----
-
-## architecture diagram
-# //TODO: UPDATE THIS DIAGRAM.
-Here is the current architecture.
-![alt text](/assets/docs/esp1/global-architecture-Page-3.png)
