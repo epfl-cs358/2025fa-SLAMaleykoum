@@ -7,6 +7,8 @@
 **Live Demo - 19.12.2025**
 _logged data_
 <p align="center"><img src="assets/Demo/DLL-run.gif" width=700></p>
+
+_Video of that same run, real speed:_
 <p align="center"><img src="assets/Demo/DLL-run-whatsapp-video.gif" width=700></p>
 
 ## Project Context
@@ -35,7 +37,7 @@ Although the CS-358 course has concluded, we continue to actively develop and im
 
 ---
 
-## Detailed Documentation
+## Quick Jump To Detailed Documentation
 
 For in-depth technical details, refer to the dedicated subsystem documentation:
 
@@ -186,8 +188,8 @@ The robot operates through a continuous perception-planning-action loop distribu
 
 **Step 0: Clone the Repository**
 ```bash
-git clone https://github.com/YOUR_USERNAME/SLAMaleykoum.git
-cd SLAMaleykoum
+git clone https://github.com/epfl-cs358/2025fa-SLAMaleykoum.git
+cd 2025fa-SLAMaleykoum
 ```
 
 **Step 1: Install Ground Station Dependencies**
@@ -228,6 +230,7 @@ This project uses two ESP32s. You must flash them individually.
    - **Password:** `l1darpass`
 
 3. **Launch ground station:**
+_Note: Further documentation can be found [here](assets/docs/GROUND_STATION.md)_
    ```bash
    # Ensure your venv is active
    source slamaleykoum_venv/bin/activate
@@ -259,13 +262,13 @@ This project uses two ESP32s. You must flash them individually.
 | ESP32-S3-WROOM-1 Microcontroller (x2)  | [Datasheet](https://cdn-shop.adafruit.com/product-files/5477/esp32-s3_datasheet_en.pdf)                                                                                                                         | 50.90       |
 | DMS15 Servo                            | [Wiki](https://wiki.dfrobot.com/DSS-M15S_270%C2%B0_15KG_DF_Metal_Servo_with_Analog_Feedback_SKU__SER0044)                                                                                                         | 5.00        |
 | BNO086 IMU                             | [Datasheet](https://docs.sparkfun.com/SparkFun_VR_IMU_Breakout_BNO086_QWIIC/assets/component_documentation/BNO080_085-Datasheet_v1.16.pdf)                                                                      | 19.90       |
-| AS5600 Encoder                         | [Datasheet](https://files.seeedstudio.com/wiki/Grove-12-bit-Magnetic-Rotary-Position-Sensor-AS5600/res/Magnetic%20Rotary%20Position%20Sensor%20AS5600%20Datasheet.pdf)                                          | 2.00        |
+| AS5600 Encoder                         | [Datasheet](https://files.seeedstudio.com/wiki/Grove-12-bit-Magnetic-Rotary-Position-Sensor-AS5600/res/Magnetic%20Rotary%20Position%20Sensor%20AS5600%20Datasheet.pdf)                                          | 12.90       |
 | HC-SR04 Ultrasonic Sensor              | [Datasheet](https://handsontec.com/dataspecs/sensor/SR-04-Ultrasonic.pdf)                                                                                                                                       | 2.00        |
 | 540J Motor                             | [Datasheet](https://asset.conrad.com/media10/add/160267/c1/-/en/001385115DS01/adatlap-1385115-540-es-motor-reely-532114c.pdf)                                                                                   | —           |
 | THW-1060-RTR ESC                       | [Datasheet](https://www.hobbywing.com/en/uploads/file/20221015/f60b7ebe160a7b283927ae8916d36763.pdf)                                                                                                            | —           |
-| LM2596 Buck Converter                  | [Datasheet](https://www.ti.com/lit/ds/symlink/lm2596.pdf)                                                                                                                                                       | —           |
+| LM2596 Buck Converter                  | [Datasheet](https://www.ti.com/lit/ds/symlink/lm2596.pdf)                                                                                                                                                       | 5.90           |
 | 7.2V Battery                           | [Product Page](https://www.galaxus.ch/fr/s5/product/gens-ace-modelisme-dune-batterie-720-v-5000-mah-batterie-rc-9459930)                                                                                        | 32.90       |
-| **Total Cost**                         |                                                                                                                                                                                                                 | **321.60**  |
+| **Total Cost**                         |                                                                                                                                                                                                                 | **338.4**  |
 
 **Additional materials needed:**
 - $3 \times 1 K\Omega$ resistors (for the ultrasonic sensor voltage divider)
@@ -418,6 +421,7 @@ We use **FreeRTOS** to enable parallel task execution with priority-based schedu
 👉 **[Full ESP Link Protocol Documentation →](include/common/esp_link_readme.md)**
 
 #### Ground Station Communication (WiFi/TCP)
+🦄 **[Full GS Documentation →](include/esp2/README.md)**
 
 **WiFi Mode**: Access Point (AP)
 ```
@@ -429,9 +433,10 @@ Password: l1darpass
 - Real-time map visualization data
 - Mission status: goal and state
 - Robot pose and trajectory
-- Telemetry
+- Telemetry logs
 
-The ESP creates a Wi-Fi access point (AP) that we connect to for **monitoring purposes only**. We used MQTT at first to get feedback during tests, but quickly switched to TCP, as it supports higher data throughput.
+The ESP1 creates a Wi-Fi access point (AP) that we connect to for **monitoring purposes only**. We used MQTT at first to get feedback during tests, but quickly switched to TCP, as it supports higher data throughput.
+We additionally log the CPU profiling for the esp1 for debugging pourpuses. Detailed information: [CPU Profiling Documentaiton](assets/docs/debugging/CPU_PROFILING.md)
 
 If you want to establish the same MQTT connection to debug, here is the guide to follow: [**WiFi and MQTT connection guide**](/assets/docs/WiFi_and_MQTT_Connection_Guide___SLAMaleykoum.pdf).
 
@@ -634,6 +639,7 @@ TaskPurePursuit:       Priority 1, Core 1, Stack 6144
 ### Software Documentation
 - [ESP-1: Mapping & Planning](include/esp1/README.md)
 - [ESP-2: Localization & Control](include/esp2/README.md)
+- [Ground station](assets/docs/GROUND_STATION.md)
 - [Pure Pursuit Controller](include/esp2/control/pure_pursuit_readme.md)
 
 ### Hardware Documentation
@@ -650,6 +656,10 @@ TaskPurePursuit:       Priority 1, Core 1, Stack 6144
 
 - [WiFi & MQTT Setup Guide](/assets/docs/WiFi_and_MQTT_Connection_Guide___SLAMaleykoum.pdf)
 
+### Debugging & Development Tools
+
+- [CPU Usage Profiling Guide](/assets/docs/debugging/CPU_PROFILING.md)
+- [Troubleshooting Guide](assets/docs/troubleshooting.md)
 ---
 
 ## Archives
@@ -681,6 +691,15 @@ To avoid redefining the same constants and parameters in every test, two shared 
 Each test entry point is implemented in `test_main_esp<i>`, which simply includes these shared files. In the setup and loop functions of the test main, the test to run is selected via a test ID.
 
 The Python files are used for TCP monitoring and for displaying the received data in a structured format.
+
+### Development & Debugging Tools
+
+During development, we created custom CPU profiling tools to analyze FreeRTOS task performance:
+- Task execution timeline tracking
+- CPU usage per core
+- Mutex contention analysis
+
+See [CPU Profiling README](assets/docs/debugging/CPU_PROFILING.md) for implementation details.
 
 ---
 

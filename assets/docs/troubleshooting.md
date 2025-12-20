@@ -1,4 +1,7 @@
-## Known Issues & Recommendations
+
+🏠 [Backlink to the main README](/README.md)
+
+## Recommendations
 
 ### Common ESP1 & ESP2
 
